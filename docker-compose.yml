@@ -1,0 +1,118 @@
+version: "3.9"
+
+networks:
+  tgpan:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+services:
+  # ── PostgreSQL 16 ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tgpan_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tgpan}
+      POSTGRES_USER: ${DB_USER:-tgpan}
+      POSTGRES_PASSWORD: ${DB_PASS:?DB_PASS is required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - tgpan
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tgpan} -d ${DB_NAME:-tgpan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis 7 ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tgpan_redis
+    restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASS" ]; then redis-server --appendonly yes --requirepass "$$REDIS_PASS"; else redis-server --appendonly yes; fi'
+    environment:
+      REDIS_PASS: ${REDIS_PASS:-}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - tgpan
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (NestJS) ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: tgpan_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-tgpan}:${DB_PASS}@postgres:5432/${DB_NAME:-tgpan}
+      # If REDIS_PASS is set, update this line to: redis://:yourpassword@redis:6379
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgpan
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Frontend (Nginx / Static) ─────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: tgpan_frontend
+    restart: unless-stopped
+    networks:
+      - tgpan
+    # Internal only – nginx reverse-proxies to this container on port 80
+
+  # ── Nginx (Reverse Proxy / TLS Termination) ───────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: tgpan_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Uncomment and populate when you have TLS certs:
+      # - ./certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+      # - ./certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - tgpan

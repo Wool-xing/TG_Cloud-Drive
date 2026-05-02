@@ -1,0 +1,30 @@
+name = "tg-pan-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# ─── Account / zone ───────────────────────────────────────────────────────────
+# account_id = "your-cloudflare-account-id"   # optional; wrangler will detect it
+
+# ─── Build ────────────────────────────────────────────────────────────────────
+[build]
+command = ""          # wrangler compiles TypeScript natively; no extra build step needed
+
+# ─── Runtime vars (non-secret, safe to commit) ────────────────────────────────
+# For secrets, run:
+#   wrangler secret put TG_BOT_TOKEN
+#   wrangler secret put TG_CHANNEL_ID
+#   wrangler secret put CF_WORKERS_SECRET
+#
+# These [vars] are placeholders only — override with `wrangler secret put` in production.
+[vars]
+# TG_BOT_TOKEN      = ""   # DO NOT commit real token — use `wrangler secret put TG_BOT_TOKEN`
+# TG_CHANNEL_ID     = ""   # DO NOT commit real channel id — use `wrangler secret put TG_CHANNEL_ID`
+# CF_WORKERS_SECRET = ""   # DO NOT commit real secret — use `wrangler secret put CF_WORKERS_SECRET`
+
+# ─── Environments ─────────────────────────────────────────────────────────────
+[env.production]
+name = "tg-pan-proxy"
+# route = "your-domain.com/proxy/*"   # uncomment to bind to a custom domain
+
+[env.staging]
+name = "tg-pan-proxy-staging"

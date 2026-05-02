@@ -1,0 +1,126 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Lock, Eye, EyeOff, ShieldAlert } from 'lucide-react';
+import { useAuthStore } from '../stores/auth.store';
+import { usersApi } from '../api/client';
+import DrivePage from '../pages/Drive';
+
+const SESSION_KEY = 'private_space_token';
+const EXPIRY_KEY = 'private_space_expiry';
+
+function isSessionValid(): boolean {
+  const token = sessionStorage.getItem(SESSION_KEY);
+  const expiry = sessionStorage.getItem(EXPIRY_KEY);
+  if (!token || !expiry) return false;
+  return Date.now() < parseInt(expiry, 10);
+}
+
+export default function PrivateSpaceGate() {
+  const user = useAuthStore(s => s.user);
+  const navigate = useNavigate();
+
+  const [unlocked, setUnlocked] = useState(isSessionValid);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!user) navigate('/login', { replace: true });
+  }, [user, navigate]);
+
+  if (!user) return null;
+
+  if (!user.hasPrivateSpace) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-6 text-gray-500 dark:text-gray-400 p-8">
+        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+          <ShieldAlert className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-medium text-gray-700 dark:text-gray-200">尚未设置隐私空间密码</p>
+          <p className="mt-1 text-sm">请前往「个人资料」页面设置隐私空间密码后再访问</p>
+        </div>
+        <button
+          onClick={() => navigate('/profile')}
+          className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          前往设置
+        </button>
+      </div>
+    );
+  }
+
+  if (unlocked) {
+    return <DrivePage isPrivate />;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await usersApi.verifyPrivateSpace(password) as any;
+      const token = res?.sessionToken;
+      const expiresIn = res?.expiresIn ?? 1800;
+      if (token) {
+        sessionStorage.setItem(SESSION_KEY, token);
+        sessionStorage.setItem(EXPIRY_KEY, String(Date.now() + expiresIn * 1000));
+        setUnlocked(true);
+      } else {
+        setError('验证失败，请重试');
+      }
+    } catch {
+      setError('密码错误');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center h-full p-8">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">隐私空间</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">请输入密码以访问隐私空间</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+              placeholder="请输入隐私空间密码"
+              autoFocus
+              className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-500 dark:text-red-400 text-center">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+          >
+            {loading ? '验证中…' : '进入隐私空间'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

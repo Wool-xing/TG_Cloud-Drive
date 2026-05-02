@@ -1,0 +1,20 @@
+{
+  "name": "tg-pan-proxy",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker proxy for Telegram Bot API — TG Pan backend",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "tail": "wrangler tail",
+    "secret:set": "echo 'Run: wrangler secret put <NAME>' && exit 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241224.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.78.0"
+  }
+}
