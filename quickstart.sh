@@ -211,12 +211,28 @@ if [ -f certs/fullchain.pem ] && [ -f certs/privkey.pem ]; then
 else
   mkdir -p certs/acme-webroot
   say "  生成 4096-bit 自签证书（CN=localhost，10 年有效）..."
-  docker run --rm -v "$(pwd)/certs:/certs" alpine/openssl req -x509 -nodes -days 3650 \
+  # Use host openssl (already verified at step 0). Avoids pulling third-party
+  # docker image `alpine/openssl` which may fail in restricted networks.
+  # MSYS_NO_PATHCONV=1 disables Git-Bash-on-Windows path conversion that would
+  # otherwise mangle the openssl `-subj "/CN=localhost"` arg into
+  # `E:/Git/CN=localhost` and silently fail (stderr redirected to /dev/null).
+  # The variable is harmless on macOS/Linux where MSYS doesn't exist.
+  MSYS_NO_PATHCONV=1 openssl req -x509 -nodes -days 3650 \
     -newkey rsa:4096 \
-    -keyout /certs/privkey.pem -out /certs/fullchain.pem \
+    -keyout certs/privkey.pem -out certs/fullchain.pem \
     -subj "/CN=localhost" \
     -addext "subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1" \
     >/dev/null 2>&1
+  # Verify both files actually exist — openssl partial-write writes privkey
+  # before failing on subject parse, leaving fullchain.pem missing.
+  if [ ! -f certs/fullchain.pem ] || [ ! -f certs/privkey.pem ]; then
+    err "证书生成失败。请手动跑下面命令查错："
+    say "    openssl req -x509 -nodes -days 3650 -newkey rsa:4096 \\"
+    say "      -keyout certs/privkey.pem -out certs/fullchain.pem \\"
+    say "      -subj \"/CN=localhost\" \\"
+    say "      -addext \"subjectAltName=DNS:localhost,IP:127.0.0.1\""
+    exit 1
+  fi
   ok "证书已生成至 certs/（浏览器首次访问会警告，开发期点'高级 → 继续'即可）"
 fi
 
@@ -239,15 +255,71 @@ for i in $(seq 1 60); do
   fi
 done
 
+# Sync postgres internal password to .env (idempotent).
+# Why: postgres image init script only sets the password on FIRST volume init.
+# On a reused volume (user ran quickstart before), the new DB_PASS generated
+# above doesn't match the old DB-internal hash → backend can't authenticate.
+# ALTER USER via local exec uses peer auth — no old password needed. Setting
+# the password to the value we just wrote into .env is safe whether the volume
+# is fresh (no-op same value) or reused (resync to new value).
+say "  同步 Postgres 内部密码到 .env（防止重复部署密码不匹配）..."
+if $DC exec -T postgres psql -U tgpan -d tgpan -c "ALTER USER tgpan PASSWORD '${DB_PASS}';" >/dev/null 2>&1; then
+  ok "Postgres 密码已同步"
+else
+  err "Postgres 密码同步失败。请手动检查："
+  say "    $DC exec postgres psql -U tgpan -d tgpan"
+  exit 1
+fi
+
+# Restart backend so it picks up the synced password on next connection attempt.
+# (TypeORM retry logic may also recover, but restart is deterministic.)
+$DC restart backend >/dev/null 2>&1 || true
+
 # ─── 7. Seed 管理员账号 ──────────────────────────────────────────────────────
 hdr "Step 7/7  初始化数据库 + 创建管理员"
 
-if $DC exec -T backend npx ts-node src/database/seed.ts; then
-  ok "管理员账号已创建"
-else
+# Wait for backend to be healthy again after the restart above.
+say "  等待 backend 就绪..."
+for i in $(seq 1 30); do
+  if $DC exec -T backend node -e "require('http').get('http://localhost:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))" >/dev/null 2>&1; then
+    ok "Backend 已就绪"
+    break
+  fi
+  sleep 2
+  if [ "$i" = "30" ]; then
+    err "Backend 启动超时（60s）。请查看日志：$DC logs backend"
+    exit 1
+  fi
+done
+
+SEED_OUTPUT="$($DC exec -T backend node dist/database/seed.js 2>&1)"
+SEED_EXIT=$?
+if [ $SEED_EXIT -ne 0 ]; then
   err "seed 失败。可能后端还没起来。等 10 秒后手动重试："
-  say "    $DC exec backend npx ts-node src/database/seed.ts"
+  say "    $DC exec backend node dist/database/seed.js"
+  say "  错误输出："
+  printf '%s\n' "$SEED_OUTPUT" | sed 's/^/    /'
   exit 1
+fi
+
+# If seed skipped (admin already exists from a previous run), sync the password
+# to whatever .env now holds. Avoids the "登录不进去" surprise where the user
+# tries the freshly-printed password but the DB still holds the previous one.
+# This is idempotent: same password = no-op; new password = re-sync.
+# CAUTION: changing admin password also breaks MEK-derived decryption of any
+# files admin uploaded under the old password. Warn loudly.
+if printf '%s\n' "$SEED_OUTPUT" | grep -q "already exists"; then
+  warn "admin 用户已存在（之前部署过）。同步密码到 .env 当前值..."
+  HASH="$($DC exec -T backend node -e "require('bcrypt').hash('${ADMIN_INITIAL_PASSWORD}',12).then(h=>process.stdout.write(h))")"
+  if $DC exec -T postgres psql -U tgpan -d tgpan -c "UPDATE users SET password_hash='${HASH}' WHERE username='admin';" >/dev/null 2>&1; then
+    ok "admin 密码已同步"
+    warn "若旧 admin 上传过加密文件，由于密码改变 MEK 派生失效，旧文件无法解密。"
+  else
+    err "admin 密码同步失败。可手动跑：make reset-admin"
+    exit 1
+  fi
+else
+  ok "管理员账号已创建"
 fi
 
 # ─── 完工 ────────────────────────────────────────────────────────────────────

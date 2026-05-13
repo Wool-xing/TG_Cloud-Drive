@@ -78,7 +78,7 @@ export class AdminService {
       );
     }
 
-    qb.orderBy('u.created_at', 'DESC')
+    qb.orderBy('u.createdAt', 'DESC')
       .skip((safePage - 1) * safeLimit)
       .take(safeLimit);
 
@@ -191,7 +191,7 @@ export class AdminService {
     const recentLogsRaw = await this.auditRepo
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.user', 'u')
-      .orderBy('a.created_at', 'DESC')
+      .orderBy('a.createdAt', 'DESC')
       .limit(20)
       .getMany();
 
@@ -409,7 +409,7 @@ export class AdminService {
     if (userId) qb.andWhere('a.user_id = :userId', { userId });
     if (action) qb.andWhere('a.action ILIKE :action', { action: `%${action}%` });
 
-    qb.orderBy('a.created_at', 'DESC')
+    qb.orderBy('a.createdAt', 'DESC')
       .skip((safePage - 1) * safeLimit)
       .take(safeLimit);
 

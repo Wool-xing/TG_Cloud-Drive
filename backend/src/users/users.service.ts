@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   ConflictException,
+  ServiceUnavailableException,
   Inject,
   Logger,
 } from '@nestjs/common';
@@ -104,10 +105,39 @@ export class UsersService {
     user.passwordHash = await hashPassword(dto.newPassword);
     await this.userRepo.save(user);
 
-    // Invalidate all sessions except the current device by clearing redis session tokens
-    // (devices are still stored; auth on next request will fail for stale tokens)
+    // D6 — Invalidate ALL existing sessions on password change.
+    // Two-layer revocation:
+    //   1) Delete all Device rows so every existing refresh token becomes unusable
+    //      (refresh() in auth.service requires a matching Device record).
+    //   2) Set force_logout:<userId> marker in Redis. JwtStrategy.validate rejects
+    //      any access token whose `iat` predates this timestamp (D7 fail-CLOSED
+    //      semantics: Redis unreachable → 503, not silent pass).
+    // Effect: user must log in again with the new password on every device.
+    // Reason: previously the function only wrote a comment claiming sessions were
+    //   invalidated. Anyone who had stolen a refresh token kept full access for
+    //   up to 30 days even after the legitimate user changed their password.
+    await this.deviceRepo.delete({ userId });
+    const forceLogoutTs = Date.now().toString();
+    // Cover the longest token lifetime (refresh = 30d by default) with headroom.
+    const ttlSeconds = this.cs.get<number>('FORCE_LOGOUT_TTL_SECONDS', 86400 * 30);
+    try {
+      await this.redis.set(`force_logout:${userId}`, forceLogoutTs, 'EX', ttlSeconds);
+    } catch (err) {
+      this.logger.error(
+        `Failed to set force_logout for user ${userId} after password change`,
+        (err as Error).stack,
+      );
+      // Devices are already deleted (refresh tokens dead). But existing access
+      // tokens may still be valid for up to access-token TTL (~2h). Surface this
+      // to caller as 503 — the password was changed, but the global revocation
+      // signal couldn't be published. User-facing copy in controller explains.
+      throw new ServiceUnavailableException(
+        '密码已修改，但会话失效信号下发失败。请立即清理浏览器缓存并重新登录，并稍后联系管理员。',
+      );
+    }
+
     await this.audit(userId, 'password.change', null, ip, ua);
-    return { message: '密码修改成功' };
+    return { message: '密码修改成功，所有设备已被强制登出，请重新登录' };
   }
 
   // ─── Devices ─────────────────────────────────────────────────────────────────
@@ -166,8 +196,16 @@ export class UsersService {
       }
     }
 
-    if (!dto.password || dto.password.length < 4) {
-      throw new BadRequestException('私密空间密码至少需要4位');
+    // P1-A3: raise floor from 4 to 8 chars + require letters AND digits.
+    // 4-char numeric was 10,000 keyspace; 8-char alphanumeric mixed is ~62^8 ≈
+    // 2.2e14. Pair with the controller @Throttle (5/min IP) and per-user fail
+    // counter in verifyPrivateSpace() — brute force becomes statistically
+    // infeasible (~100 days even at 10 RPS, with 15-min lockouts every 5 tries).
+    if (!dto.password || dto.password.length < 8) {
+      throw new BadRequestException('私密空间密码至少需要 8 位');
+    }
+    if (!/[A-Za-z]/.test(dto.password) || !/\d/.test(dto.password)) {
+      throw new BadRequestException('私密空间密码必须同时包含字母和数字');
     }
 
     user.privateSpaceHash = await hashPassword(dto.password);
@@ -188,10 +226,40 @@ export class UsersService {
       throw new BadRequestException('私密空间尚未设置密码');
     }
 
+    // P1-A3: per-user brute-force lock. Mirrors the verification code defense
+    // (P1-A6). Keys scoped to userId — IP rotation cannot bypass.
+    const failKey = `ps:fail:${userId}`;
+    const lockKey = `ps:lock:${userId}`;
+    const maxAttempts = 5;
+    const lockSeconds = 15 * 60;
+    let locked: string | null;
+    try {
+      locked = await this.redis.get(lockKey);
+    } catch (e) {
+      throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+    }
+    if (locked) {
+      throw new UnauthorizedException('私密空间连续错误次数过多，请 15 分钟后再试');
+    }
+
     const valid = await comparePassword(password, user.privateSpaceHash);
     if (!valid) {
+      let fails: number;
+      try {
+        fails = await this.redis.incr(failKey);
+        if (fails === 1) await this.redis.expire(failKey, 30 * 60);
+      } catch (e) {
+        throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+      }
+      if (fails >= maxAttempts) {
+        await this.redis.set(lockKey, '1', 'EX', lockSeconds).catch(() => {});
+        await this.redis.del(failKey).catch(() => {});
+        throw new UnauthorizedException('私密空间连续错误次数过多，请 15 分钟后再试');
+      }
       throw new UnauthorizedException('私密空间密码错误');
     }
+
+    await this.redis.del(failKey).catch(() => {});
 
     // Issue a short-lived JWT that grants private space access
     const expiresIn = 30 * 60; // 30 minutes in seconds

@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { SharesService, CreateShareDto } from './shares.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -64,16 +65,41 @@ export class SharesController {
   /**
    * POST /shares/access/:token/download
    * Public — increment download count after a successful download.
+   *
+   * Password (if the share has one) MUST be re-validated here. Without that:
+   *   - any anonymous client could POST repeatedly to drain maxDownloads (DoS),
+   *   - or call once per fetched chunk to count multiple "downloads" for one
+   *     real grab. accessShare(token, password) throws 401 on mismatch.
+   * Throttle defends against brute-forcing tokens / passwords through this
+   * endpoint (10 calls / minute / IP).
    */
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('access/:token/download')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '记录下载次数（公开）' })
-  async recordDownload(@Param('token') token: string) {
-    // We need to look up the shareId from token first;
-    // delegate entirely to service to keep controller thin.
-    const shareInfo = await this.sharesService.accessShare(token);
+  async recordDownload(
+    @Param('token') token: string,
+    @Body() body: { password?: string } = {},
+  ) {
+    const shareInfo = await this.sharesService.accessShare(token, body?.password);
     await this.sharesService.incrementDownload(shareInfo.shareId);
+  }
+
+  /**
+   * GET /shares/:id/token
+   * P1-B17: dedicated endpoint to reveal the full share token. listMy now
+   * returns truncated previews — callers (e.g. "copy link" UI) hit this to
+   * get the real token. Audit-logged on the service side.
+   */
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Get(':id/token')
+  @ApiOperation({ summary: '获取分享链接完整 token（仅创建者）' })
+  getToken(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) shareId: string,
+  ) {
+    return this.sharesService.getShareToken(userId, shareId);
   }
 
   /**

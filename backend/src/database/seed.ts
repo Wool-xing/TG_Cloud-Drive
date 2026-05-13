@@ -1,7 +1,8 @@
 /**
  * Database seeder — run once after first migration to create the admin user.
  *
- * Usage:  npx ts-node src/database/seed.ts
+ * Usage (in production container):  node dist/database/seed.js
+ *        (local dev with ts-node):   npx ts-node src/database/seed.ts
  *
  * Reads required values from .env (no hardcoded defaults):
  *   - ADMIN_USERNAME             (e.g. "admin")

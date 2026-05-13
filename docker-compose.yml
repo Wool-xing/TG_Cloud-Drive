@@ -71,7 +71,9 @@ services:
     env_file:
       - .env
     environment:
-      NODE_ENV: production
+      # NODE_ENV is governed by .env (env_file) so quickstart's dev mode
+      # actually takes effect. Dockerfile sets NODE_ENV=production as the
+      # image-level default for plain `docker run` use.
       DATABASE_URL: postgresql://${DB_USER:-tgpan}:${DB_PASS}@postgres:5432/${DB_NAME:-tgpan}
       # REDIS_PASS is read via env_file and passed to ioredis as a separate
       # option — no URL-encoding pain for passwords with special chars.

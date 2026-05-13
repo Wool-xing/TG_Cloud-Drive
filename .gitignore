@@ -104,6 +104,7 @@ Thumbs.db
 
 # quickstart 备份的旧 .env
 .env.backup.*
+.env.audit-backup.*
 
 # 自签 TLS 证书（每次本地生成，不入仓）
 certs/fullchain.pem

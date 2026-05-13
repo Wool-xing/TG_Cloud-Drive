@@ -1,7 +1,17 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import fetch from 'node-fetch';
 import * as FormData from 'form-data';
+
+// P1-B21: bounded retry + timeout wrapper. Pre-fix, sendDocument /
+// getFileUrl could hang forever on Telegram outages, holding a chunk's
+// HTTP worker thread until OS-level keepalive timeouts. The retry/backoff
+// is bounded so a sustained Telegram outage surfaces as 503 quickly, not
+// as a stalled upload.
+const UPLOAD_TIMEOUT_MS = 60_000;       // single try; chunk size capped at 20 MB
+const READ_TIMEOUT_MS = 15_000;         // metadata calls (getFile, deleteMessage)
+const MAX_RETRIES = 3;
+const RETRY_BACKOFF_MS = [500, 1500, 4000];
 
 @Injectable()
 export class TelegramService {
@@ -16,6 +26,35 @@ export class TelegramService {
     this.channelId = cs.get<string>('TG_CHANNEL_ID');
     this.workersUrl = cs.get<string>('CF_WORKERS_URL');
     this.workersSecret = cs.get<string>('CF_WORKERS_SECRET');
+  }
+
+  /** P1-B21: fetch with AbortController-based timeout + retry on 429/5xx/network. */
+  private async fetchWithRetry(url: string, init: any, timeoutMs: number): Promise<any> {
+    let lastErr: any;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...init, signal: ctrl.signal as any });
+        clearTimeout(timer);
+        const retryable = res.status === 429 || (res.status >= 500 && res.status < 600);
+        if (retryable && attempt < MAX_RETRIES - 1) {
+          lastErr = new Error(`HTTP ${res.status}`);
+          await new Promise(r => setTimeout(r, RETRY_BACKOFF_MS[attempt]));
+          continue;
+        }
+        return res;
+      } catch (e: any) {
+        clearTimeout(timer);
+        lastErr = e;
+        // Network failure or timeout: retry unless it's the last attempt.
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise(r => setTimeout(r, RETRY_BACKOFF_MS[attempt]));
+          continue;
+        }
+      }
+    }
+    throw new ServiceUnavailableException(`Telegram 上游不可用：${lastErr?.message || 'unknown'}`);
   }
 
   private get apiBase() {
@@ -41,7 +80,7 @@ export class TelegramService {
     const headers = form.getHeaders();
     if (this.workersSecret) headers['X-Workers-Secret'] = this.workersSecret;
 
-    const res = await fetch(url, { method: 'POST', body: form, headers });
+    const res = await this.fetchWithRetry(url, { method: 'POST', body: form, headers }, UPLOAD_TIMEOUT_MS);
     if (!res.ok) {
       const text = await res.text();
       this.logger.error(`Telegram upload failed: ${text}`);
@@ -56,9 +95,11 @@ export class TelegramService {
   }
 
   async getFileUrl(fileId: string): Promise<string> {
-    const res = await fetch(`${this.apiBase}/getFile?file_id=${fileId}`, {
-      headers: this.defaultHeaders(),
-    });
+    const res = await this.fetchWithRetry(
+      `${this.apiBase}/getFile?file_id=${fileId}`,
+      { headers: this.defaultHeaders() },
+      READ_TIMEOUT_MS,
+    );
     const json = await res.json() as any;
     if (!json.ok) throw new InternalServerErrorException('获取文件路径失败');
     const filePath = json.result.file_path;
@@ -69,11 +110,22 @@ export class TelegramService {
   }
 
   async deleteMessage(messageId: number) {
-    await fetch(`${this.apiBase}/deleteMessage`, {
-      method: 'POST',
-      headers: this.defaultHeaders(),
-      body: JSON.stringify({ chat_id: this.channelId, message_id: messageId }),
-    }).catch(e => this.logger.warn(`Delete message failed: ${e.message}`));
+    // P1-B21: best-effort delete; do NOT block the calling delete path on
+    // Telegram availability. Bounded retry on transient failure, swallowed
+    // on persistent failure (logged for cleanup job to retry later).
+    try {
+      await this.fetchWithRetry(
+        `${this.apiBase}/deleteMessage`,
+        {
+          method: 'POST',
+          headers: this.defaultHeaders(),
+          body: JSON.stringify({ chat_id: this.channelId, message_id: messageId }),
+        },
+        READ_TIMEOUT_MS,
+      );
+    } catch (e: any) {
+      this.logger.warn(`Delete message ${messageId} failed after retries: ${e.message}`);
+    }
   }
 
   buildSignedDownloadUrl(fileId: string, expiresInSeconds = 3600): string {

@@ -128,15 +128,31 @@ async function processTask(taskId: string, set: any, get: any) {
       formData.append('chunkIv', chunkIv); // IV for THIS chunk's ciphertext (FileChunk.iv)
       formData.append('salt', salt);
 
+      // For progress UI: use ciphertext byte counts (loaded vs encrypted chunk
+       // size) — mixing axios `loaded` (ciphertext + GCM auth tag) with
+       // task.file.size (plaintext) overshot 100% on big files.
+      const encryptedChunkBytes = chunkData.byteLength;
+      const plainChunkBytes = end - start;
       let retries = 0;
       while (retries < 5) {
         try {
           await filesApi.uploadChunk(formData, (loaded) => {
-            const delta = loaded - (i === 0 ? 0 : uploadedBytes % CHUNK_SIZE);
-            uploadedBytes = start + loaded;
-            const elapsed = (Date.now() - startTime) / 1000;
+            // Per-chunk fraction in [0, 1]; clamp to guard against axios
+            // reporting loaded > total on the very last byte.
+            const chunkFraction = encryptedChunkBytes > 0
+              ? Math.min(1, loaded / encryptedChunkBytes)
+              : 1;
+            // Cumulative plaintext bytes uploaded (for speed display).
+            uploadedBytes = start + Math.round(chunkFraction * plainChunkBytes);
+            const elapsed = Math.max(0.001, (Date.now() - startTime) / 1000);
             const speed = uploadedBytes / elapsed;
-            const progress = 30 + Math.round((uploadedBytes / task.file.size) * 70);
+            // Progress in the 30–100 range; based on chunk index + intra-chunk
+            // fraction, NOT byte ratios — so ciphertext overhead can't blow
+            // past 100%.
+            const progress = Math.min(
+              100,
+              30 + Math.round(((i + chunkFraction) / totalChunks) * 70),
+            );
             updateTask({ uploadedBytes, speed, progress });
           });
           break;
