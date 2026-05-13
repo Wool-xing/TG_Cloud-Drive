@@ -55,13 +55,14 @@ export class FilesController {
     @Body('parentId') parentId: string,
     @Body('private') isPrivate: string,
     @Body('encryptedDek') encryptedDek: string,
-    @Body('iv') iv: string,
+    @Body('dekIv') dekIv: string,
+    @Body('chunkIv') chunkIv: string,
     @Body('salt') salt: string,
   ) {
     return this.filesService.uploadChunk(
       userId, idempotencyKey, parseInt(chunkIndex), parseInt(totalChunks),
       filename, md5, mimeType, parentId, isPrivate === 'true',
-      file.buffer, encryptedDek, iv, salt,
+      file.buffer, encryptedDek, dekIv, chunkIv, salt,
     );
   }
 

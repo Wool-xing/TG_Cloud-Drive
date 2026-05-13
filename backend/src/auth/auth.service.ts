@@ -11,7 +11,10 @@ import { User, UserRole, UserStatus } from '../users/entities/user.entity';
 import { Device } from '../users/entities/device.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
-import { hashPassword, comparePassword, generateSecureToken, encryptField, decryptField, generateSalt } from '../common/encryption';
+import {
+  hashPassword, comparePassword, generateSecureToken, encryptField,
+  generateSalt, hashIdentifier, normalizeEmail, normalizePhone,
+} from '../common/encryption';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerificationService } from '../verification/verification.service';
@@ -33,12 +36,33 @@ export class AuthService {
     const target = email || phone;
     if (!target) throw new BadRequestException('请提供邮箱或手机号');
 
+    // Verify against the raw target — sendCode stored it as-is. Hashing & dedup
+    // below uses the normalized form to make login case-/format-insensitive.
     await this.verificationService.verify(target, code, 'register');
 
     const exists = await this.userRepo.findOne({ where: { username } });
     if (exists) throw new ConflictException('用户名已被使用');
 
     const masterKey = this.configService.get<string>('ENCRYPTION_MASTER_KEY');
+    // validateEnvOrExit() guarantees masterKey at boot; defense in depth here.
+    if (!masterKey) throw new BadRequestException('服务加密配置异常，请联系管理员');
+
+    const normalizedEmail = email ? normalizeEmail(email) : null;
+    const normalizedPhone = phone ? normalizePhone(phone) : null;
+    const emailHash = normalizedEmail ? hashIdentifier(normalizedEmail, masterKey) : null;
+    const phoneHash = normalizedPhone ? hashIdentifier(normalizedPhone, masterKey) : null;
+
+    // O(1) duplicate check via unique indexes — replaces the previous full-table
+    // scan + per-row decryption pattern (DoS vector + user-enumeration timing).
+    if (emailHash) {
+      const dup = await this.userRepo.findOne({ where: { emailHash } });
+      if (dup) throw new ConflictException('该邮箱已被注册');
+    }
+    if (phoneHash) {
+      const dup = await this.userRepo.findOne({ where: { phoneHash } });
+      if (dup) throw new ConflictException('该手机号已被注册');
+    }
+
     const passwordHash = await hashPassword(password);
     const mekSalt = generateSalt();
 
@@ -47,8 +71,12 @@ export class AuthService {
       passwordHash,
       mekSalt,
       quotaBytes: (this.configService.get<number>('DEFAULT_USER_QUOTA_GB') || 50) * 1024 * 1024 * 1024,
-      emailEncrypted: email && masterKey ? encryptField(email, masterKey) : null,
-      phoneEncrypted: phone && masterKey ? encryptField(phone, masterKey) : null,
+      // Encrypted fields store the normalized form so decrypting yields a value
+      // consistent with what login/dedup compare against.
+      emailEncrypted: normalizedEmail ? encryptField(normalizedEmail, masterKey) : null,
+      emailHash,
+      phoneEncrypted: normalizedPhone ? encryptField(normalizedPhone, masterKey) : null,
+      phoneHash,
     });
 
     await this.userRepo.save(user);
@@ -109,12 +137,14 @@ export class AuthService {
     const user = await this.userRepo.findOne({ where: { id: payload.sub } });
     if (!user || user.status === UserStatus.DISABLED) throw new UnauthorizedException();
 
-    const accessToken = this.signAccess(user);
+    const accessToken = this.signAccess(user, device.id);
     await this.deviceRepo.update(device.id, { lastActiveAt: new Date(), ipAddress: ip });
     return { accessToken };
   }
 
   async logout(deviceId: string) {
+    // Guard against accidental "delete all" if access token lacks deviceId
+    if (!deviceId) throw new UnauthorizedException('登录令牌缺少设备标识');
     await this.deviceRepo.delete({ id: deviceId });
     return { message: '已退出登录' };
   }
@@ -154,26 +184,39 @@ export class AuthService {
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     await this.deviceRepo.update(device.id, { refreshTokenHash: tokenHash });
 
-    const accessToken = this.signAccess(user);
+    const accessToken = this.signAccess(user, device.id);
     return { accessToken, refreshToken, deviceId: device.id };
   }
 
-  private signAccess(user: User) {
-    return this.jwtService.sign({ sub: user.id, role: user.role });
+  private signAccess(user: User, deviceId: string) {
+    return this.jwtService.sign({ sub: user.id, role: user.role, deviceId });
   }
 
   private async findUserByIdentifier(identifier: string) {
+    // 1. Username lookup (unique index, O(1)).
     const byUsername = await this.userRepo.findOne({ where: { username: identifier } });
     if (byUsername) return byUsername;
+
     const masterKey = this.configService.get<string>('ENCRYPTION_MASTER_KEY');
     if (!masterKey) return null;
-    const users = await this.userRepo.find();
-    for (const u of users) {
-      try {
-        if (u.emailEncrypted && decryptField(u.emailEncrypted, masterKey) === identifier) return u;
-        if (u.phoneEncrypted && decryptField(u.phoneEncrypted, masterKey) === identifier) return u;
-      } catch {}
+
+    // 2. Email-by-hash lookup (unique index, O(1)).
+    // Replaces the previous full-table scan + per-row decryption, which was both
+    // a DoS vector and a timing side-channel for user enumeration.
+    if (identifier.includes('@')) {
+      const emailHash = hashIdentifier(normalizeEmail(identifier), masterKey);
+      const byEmail = await this.userRepo.findOne({ where: { emailHash } });
+      if (byEmail) return byEmail;
     }
+
+    // 3. Phone-by-hash lookup (unique index, O(1)).
+    const phoneCandidate = normalizePhone(identifier);
+    if (/^\d{11}$/.test(phoneCandidate)) {
+      const phoneHash = hashIdentifier(phoneCandidate, masterKey);
+      const byPhone = await this.userRepo.findOne({ where: { phoneHash } });
+      if (byPhone) return byPhone;
+    }
+
     return null;
   }
 

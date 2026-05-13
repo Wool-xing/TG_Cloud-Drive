@@ -71,17 +71,19 @@ async function fetchAndDecrypt(
   // Decrypt DEK
   const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
 
-  // Download and decrypt each chunk
+  // Download and decrypt each chunk using its OWN iv (chunk.iv, NOT key.iv).
+  // key.iv is the IV used to wrap the DEK with MEK above — reusing it for chunk
+  // decryption is what previously made multi-chunk encrypted files unrecoverable.
   const chunks: ArrayBuffer[] = [];
   for (let i = 0; i < info.chunks.length; i++) {
-    const chunkUrl = info.chunks[i];
-    const res = await fetch(chunkUrl);
+    const chunk = info.chunks[i];
+    if (!chunk.iv) {
+      throw new Error(`分片 ${i} 缺少 IV，可能是 A1 修复前上传的历史损坏文件`);
+    }
+    const res = await fetch(chunk.url);
     if (!res.ok) throw new Error(`下载分片 ${i} 失败`);
     const encryptedData = await res.arrayBuffer();
-    // The iv for each chunk is embedded or derived — for single-chunk files the NodeKey iv is used
-    // For multi-chunk files the server must provide per-chunk IVs; here we use the NodeKey iv
-    const iv = info.key.iv;
-    const decrypted = await decryptBuffer(encryptedData, dek, iv);
+    const decrypted = await decryptBuffer(encryptedData, dek, chunk.iv);
     chunks.push(decrypted);
   }
 

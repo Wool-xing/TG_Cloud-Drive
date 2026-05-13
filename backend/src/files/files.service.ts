@@ -66,12 +66,25 @@ export class FilesService {
 
   async uploadChunk(userId: string, nodeIdempotencyKey: string, chunkIndex: number, totalChunks: number,
     filename: string, md5: string, mimeType: string, parentId: string, isPrivate: boolean,
-    buffer: Buffer, encryptedDek: string, iv: string, salt: string): Promise<any> {
+    buffer: Buffer,
+    encryptedDek: string, // ciphertext of DEK, written to NodeKey on first chunk
+    dekIv: string,        // IV used to wrap DEK with MEK; written to NodeKey.iv on first chunk
+    chunkIv: string,      // IV used to encrypt THIS chunk with DEK; written to FileChunk.iv per chunk
+    salt: string,         // KDF salt (optional, depends on KDF design)
+  ): Promise<any> {
 
     const cacheKey = `upload:${userId}:${nodeIdempotencyKey}`;
     let nodeId = await this.redis.get(cacheKey).catch(() => null);
 
     if (!nodeId) {
+      // Fail-CLOSED: a brand-new file MUST carry both DEK envelope + first chunk IV.
+      // End-to-end encryption is a load-bearing product promise — letting it degrade
+      // silently per-request would void it entirely. Pairs with frontend MEK gate.
+      if (!encryptedDek || !dekIv) {
+        throw new BadRequestException(
+          '缺少加密元数据 (encryptedDek/dekIv)：本服务仅接受端到端加密上传，请使用支持加密的客户端',
+        );
+      }
       await this.validateParent(userId, parentId, isPrivate);
       const existing = await this.nodeRepo.findOne({ where: { userId, parentId: parentId || null, name: filename, deletedAt: IsNull() } });
       if (existing) {
@@ -86,15 +99,20 @@ export class FilesService {
       nodeId = node.id;
       await this.redis.set(cacheKey, nodeId, 'EX', 3600).catch(() => {});
 
-      if (encryptedDek) {
-        await this.keyRepo.save(this.keyRepo.create({ nodeId, encryptedDek, iv, salt }));
-      }
+      // NodeKey.iv = dekIv (the IV that wrapped DEK with MEK).
+      await this.keyRepo.save(this.keyRepo.create({ nodeId, encryptedDek, iv: dekIv, salt }));
     }
 
+    // Every chunk needs its own fresh IV — reusing one IV across chunks of the
+    // same DEK is a catastrophic AES-GCM mistake (nonce-reuse / forbidden-attack).
+    if (!chunkIv) {
+      throw new BadRequestException('缺少分片加密 IV (chunkIv)，无法保存');
+    }
     const tgResult = await this.telegramService.sendDocument(buffer, `chunk_${chunkIndex}`, 'application/octet-stream');
     await this.chunkRepo.save(this.chunkRepo.create({
       nodeId, chunkIndex, tgFileId: tgResult.fileId, tgMessageId: tgResult.messageId,
       size: buffer.length, checksum: crypto.createHash('md5').update(buffer).digest('hex'),
+      iv: chunkIv,
     }));
 
     const uploaded = await this.chunkRepo.count({ where: { nodeId } });
@@ -120,12 +138,18 @@ export class FilesService {
 
     const chunks = await this.chunkRepo.find({ where: { nodeId }, order: { chunkIndex: 'ASC' } });
     const key = await this.keyRepo.findOne({ where: { nodeId } });
-    const downloadUrls = await Promise.all(
-      chunks.map(c => this.telegramService.getFileUrl(c.tgFileId))
+    // Return per-chunk { url, iv } objects. iv is the AES-GCM IV used when this chunk
+    // was encrypted client-side; the frontend must use chunk.iv (NOT key.iv) for
+    // chunk decryption. key.iv is only for unwrapping the DEK with MEK.
+    const chunkInfos = await Promise.all(
+      chunks.map(async c => ({
+        url: await this.telegramService.getFileUrl(c.tgFileId),
+        iv: c.iv,
+      })),
     );
 
     await this.audit(userId, 'download', nodeId, node.name);
-    return { node: this.safeNode(node), chunks: downloadUrls, key };
+    return { node: this.safeNode(node), chunks: chunkInfos, key };
   }
 
   async rename(userId: string, nodeId: string, newName: string) {

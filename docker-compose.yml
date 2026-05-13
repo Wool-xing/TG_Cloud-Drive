@@ -23,8 +23,12 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Bind to loopback only by default. Backend reaches postgres via the
+    # internal `tgpan` network using the service name `postgres:5432` —
+    # external mapping is for local debugging tools (psql, DBeaver) ONLY.
+    # NEVER use 0.0.0.0/host-public binding without a firewall rule.
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     networks:
       - tgpan
     healthcheck:
@@ -45,8 +49,9 @@ services:
       REDIS_PASS: ${REDIS_PASS:-}
     volumes:
       - redis_data:/data
+    # Same loopback-only policy as postgres above.
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     networks:
       - tgpan
     healthcheck:
@@ -68,7 +73,8 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${DB_USER:-tgpan}:${DB_PASS}@postgres:5432/${DB_NAME:-tgpan}
-      # If REDIS_PASS is set, update this line to: redis://:yourpassword@redis:6379
+      # REDIS_PASS is read via env_file and passed to ioredis as a separate
+      # option — no URL-encoding pain for passwords with special chars.
       REDIS_URL: redis://redis:6379
     ports:
       - "${BACKEND_PORT:-3000}:3000"
@@ -108,9 +114,12 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      # Uncomment and populate when you have TLS certs:
-      # - ./certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
-      # - ./certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+      # TLS certs — REQUIRED to start (nginx.conf has HTTPS as default).
+      # For dev / first-run: generate self-signed pair with `make certs-dev`.
+      # For prod: replace with Let's Encrypt / Cloudflare Origin / commercial CA.
+      - ./certs:/etc/nginx/certs:ro
+      # ACME webroot — used by certbot if you choose Let's Encrypt.
+      - ./certs/acme-webroot:/var/www/certbot:ro
     depends_on:
       - backend
       - frontend

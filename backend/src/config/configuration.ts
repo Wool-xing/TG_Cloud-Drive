@@ -1,6 +1,7 @@
 export default () => ({
   PORT: parseInt(process.env.PORT, 10) || 3000,
   NODE_ENV: process.env.NODE_ENV || 'development',
+  // APP_URL dev fallback only; production requires explicit value via validateEnvOrExit().
   APP_URL: process.env.APP_URL || 'http://localhost:5173',
 
   DATABASE_URL: process.env.DATABASE_URL,
@@ -8,8 +9,10 @@ export default () => ({
 
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  JWT_SECRET: process.env.JWT_SECRET || 'change-me-jwt-secret',
-  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'change-me-refresh-secret',
+  // No fallback values for secrets — startup is gated by validateEnvOrExit().
+  // Missing or weak values cause process.exit(1) before this code is reached.
+  JWT_SECRET: process.env.JWT_SECRET,
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   JWT_EXPIRES_IN: '2h',
   JWT_REFRESH_EXPIRES_IN: '30d',
 
@@ -26,7 +29,9 @@ export default () => ({
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM || 'TG云盘 <noreply@example.com>',
 
-  ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123456',
+  // No fallback — startup validated; seed script also re-checks.
+  ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD,
+  ADMIN_USERNAME: process.env.ADMIN_USERNAME,
   DEFAULT_USER_QUOTA_GB: parseInt(process.env.DEFAULT_USER_QUOTA_GB, 10) || 50,
 
   MAX_FOLDERS_PER_DIR: parseInt(process.env.MAX_FOLDERS_PER_DIR, 10) || 10,

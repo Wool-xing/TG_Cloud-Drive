@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { UploadTask } from '../types';
-import { v4 as uuid } from 'crypto';
 import { filesApi } from '../api/client';
 import { generateDEK, encryptDEK, encryptChunk, computeFileHash, getSessionMEK, exportDEKAsBase64 } from '../utils/crypto';
 import toast from 'react-hot-toast';
@@ -77,18 +76,18 @@ async function processTask(taskId: string, set: any, get: any) {
 
     updateTask({ status: 'encrypting', progress: 0 });
 
+    // Fail-CLOSED: refuse to upload without MEK. Falling back to plaintext silently
+    // would void the E2E encryption promise — better to halt and prompt the user
+    // to unlock (log out + log in to re-derive MEK from password).
+    // Pairs with backend uploadChunk encryptedDek check.
     const mek = getSessionMEK();
-    const dek = await generateDEK();
-    let encryptedDek = '';
-    let iv = '';
-    let salt = '';
-
-    if (mek) {
-      const dekInfo = await encryptDEK(dek, mek);
-      encryptedDek = dekInfo.encryptedDek;
-      iv = dekInfo.iv;
-      salt = dekInfo.salt;
+    if (!mek) {
+      throw new Error('会话密钥已失效，请退出后重新登录以解锁加密上传（明文上传已被禁用）');
     }
+    const dek = await generateDEK();
+    // dekIv = the IV used to wrap DEK with MEK (corresponds to backend NodeKey.iv).
+    // Renamed from `iv` to disambiguate from per-chunk IVs (FileChunk.iv).
+    const { encryptedDek, iv: dekIv, salt } = await encryptDEK(dek, mek);
 
     const fileHash = await computeFileHash(task.file);
     const totalChunks = Math.ceil(task.file.size / CHUNK_SIZE);
@@ -108,15 +107,9 @@ async function processTask(taskId: string, set: any, get: any) {
       const slice = task.file.slice(start, end);
       const buffer = await slice.arrayBuffer();
 
-      let chunkData: ArrayBuffer;
-      let chunkIv = '';
-      if (mek) {
-        const encrypted = await encryptChunk(buffer, dek);
-        chunkData = encrypted.data;
-        chunkIv = encrypted.iv;
-      } else {
-        chunkData = buffer;
-      }
+      // Always encrypted — plaintext fallback removed (see MEK gate above).
+      const { data: chunkData, iv: chunkIv } = await encryptChunk(buffer, dek);
+
       // Show encryption progress (0-30% range)
       updateTask({ progress: Math.round(((i + 1) / totalChunks) * 30) });
 
@@ -130,11 +123,10 @@ async function processTask(taskId: string, set: any, get: any) {
       formData.append('mimeType', task.file.type || 'application/octet-stream');
       formData.append('parentId', task.parentId || '');
       formData.append('private', String(task.isPrivate));
-      if (mek) {
-        formData.append('encryptedDek', encryptedDek);
-        formData.append('iv', chunkIv || iv);
-        formData.append('salt', salt);
-      }
+      formData.append('encryptedDek', encryptedDek);
+      formData.append('dekIv', dekIv);   // IV for DEK envelope (NodeKey.iv on first chunk)
+      formData.append('chunkIv', chunkIv); // IV for THIS chunk's ciphertext (FileChunk.iv)
+      formData.append('salt', salt);
 
       let retries = 0;
       while (retries < 5) {

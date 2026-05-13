@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
+  ServiceUnavailableException,
   Inject,
   Logger,
 } from '@nestjs/common';
@@ -143,11 +144,20 @@ export class AdminService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
 
-    // Delete all device sessions
+    // Delete all device sessions (refresh tokens immediately useless)
     const deleted = await this.deviceRepo.delete({ userId });
 
-    // Set Redis flag so existing access tokens are rejected until they expire
-    await this.redis.set(`force_logout:${userId}`, Date.now().toString(), 'EX', 86400).catch(() => {});
+    // Fail-CLOSED: the redis flag is what rejects already-issued access tokens
+    // (which can live up to JWT_EXPIRES_IN, currently 2h). If Redis is down the
+    // admin MUST be told the force-logout is only partially in effect — devices
+    // gone, but unexpired access tokens may still work.
+    try {
+      await this.redis.set(`force_logout:${userId}`, Date.now().toString(), 'EX', 86400);
+    } catch (e) {
+      throw new ServiceUnavailableException(
+        `强制下线部分成功：已清空 ${deleted.affected ?? 0} 个设备会话，但 Redis 不可用，已签发的 access token 可能在过期前仍可使用。请稍后重试。`,
+      );
+    }
 
     await this.audit(adminId, 'admin.user.force_logout', null, null, null, {
       targetUserId: userId,

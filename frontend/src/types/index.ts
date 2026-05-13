@@ -81,9 +81,14 @@ export interface UploadTask {
   nodeId?: string;
 }
 
+export interface DownloadChunk {
+  url: string;
+  iv: string; // hex, per-chunk AES-GCM IV (NOT to be confused with NodeKey.iv)
+}
+
 export interface DownloadInfo {
   node: Node;
-  chunks: string[];
+  chunks: DownloadChunk[];
   key?: NodeKey;
 }
 

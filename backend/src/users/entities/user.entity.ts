@@ -25,8 +25,23 @@ export class User {
   @Column({ name: 'email_encrypted', nullable: true })
   emailEncrypted: string;
 
+  /**
+   * Deterministic HMAC of the normalized email — indexable, server-bound,
+   * not reversible. See common/encryption.ts hashIdentifier(). Allows O(1)
+   * login-by-email + unique-email-per-user enforcement, without storing
+   * plaintext emails. NULL allowed (PG: multiple NULLs satisfy UNIQUE).
+   */
+  @Index({ unique: true })
+  @Column({ name: 'email_hash', nullable: true, length: 64 })
+  emailHash: string;
+
   @Column({ name: 'phone_encrypted', nullable: true })
   phoneEncrypted: string;
+
+  /** Same construction as emailHash, for phone numbers. */
+  @Index({ unique: true })
+  @Column({ name: 'phone_hash', nullable: true, length: 64 })
+  phoneHash: string;
 
   @Column({ nullable: true, length: 255 })
   nickname: string;

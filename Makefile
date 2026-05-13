@@ -1,4 +1,4 @@
-.PHONY: help prod dev stop restart logs seed clean status worker-deploy
+.PHONY: help prod dev stop restart logs seed clean status worker-deploy certs-dev
 
 # ─── TG 云盘 Makefile ────────────────────────────────────────────────────────
 # Usage: make <target>
@@ -15,12 +15,32 @@ help: ## 显示帮助信息
 
 prod: ## 一键启动所有生产容器（含构建）
 	@[ -f .env ] || (cp .env.example .env && echo "已创建 .env，请先填写必填项再重新运行" && exit 1)
+	@[ -f certs/fullchain.pem ] && [ -f certs/privkey.pem ] || \
+		(echo "❌ 缺少 TLS 证书 certs/fullchain.pem 与 certs/privkey.pem。开发可运行: make certs-dev；生产请配置 Let's Encrypt / Cloudflare / 商业证书后再启动" && exit 1)
 	docker compose up -d --build
 	@echo "等待 PostgreSQL 就绪..."
 	@until docker compose exec -T postgres pg_isready -U tgpan -d tgpan >/dev/null 2>&1; do sleep 2; done
 	@$(MAKE) seed
 	@echo ""
-	@echo "  ✅ 启动完成 → http://localhost"
+	@echo "  ✅ 启动完成 → https://localhost"
+
+# ─── TLS 证书 ────────────────────────────────────────────────────────────────
+
+certs-dev: ## 生成开发用自签 TLS 证书（仅供本机调试，浏览器会显示不受信任警告）
+	@mkdir -p certs/acme-webroot
+	@if [ -f certs/fullchain.pem ] && [ -f certs/privkey.pem ]; then \
+		echo "已存在 certs/fullchain.pem 与 certs/privkey.pem，跳过。如需重新生成请先删除。"; \
+	else \
+		echo "生成 4096-bit 自签证书（CN=localhost，10 年有效）..."; \
+		docker run --rm -v "$$(pwd)/certs:/certs" alpine/openssl req -x509 -nodes -days 3650 \
+			-newkey rsa:4096 \
+			-keyout /certs/privkey.pem -out /certs/fullchain.pem \
+			-subj "/CN=localhost" \
+			-addext "subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1"; \
+		echo ""; \
+		echo "  ✅ 证书已生成至 certs/。重要：浏览器首次访问会警告，开发期可点击高级 → 继续；"; \
+		echo "     生产部署必须替换为 Let's Encrypt / Cloudflare / 商业证书。"; \
+	fi
 
 stop: ## 停止所有容器
 	docker compose down

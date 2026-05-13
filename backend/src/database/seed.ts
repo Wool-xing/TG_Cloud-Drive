@@ -1,6 +1,16 @@
 /**
  * Database seeder — run once after first migration to create the admin user.
- * Usage: npx ts-node src/database/seed.ts
+ *
+ * Usage:  npx ts-node src/database/seed.ts
+ *
+ * Reads required values from .env (no hardcoded defaults):
+ *   - ADMIN_USERNAME             (e.g. "admin")
+ *   - ADMIN_INITIAL_PASSWORD     (strong random; will be force-changed on first login)
+ *   - ENCRYPTION_MASTER_KEY      (64 hex chars)
+ *   - DATABASE_URL
+ *
+ * Refuses to run if any required value is missing, a CHANGE_ME_* placeholder,
+ * or a known weak default. See backend/src/common/env-validator.ts.
  */
 import 'reflect-metadata';
 import * as dotenv from 'dotenv';
@@ -16,9 +26,16 @@ import { NodeKey } from '../files/entities/node-key.entity';
 import { Tag } from '../files/entities/tag.entity';
 import { Share } from '../shares/entities/share.entity';
 import { VerificationCode } from '../verification/verification.entity';
-import { hashPassword, generateSalt, encryptField } from '../common/encryption';
+import { hashPassword, generateSalt } from '../common/encryption';
+import { validateEnvOrExit } from '../common/env-validator';
 
 async function seed() {
+  // Same gate as runtime bootstrap — fail-fast on placeholders / weak defaults.
+  validateEnvOrExit();
+
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_INITIAL_PASSWORD;
+
   const ds = new DataSource({
     type: 'postgres',
     url: process.env.DATABASE_URL,
@@ -29,32 +46,33 @@ async function seed() {
   await ds.initialize();
 
   const repo = ds.getRepository(User);
-  const existing = await repo.findOne({ where: { username: 'Wool' } });
+  const existing = await repo.findOne({ where: { username } });
   if (existing) {
-    console.log('Admin user already exists, skipping seed.');
+    // eslint-disable-next-line no-console
+    console.log(`Admin user "${username}" already exists, skipping seed.`);
     await ds.destroy();
     return;
   }
 
-  const password = process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123456';
-  const masterKey = process.env.ENCRYPTION_MASTER_KEY;
-  const phone = '19247050520';
-
   const admin = repo.create({
-    username: 'Wool',
+    username,
     passwordHash: await hashPassword(password),
     mekSalt: generateSalt(),
     role: UserRole.ADMIN,
     status: UserStatus.ACTIVE,
     quotaBytes: 1099511627776, // 1TB for admin
-    phoneEncrypted: masterKey ? encryptField(phone, masterKey) : null,
   });
 
   await repo.save(admin);
-  console.log('✅ Admin user created: Wool');
-  console.log(`   Password: ${password}`);
-  console.log('   ⚠️  Change the password after first login!');
+  // eslint-disable-next-line no-console
+  console.log(`✅ Admin user created: ${username}`);
+  // eslint-disable-next-line no-console
+  console.log('   ⚠️  Use the password from your .env (ADMIN_INITIAL_PASSWORD) and change it after first login.');
   await ds.destroy();
 }
 
-seed().catch(e => { console.error(e); process.exit(1); });
+seed().catch(e => {
+  // eslint-disable-next-line no-console
+  console.error(e);
+  process.exit(1);
+});

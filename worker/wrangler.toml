@@ -20,6 +20,11 @@ command = ""          # wrangler compiles TypeScript natively; no extra build st
 # TG_BOT_TOKEN      = ""   # DO NOT commit real token — use `wrangler secret put TG_BOT_TOKEN`
 # TG_CHANNEL_ID     = ""   # DO NOT commit real channel id — use `wrangler secret put TG_CHANNEL_ID`
 # CF_WORKERS_SECRET = ""   # DO NOT commit real secret — use `wrangler secret put CF_WORKERS_SECRET`
+# ALLOWED_ORIGINS   = ""   # REQUIRED for /file/:token cross-origin fetches.
+#                          # Comma-separated browser Origins, e.g.:
+#                          #   "https://mydrive.com,https://staging.mydrive.com"
+#                          # Empty → all browser fetches blocked (correct for backend-only deployments).
+#                          # Use `wrangler secret put ALLOWED_ORIGINS` or [env.production.vars] below.
 
 # ─── Environments ─────────────────────────────────────────────────────────────
 [env.production]

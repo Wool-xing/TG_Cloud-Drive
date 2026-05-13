@@ -21,34 +21,57 @@ export interface Env {
   TG_BOT_TOKEN: string;
   TG_CHANNEL_ID: string;
   CF_WORKERS_SECRET: string;
+  /**
+   * Comma-separated list of allowed browser Origins for cross-origin fetches
+   * to /file/:token. Server-to-server endpoints (/upload-chunk, /api/tg/*) do
+   * not return CORS headers regardless — they auth via X-Workers-Secret.
+   * Example: "https://mydrive.com,https://staging.mydrive.com"
+   * Set via `wrangler secret put ALLOWED_ORIGINS` (or [vars] for non-prod).
+   */
+  ALLOWED_ORIGINS?: string;
 }
 
-// ─── CORS helpers ────────────────────────────────────────────────────────────
+// ─── Whitelist of Telegram Bot API methods the proxy will forward ───────────
+// The proxy is NOT a generic Bot API gateway — it only relays methods the
+// backend genuinely needs. Adding here is a deliberate security review step.
+const ALLOWED_TG_METHODS = new Set<string>(['getFile', 'deleteMessage']);
 
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Workers-Secret, Range',
-  'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
-};
+// ─── CORS helpers (Origin-allowlist mode) ─────────────────────────────────────
 
-function withCors(response: Response): Response {
-  const headers = new Headers(response.headers);
-  for (const [k, v] of Object.entries(CORS_HEADERS)) {
-    headers.set(k, v);
+function parseAllowedOrigins(env: Env): string[] {
+  return (env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function corsHeadersFor(request: Request, env: Env): Record<string, string> {
+  const origin = request.headers.get('Origin');
+  const allowed = parseAllowedOrigins(env);
+  // Only return Allow-Origin when (a) the request actually has an Origin
+  // (i.e. it's a browser cross-origin fetch) and (b) it's in the allowlist.
+  // Otherwise return nothing — the browser will block the fetch (correct).
+  if (origin && allowed.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Workers-Secret, Range',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+      'Vary': 'Origin',
+    };
   }
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return {};
 }
 
-function corsJson(body: unknown, status = 200): Response {
+function corsJson(body: unknown, status: number, request: Request, env: Env): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...corsHeadersFor(request, env) },
   });
 }
 
-function corsError(message: string, status: number): Response {
-  return corsJson({ ok: false, error: message }, status);
+function corsError(message: string, status: number, request: Request, env: Env): Response {
+  return corsJson({ ok: false, error: message }, status, request, env);
 }
 
 // ─── HMAC helpers (Web Crypto) ────────────────────────────────────────────────
@@ -141,28 +164,28 @@ function validateSecret(request: Request, env: Env): boolean {
 
 async function handleUploadChunk(request: Request, env: Env): Promise<Response> {
   if (!validateSecret(request, env)) {
-    return corsError('Unauthorized', 401);
+    return corsError('Unauthorized', 401, request, env);
   }
 
   let formData: FormData;
   try {
     formData = await request.formData();
   } catch {
-    return corsError('Invalid form data', 400);
+    return corsError('Invalid form data', 400, request, env);
   }
 
   const document = formData.get('document') as File | null;
   const filename = (formData.get('filename') as string) || 'chunk.bin';
   const contentType = (formData.get('content_type') as string) || 'application/octet-stream';
-  const chatId = (formData.get('chat_id') as string) || env.TG_CHANNEL_ID;
 
   if (!document) {
-    return corsError('Missing document field', 400);
+    return corsError('Missing document field', 400, request, env);
   }
 
-  // Build multipart form for Telegram sendDocument
+  // chat_id is ALWAYS env.TG_CHANNEL_ID — clients cannot redirect uploads to
+  // an attacker-controlled chat by passing a different chat_id in form data.
   const tgForm = new FormData();
-  tgForm.set('chat_id', chatId);
+  tgForm.set('chat_id', env.TG_CHANNEL_ID);
   tgForm.set('document', new File([await document.arrayBuffer()], filename, { type: contentType }));
 
   const tgRes = await fetch(
@@ -172,7 +195,7 @@ async function handleUploadChunk(request: Request, env: Env): Promise<Response> 
 
   const tgJson = await tgRes.json() as any;
   if (!tgJson.ok) {
-    return corsError(`Telegram error: ${tgJson.description ?? 'unknown'}`, 502);
+    return corsError(`Telegram error: ${tgJson.description ?? 'unknown'}`, 502, request, env);
   }
 
   const message = tgJson.result;
@@ -184,7 +207,7 @@ async function handleUploadChunk(request: Request, env: Env): Promise<Response> 
     null;
 
   if (!fileId) {
-    return corsError('Could not extract file_id from Telegram response', 502);
+    return corsError('Could not extract file_id from Telegram response', 502, request, env);
   }
 
   // Generate a signed access token for later retrieval
@@ -196,7 +219,7 @@ async function handleUploadChunk(request: Request, env: Env): Promise<Response> 
     messageId: message.message_id,
     accessToken,
     size: message?.document?.file_size ?? null,
-  });
+  }, 200, request, env);
 }
 
 // ─── File serving with Range support ─────────────────────────────────────────
@@ -204,7 +227,7 @@ async function handleUploadChunk(request: Request, env: Env): Promise<Response> 
 async function handleFileServe(token: string, request: Request, env: Env): Promise<Response> {
   const verified = await verifyFileToken(token, env.CF_WORKERS_SECRET);
   if (!verified) {
-    return corsError('Invalid or expired file token', 403);
+    return corsError('Invalid or expired file token', 403, request, env);
   }
 
   const { fileId } = verified;
@@ -215,12 +238,12 @@ async function handleFileServe(token: string, request: Request, env: Env): Promi
   );
   const getFileJson = await getFileRes.json() as any;
   if (!getFileJson.ok) {
-    return corsError(`Telegram getFile error: ${getFileJson.description ?? 'unknown'}`, 502);
+    return corsError(`Telegram getFile error: ${getFileJson.description ?? 'unknown'}`, 502, request, env);
   }
 
   const filePath: string = getFileJson.result?.file_path;
   if (!filePath) {
-    return corsError('file_path not available', 502);
+    return corsError('file_path not available', 502, request, env);
   }
 
   const fileUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`;
@@ -244,7 +267,8 @@ async function handleFileServe(token: string, request: Request, env: Env): Promi
     const v = fileRes.headers.get(h);
     if (v) responseHeaders.set(h, v);
   }
-  for (const [k, v] of Object.entries(CORS_HEADERS)) {
+  // CORS only for browser cross-origin fetches matching ALLOWED_ORIGINS.
+  for (const [k, v] of Object.entries(corsHeadersFor(request, env))) {
     responseHeaders.set(k, v);
   }
 
@@ -263,31 +287,39 @@ async function handleTgProxy(
   env: Env,
 ): Promise<Response> {
   if (!validateSecret(request, env)) {
-    return corsError('Unauthorized', 401);
+    return corsError('Unauthorized', 401, request, env);
+  }
+
+  // Method whitelist: refuse anything not explicitly approved. Prevents the
+  // secret from becoming a universal Bot API key (sendMessage, leaveChat,
+  // banChatMember, getUpdates ... all reachable with the old wildcard).
+  if (!ALLOWED_TG_METHODS.has(method)) {
+    return corsError(`Method '${method}' is not on the proxy whitelist`, 403, request, env);
   }
 
   const tgBase = `https://api.telegram.org/bot${env.TG_BOT_TOKEN}/${method}`;
 
   if (request.method === 'GET') {
-    // Forward query params; inject chat_id if absent
+    // Forward query params; ALWAYS overwrite chat_id with env value — clients
+    // cannot redirect operations to attacker-controlled chats.
     const inUrl = new URL(request.url);
     const params = new URLSearchParams(inUrl.searchParams);
-    if (!params.has('chat_id')) params.set('chat_id', env.TG_CHANNEL_ID);
+    params.set('chat_id', env.TG_CHANNEL_ID);
 
     const res = await fetch(`${tgBase}?${params.toString()}`);
     const json = await res.json();
-    return corsJson(json, res.status);
+    return corsJson(json, res.status, request, env);
   }
 
-  // POST: handle both JSON and FormData bodies
+  // POST: handle both JSON and FormData bodies — same chat_id enforcement.
   const contentType = request.headers.get('Content-Type') ?? '';
 
   if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
     const form = await request.formData();
-    if (!form.has('chat_id')) form.set('chat_id', env.TG_CHANNEL_ID);
+    form.set('chat_id', env.TG_CHANNEL_ID);
     const res = await fetch(tgBase, { method: 'POST', body: form });
     const json = await res.json();
-    return corsJson(json, res.status);
+    return corsJson(json, res.status, request, env);
   }
 
   // Default: JSON body
@@ -298,9 +330,7 @@ async function handleTgProxy(
     // empty or invalid JSON — proceed with empty body
   }
 
-  if (!('chat_id' in body)) {
-    body.chat_id = env.TG_CHANNEL_ID;
-  }
+  body.chat_id = env.TG_CHANNEL_ID;
 
   const res = await fetch(tgBase, {
     method: 'POST',
@@ -308,15 +338,15 @@ async function handleTgProxy(
     body: JSON.stringify(body),
   });
   const json = await res.json();
-  return corsJson(json, res.status);
+  return corsJson(json, res.status, request, env);
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 async function handler(request: Request, env: Env): Promise<Response> {
-  // Preflight CORS
+  // Preflight CORS — only respond with permissive headers for allowed origins.
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: corsHeadersFor(request, env) });
   }
 
   const url = new URL(request.url);
@@ -342,13 +372,13 @@ async function handler(request: Request, env: Env): Promise<Response> {
 
     // Health check
     if (pathname === '/health' && request.method === 'GET') {
-      return corsJson({ ok: true, timestamp: Date.now() });
+      return corsJson({ ok: true, timestamp: Date.now() }, 200, request, env);
     }
 
-    return corsError('Not Found', 404);
+    return corsError('Not Found', 404, request, env);
   } catch (err: any) {
     console.error('Worker error:', err);
-    return corsError(`Internal Server Error: ${err?.message ?? 'unknown'}`, 500);
+    return corsError(`Internal Server Error: ${err?.message ?? 'unknown'}`, 500, request, env);
   }
 }
 

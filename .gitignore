@@ -41,6 +41,23 @@ venv.bak/
 .env.local
 .env.*.local
 
+# Node.js dependencies — never commit (gigabytes, machine-specific)
+node_modules/
+
+# Build outputs
+backend/dist/
+frontend/dist/
+
+# Cloudflare Wrangler local state (contains preview tokens, KV cache)
+.wrangler/
+
+# Personal IDE / agent config (machine-specific paths)
+.mcp.json
+
+# TLS certs — generated locally, never committed
+certs/*.pem
+certs/*.key
+
 # Data
 data/*.json
 !data/*.json.example

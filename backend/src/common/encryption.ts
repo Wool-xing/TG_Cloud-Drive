@@ -39,6 +39,41 @@ export function hmacVerify(data: string, secret: string, signature: string): boo
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
 
+/**
+ * Normalize an email for hashing / indexing.
+ * Lowercase + trim. Does NOT do mailbox-canonicalization (e.g. gmail dot rules)
+ * because that would conflict with users who rely on those aliases for separate accounts.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/**
+ * Normalize a Chinese phone number for hashing / indexing.
+ * Strip non-digits, drop optional +86 country prefix, expect 11-digit mobile.
+ * Non-Chinese formats are returned digits-only as a fallback.
+ */
+export function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('86') && digits.length === 13) return digits.slice(2);
+  return digits;
+}
+
+/**
+ * Deterministic HMAC of a normalized identifier (email or phone) using the server's
+ * master key as the HMAC secret. Used for unique indexing and login lookup of
+ * fields that are otherwise encrypted with random IVs (which break indexing).
+ *
+ * Properties:
+ *   - Deterministic: same input + key → same output (indexable)
+ *   - Server-bound: requires masterKey to compute → attacker who only steals the DB
+ *     cannot enumerate emails offline without ALSO stealing ENCRYPTION_MASTER_KEY
+ *   - Not reversible: cannot recover email from hash even with the key
+ */
+export function hashIdentifier(value: string, masterKey: string): string {
+  return hmacSign(value, masterKey);
+}
+
 export function hashPassword(password: string): Promise<string> {
   const bcrypt = require('bcrypt');
   return bcrypt.hash(password, 12);
