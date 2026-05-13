@@ -1,4 +1,4 @@
-.PHONY: help prod dev stop restart logs seed clean status worker-deploy certs-dev
+.PHONY: help quickstart prod dev stop restart logs seed clean status worker-deploy certs-dev
 
 # ─── TG 云盘 Makefile ────────────────────────────────────────────────────────
 # Usage: make <target>
@@ -11,9 +11,14 @@ help: ## 显示帮助信息
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
+# ─── 一键部署 ────────────────────────────────────────────────────────────────
+
+quickstart: ## 🚀 全新部署：交互式问 2 个 TG 值，其余全自动（密钥/证书/起容器/seed）
+	@bash ./quickstart.sh
+
 # ─── Docker 生产环境 ─────────────────────────────────────────────────────────
 
-prod: ## 一键启动所有生产容器（含构建）
+prod: ## 一键启动所有生产容器（含构建，需先填好 .env）
 	@[ -f .env ] || (cp .env.example .env && echo "已创建 .env，请先填写必填项再重新运行" && exit 1)
 	@[ -f certs/fullchain.pem ] && [ -f certs/privkey.pem ] || \
 		(echo "❌ 缺少 TLS 证书 certs/fullchain.pem 与 certs/privkey.pem。开发可运行: make certs-dev；生产请配置 Let's Encrypt / Cloudflare / 商业证书后再启动" && exit 1)

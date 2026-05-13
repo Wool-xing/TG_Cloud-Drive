@@ -1,0 +1,8 @@
+# 强制 shell 脚本用 LF 行尾，避免 Windows checkout 转 CRLF 后 bash shebang 失效
+*.sh text eol=lf
+
+# Makefile 必须 LF + tab（make 不接受 CRLF）
+Makefile text eol=lf
+
+# 其它文本默认让 git 自动处理
+* text=auto

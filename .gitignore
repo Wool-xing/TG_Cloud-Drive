@@ -96,3 +96,16 @@ secrets/
 # OS
 Thumbs.db
 .DS_Store
+
+# 内部协作文档（仅本地保留，不公开）
+项目协作宪章.md
+代码审查报告.md
+灵感笔记.md
+
+# quickstart 备份的旧 .env
+.env.backup.*
+
+# 自签 TLS 证书（每次本地生成，不入仓）
+certs/fullchain.pem
+certs/privkey.pem
+certs/acme-webroot/
