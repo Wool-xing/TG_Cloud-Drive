@@ -50,6 +50,8 @@ export default function App() {
 
         <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
           <Route index element={<AdminDashboard />} />
+          {/* /admin/dashboard alias — users typing the URL directly expect this path */}
+          <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="files" element={<AdminFiles />} />
           <Route path="config" element={<AdminConfig />} />

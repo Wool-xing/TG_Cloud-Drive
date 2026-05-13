@@ -1,0 +1,35 @@
+# Build artifacts
+dist
+node_modules
+
+# Local env (never bake into image — env_file injects at runtime)
+.env
+.env.*
+!.env.example
+
+# VCS
+.git
+.gitignore
+
+# IDE / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / caches
+*.log
+.npm
+coverage
+.nyc_output
+
+# Tests / dev
+test
+__tests__
+*.test.ts
+*.spec.ts
+
+# Docker
+Dockerfile
+.dockerignore

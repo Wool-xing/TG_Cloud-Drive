@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesService } from './files.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -142,6 +143,21 @@ export class FilesController {
     return this.filesService.setLock(userId, nodeId, password);
   }
 
+  // P1-B12: explicit unlock endpoint. setLock no longer accepts empty password
+  // to clear protection — callers must verify current password here. Throttled
+  // to match other auth-sensitive endpoints (10 / minute / IP).
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Delete(':nodeId/lock')
+  @HttpCode(200)
+  removeLock(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId') nodeId: string,
+    @Body('password') password: string,
+  ) {
+    return this.filesService.removeLock(userId, nodeId, password);
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':nodeId/verify-lock')
   @HttpCode(200)
   verifyLock(

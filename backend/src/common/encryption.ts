@@ -1,6 +1,10 @@
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 const ALGORITHM = 'aes-256-gcm';
+// P1-A1: bcrypt cost factor. 12 ≈ 200-300ms per op on modern hardware.
+// Centralized so future tuning (e.g. CPU profile, hardware swap) hits one site.
+const BCRYPT_COST = 12;
 
 export function encryptField(plaintext: string, masterKey: string): string {
   const key = Buffer.from(masterKey, 'hex').slice(0, 32);
@@ -75,11 +79,9 @@ export function hashIdentifier(value: string, masterKey: string): string {
 }
 
 export function hashPassword(password: string): Promise<string> {
-  const bcrypt = require('bcrypt');
-  return bcrypt.hash(password, 12);
+  return bcrypt.hash(password, BCRYPT_COST);
 }
 
 export function comparePassword(password: string, hash: string): Promise<boolean> {
-  const bcrypt = require('bcrypt');
   return bcrypt.compare(password, hash);
 }

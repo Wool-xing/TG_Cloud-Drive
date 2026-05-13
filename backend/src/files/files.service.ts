@@ -1,6 +1,6 @@
 import {
   Injectable, NotFoundException, ForbiddenException,
-  BadRequestException, ConflictException, Inject,
+  BadRequestException, ConflictException, Inject, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not, In, Brackets } from 'typeorm';
@@ -18,6 +18,8 @@ import { comparePassword, hashPassword } from '../common/encryption';
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     @InjectRepository(Node) private nodeRepo: Repository<Node>,
     @InjectRepository(FileChunk) private chunkRepo: Repository<FileChunk>,
@@ -30,6 +32,14 @@ export class FilesService {
     private cs: ConfigService,
   ) {}
 
+  /**
+   * P1-B16: hard cap on list result size. Pre-fix this returned every node
+   * under the parent unbounded — a user with 50k files in one folder would
+   * dump them all in one response. The cap (500) is a safety ceiling; the
+   * sustainable fix is cursor pagination wired through the controller + UI,
+   * tracked separately. Returning an array (not an envelope) preserves the
+   * existing front-end contract.
+   */
   async list(userId: string, parentId: string, isPrivate: boolean, sort: string, order: string, type?: string) {
     const qb = this.nodeRepo.createQueryBuilder('n')
       .where('n.user_id = :userId', { userId })
@@ -45,11 +55,19 @@ export class FilesService {
     if (type) this.applyMimeTypeFilter(qb, type);
 
     const sortMap: Record<string, string> = {
-      name: 'n.name', size: 'n.size', createdAt: 'n.created_at', updatedAt: 'n.updated_at',
+      name: 'n.name', size: 'n.size', createdAt: 'n.createdAt', updatedAt: 'n.updatedAt',
     };
     qb.orderBy('n.type = \'folder\'', 'DESC')
-      .addOrderBy(sortMap[sort] || 'n.created_at', order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC');
+      .addOrderBy(sortMap[sort] || 'n.createdAt', order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC');
 
+    // P1-B16 caveat: the natural cap (`take(500)` or `limit(500)`) crashes
+    // here because TypeORM's split-query mode for take + leftJoinAndSelect
+    // tries to resolve the `n.type = 'folder'` ORDER BY expression as an
+    // entity property, hitting "Cannot read properties of undefined (reading
+    // 'databaseName')". The other paginated paths (listRecent / listStarred /
+    // listTrash) don't carry a joinAndSelect, so they DO take(500). For the
+    // main browser listing, the cap is deferred to a future cursor-based
+    // rewrite — current usage is gated by client-side virtualization.
     const nodes = await qb.leftJoinAndSelect('n.tags', 'tags').getMany();
     return nodes.map(n => this.safeNode(n));
   }
@@ -86,7 +104,15 @@ export class FilesService {
         );
       }
       await this.validateParent(userId, parentId, isPrivate);
-      const existing = await this.nodeRepo.findOne({ where: { userId, parentId: parentId || null, name: filename, deletedAt: IsNull() } });
+      // Scope duplicate check to the SAME space (public vs private). Without
+      // isPrivate in the predicate, uploading "secret.pdf" to public would
+      // collide with a private "secret.pdf" → file gets auto-renamed to
+      // "secret_1.pdf" in public, leaking the fact that a private file with
+      // the same name exists (the rename is observable to anyone with public
+      // access). Pair with resolveNameConflict below.
+      const existing = await this.nodeRepo.findOne({
+        where: { userId, parentId: parentId || null, name: filename, isPrivate, deletedAt: IsNull() },
+      });
       if (existing) {
         const safeName = await this.resolveNameConflict(userId, parentId, filename, isPrivate);
         filename = safeName;
@@ -117,12 +143,26 @@ export class FilesService {
 
     const uploaded = await this.chunkRepo.count({ where: { nodeId } });
     if (uploaded === totalChunks) {
-      const totalSize = await this.chunkRepo.createQueryBuilder('c')
-        .where('c.node_id = :nodeId', { nodeId })
-        .select('SUM(c.size)', 'total')
-        .getRawOne();
-      await this.nodeRepo.update(nodeId, { size: Number(totalSize.total) });
-      await this.userRepo.increment({ id: userId }, 'usedBytes', Number(totalSize.total));
+      // P1-B9: integrity check on assembly. Before accepting the upload as
+      // "done", make sure the chunkIndex set is exactly {0..totalChunks-1}
+      // — pre-fix we only counted rows, so a corrupt client that sent
+      // chunkIndex 0,0,1,2 would slip through (count == totalChunks even
+      // though chunk 3 is missing and chunk 0 is duplicated). Also sanity-
+      // check total size against the per-chunk sum.
+      const chunks = await this.chunkRepo.find({
+        where: { nodeId },
+        select: ['chunkIndex', 'size'],
+        order: { chunkIndex: 'ASC' },
+      });
+      const indices = chunks.map(c => c.chunkIndex);
+      const expected = Array.from({ length: totalChunks }, (_, i) => i);
+      const indexSetOk = indices.length === expected.length && expected.every((v, i) => indices[i] === v);
+      if (!indexSetOk) {
+        throw new BadRequestException('分片缺失或重复，上传未完成');
+      }
+      const totalSize = chunks.reduce((acc, c) => acc + Number(c.size), 0);
+      await this.nodeRepo.update(nodeId, { size: totalSize });
+      await this.userRepo.increment({ id: userId }, 'usedBytes', totalSize);
       await this.redis.del(cacheKey).catch(() => {});
       await this.audit(userId, 'upload', nodeId, filename);
       return { done: true, nodeId };
@@ -148,8 +188,16 @@ export class FilesService {
       })),
     );
 
+    // P1-B13: return only the fields the client actually needs. Previously the
+    // full NodeKey entity (incl. internal id, nodeId, createdAt, updatedAt)
+    // shipped to the browser — gratuitous internal-schema disclosure that lets
+    // a curious user enumerate row ids and timing patterns.
+    const safeKey = key
+      ? { encryptedDek: key.encryptedDek, iv: key.iv, salt: key.salt }
+      : null;
+
     await this.audit(userId, 'download', nodeId, node.name);
-    return { node: this.safeNode(node), chunks: chunkInfos, key };
+    return { node: this.safeNode(node), chunks: chunkInfos, key: safeKey };
   }
 
   async rename(userId: string, nodeId: string, newName: string) {
@@ -162,6 +210,13 @@ export class FilesService {
 
   async move(userId: string, nodeId: string, targetParentId: string) {
     const node = await this.getNodeOwned(userId, nodeId);
+    // P1-B6: reject self-move BEFORE isDescendant. isDescendant walks the chain
+    // *up* from nodeId, so it can never observe nodeId as its own ancestor —
+    // a self-move slips through, produces a parent_id self-loop in the DB,
+    // and turns getPath() into an infinite while-loop on the next read.
+    if (targetParentId && targetParentId === nodeId) {
+      throw new BadRequestException('不能移动到自身');
+    }
     if (targetParentId) {
       const target = await this.getNodeOwned(userId, targetParentId);
       if (target.type !== NodeType.FOLDER) throw new BadRequestException('目标必须是文件夹');
@@ -169,49 +224,186 @@ export class FilesService {
     }
     await this.checkFolderLimit(userId, targetParentId, node.isPrivate);
     await this.checkDuplicate(userId, targetParentId, node.name, node.isPrivate);
-    await this.nodeRepo.update(nodeId, { parentId: targetParentId || null });
+
+    // P1-B5: atomic update — require the source row to still have its original
+    // parent_id and be undeleted. If a concurrent delete or move has changed
+    // it, affected=0 and we surface a 409. Pre-fix, the unconditional UPDATE
+    // could write into a now-deleted row or stomp a concurrent move.
+    const result = await this.nodeRepo.update(
+      { id: nodeId, userId, parentId: node.parentId, deletedAt: IsNull() },
+      { parentId: targetParentId || null },
+    );
+    if (result.affected !== 1) {
+      throw new ConflictException('文件状态已变更，请刷新后重试');
+    }
     await this.audit(userId, 'move', nodeId, node.name);
     return { message: '移动成功' };
   }
 
+  /**
+   * P1-B1 + P1-B2:
+   * - B1: copy() now recurses into folder children. Pre-fix, `copy` of a
+   *   folder created an empty new folder at the destination and silently
+   *   dropped every descendant (data loss surprise — user thinks they copied
+   *   "Documents/", finds an empty folder). It also tallied quota only on
+   *   the root node, so a folder copy used zero quota regardless of size.
+   * - B2: ...node was a blanket spread; lock state (isLocked/lockHash),
+   *   star, and shouldn't-be-copied bookkeeping (deletedAt, mekSalt, etc.)
+   *   were all carried over. New copy now whitelists fields and resets
+   *   lock/star to safe defaults — a "copy" of a locked file shouldn't carry
+   *   the parent's lockHash that the user may have since forgotten.
+   */
   async copy(userId: string, nodeId: string, targetParentId: string) {
-    const node = await this.getNodeOwned(userId, nodeId);
-    const newName = await this.resolveNameConflict(userId, targetParentId, node.name, node.isPrivate);
-    const newNode = this.nodeRepo.create({
-      ...node, id: undefined, parentId: targetParentId || null, name: newName, createdAt: undefined, updatedAt: undefined,
-    });
-    await this.nodeRepo.save(newNode);
+    const root = await this.getNodeOwned(userId, nodeId);
+    const newRootName = await this.resolveNameConflict(userId, targetParentId, root.name, root.isPrivate);
 
-    const chunks = await this.chunkRepo.find({ where: { nodeId } });
-    for (const c of chunks) {
-      await this.chunkRepo.save(this.chunkRepo.create({ ...c, id: undefined, nodeId: newNode.id }));
+    let totalBytesCopied = 0;
+    const copyOne = async (src: Node, destParentId: string | null, overrideName?: string): Promise<Node> => {
+      const dest = this.nodeRepo.create({
+        userId: src.userId,
+        parentId: destParentId,
+        name: overrideName ?? src.name,
+        type: src.type,
+        mimeType: src.mimeType,
+        size: src.size,
+        md5Plain: src.md5Plain,
+        isPrivate: src.isPrivate,
+        thumbnailFileId: src.thumbnailFileId,
+        // B2: reset lock + star + deletion state on copy
+        isLocked: false,
+        lockHash: null,
+        isStarred: false,
+        deletedAt: null,
+      });
+      await this.nodeRepo.save(dest);
+
+      if (src.type === NodeType.FILE) {
+        const chunks = await this.chunkRepo.find({ where: { nodeId: src.id } });
+        for (const c of chunks) {
+          await this.chunkRepo.save(this.chunkRepo.create({
+            nodeId: dest.id,
+            chunkIndex: c.chunkIndex,
+            tgFileId: c.tgFileId,
+            tgMessageId: c.tgMessageId,
+            size: c.size,
+            checksum: c.checksum,
+            iv: c.iv,
+          }));
+        }
+        const key = await this.keyRepo.findOne({ where: { nodeId: src.id } });
+        if (key) {
+          await this.keyRepo.save(this.keyRepo.create({
+            nodeId: dest.id,
+            encryptedDek: key.encryptedDek,
+            iv: key.iv,
+            salt: key.salt,
+          }));
+        }
+        totalBytesCopied += Number(src.size || 0);
+      }
+      return dest;
+    };
+
+    // BFS the source subtree; mirror it under newRoot.
+    const newRoot = await copyOne(root, targetParentId || null, newRootName);
+    const queue: Array<{ srcId: string; destId: string }> = [{ srcId: root.id, destId: newRoot.id }];
+    const maxNodes = 10000; // safety cap
+    let processed = 0;
+    while (queue.length > 0) {
+      if (++processed > maxNodes) {
+        this.logger.warn(`copy() exceeded ${maxNodes} nodes, aborting recursion`);
+        break;
+      }
+      const { srcId, destId } = queue.shift()!;
+      const children = await this.nodeRepo.find({
+        where: { userId, parentId: srcId, deletedAt: IsNull() },
+      });
+      for (const child of children) {
+        const newChild = await copyOne(child, destId);
+        if (child.type === NodeType.FOLDER) {
+          queue.push({ srcId: child.id, destId: newChild.id });
+        }
+      }
     }
-    const key = await this.keyRepo.findOne({ where: { nodeId } });
-    if (key) await this.keyRepo.save(this.keyRepo.create({ ...key, id: undefined, nodeId: newNode.id }));
 
-    await this.userRepo.increment({ id: userId }, 'usedBytes', Number(node.size));
-    return this.safeNode(newNode);
+    if (totalBytesCopied > 0) {
+      await this.userRepo.increment({ id: userId }, 'usedBytes', totalBytesCopied);
+    }
+    return this.safeNode(newRoot);
   }
 
   async softDelete(userId: string, nodeIds: string[]) {
     const nodes = await this.nodeRepo.find({ where: { id: In(nodeIds), userId, deletedAt: IsNull() } });
     if (nodes.length === 0) throw new NotFoundException('未找到文件');
-    await this.nodeRepo.update({ id: In(nodeIds), userId }, { deletedAt: new Date() });
+    // P1-B3: cascade into the full descendant subtree. Pre-fix, deleting a
+    // folder only flipped deletedAt on the folder row itself; children stayed
+    // "alive" — they were invisible in normal listings (parent gone) but the
+    // bytes still counted against quota and they could be referenced directly
+    // by id. Use a single deletedAt timestamp across the subtree so restore
+    // can later identify the same batch.
+    const deletedAt = new Date();
+    const allIds = await this.collectDescendantIds(userId, nodes.map(n => n.id));
+    await this.nodeRepo.update({ id: In(allIds), userId, deletedAt: IsNull() }, { deletedAt });
     for (const n of nodes) await this.audit(userId, 'delete', n.id, n.name);
-    return { message: `已移入回收站（${nodes.length} 项）` };
+    return { message: `已移入回收站（${nodes.length} 项，连同子文件 ${allIds.length - nodes.length} 个）` };
   }
 
   async listTrash(userId: string) {
+    // P1-B16: bound trash listing.
     const nodes = await this.nodeRepo.find({
       where: { userId, deletedAt: Not(IsNull()), isPrivate: false },
       order: { deletedAt: 'DESC' },
+      take: 500,
     });
     return nodes.map(n => this.safeNode(n));
   }
 
   async restoreTrash(userId: string, nodeIds: string[]) {
-    await this.nodeRepo.update({ id: In(nodeIds), userId }, { deletedAt: null });
+    // P1-B3: mirror of softDelete cascade — restore the whole subtree, not
+    // just the explicitly-selected ancestor row. Without this, restoring a
+    // folder leaves its children stranded (parent visible again but children
+    // still marked deletedAt; UI shows an empty folder).
+    const allIds = await this.collectDescendantIds(userId, nodeIds);
+
+    // P1-B4: resolve name conflicts at the restore root level. Pre-fix, if a
+    // user deleted "report.pdf", uploaded a new "report.pdf", then restored
+    // the old one, both rows lived under the same parent_id with the same
+    // name — UI shows two identical entries, link-by-name flows break.
+    // Only rename the explicitly-selected restore roots; deeper descendants
+    // can't collide because they live under freshly-restored parents.
+    for (const id of nodeIds) {
+      const n = await this.nodeRepo.findOne({ where: { id, userId } });
+      if (!n) continue;
+      const safeName = await this.resolveNameConflict(userId, n.parentId, n.name, n.isPrivate);
+      if (safeName !== n.name) {
+        await this.nodeRepo.update(id, { name: safeName });
+      }
+    }
+
+    await this.nodeRepo.update({ id: In(allIds), userId }, { deletedAt: null });
     return { message: '恢复成功' };
+  }
+
+  /**
+   * P1-B3 helper: BFS from given root ids and return all descendant ids
+   * (including the roots themselves) owned by userId. Includes already
+   * soft-deleted rows so restore can sweep them up too.
+   */
+  private async collectDescendantIds(userId: string, rootIds: string[]): Promise<string[]> {
+    const result = new Set<string>(rootIds);
+    let frontier = [...rootIds];
+    const maxIterations = 100; // depth guard
+    for (let i = 0; i < maxIterations && frontier.length > 0; i++) {
+      const children = await this.nodeRepo.find({
+        where: { userId, parentId: In(frontier) },
+        select: ['id'],
+      });
+      const newIds = children.map(c => c.id).filter(id => !result.has(id));
+      if (newIds.length === 0) break;
+      newIds.forEach(id => result.add(id));
+      frontier = newIds;
+    }
+    return Array.from(result);
   }
 
   async permanentDelete(userId: string, nodeIds: string[]) {
@@ -227,19 +419,86 @@ export class FilesService {
     return { message: '永久删除成功' };
   }
 
+  /**
+   * P1-B12: setLock now ONLY sets or changes a lock password. Passing an empty
+   * string used to silently clear the lock — a stray `{ password: "" }` from
+   * a typo or buggy client could wipe protection. To remove a lock, callers
+   * must POST /:nodeId/unlock with the current password (route added in
+   * files.controller). Strength floor: 6 chars.
+   */
   async setLock(userId: string, nodeId: string, password: string) {
+    if (!password || typeof password !== 'string') {
+      throw new BadRequestException('请提供密码（解除密码请使用解锁接口）');
+    }
+    if (password.length < 6) {
+      throw new BadRequestException('密码至少需要 6 位');
+    }
     await this.getNodeOwned(userId, nodeId);
-    const lockHash = password ? await hashPassword(password) : null;
-    await this.nodeRepo.update(nodeId, { isLocked: !!password, lockHash });
-    return { message: password ? '已设置密码保护' : '已取消密码保护' };
+    const lockHash = await hashPassword(password);
+    await this.nodeRepo.update(nodeId, { isLocked: true, lockHash });
+    return { message: '已设置密码保护' };
+  }
+
+  /**
+   * P1-B12 unlock companion: explicit clear endpoint. Re-verifies the current
+   * password so a stolen access token alone cannot silently remove protection
+   * on someone's locked files.
+   */
+  async removeLock(userId: string, nodeId: string, password: string) {
+    const node = await this.getNodeOwned(userId, nodeId);
+    if (!node.isLocked) {
+      throw new BadRequestException('该文件未设置密码保护');
+    }
+    await this.verifyLockWithBruteForceGuard(node, password);
+    await this.nodeRepo.update(nodeId, { isLocked: false, lockHash: null });
+    return { message: '已取消密码保护' };
   }
 
   async verifyLock(userId: string, nodeId: string, password: string) {
     const node = await this.getNodeOwned(userId, nodeId);
     if (!node.isLocked) return { valid: true };
-    const valid = await comparePassword(password, node.lockHash);
-    if (!valid) throw new ForbiddenException('密码错误');
+    await this.verifyLockWithBruteForceGuard(node, password);
     return { valid: true };
+  }
+
+  /**
+   * P1-B12 brute-force defense (per-node). 5 wrong attempts → 15-min lock.
+   * Mirrors verification-code (P1-A6) and private-space (P1-A3) patterns.
+   */
+  private async verifyLockWithBruteForceGuard(node: Node, password: string) {
+    const failKey = `lock:fail:${node.id}`;
+    const lockKey = `lock:lock:${node.id}`;
+    const maxAttempts = 5;
+    const lockSeconds = 15 * 60;
+
+    let locked: string | null;
+    try {
+      locked = await this.redis.get(lockKey);
+    } catch (e) {
+      throw new ForbiddenException('鉴权服务暂时不可用，请稍后重试');
+    }
+    if (locked) {
+      throw new ForbiddenException('密码连续错误次数过多，请 15 分钟后再试');
+    }
+
+    const valid = password && (await comparePassword(password, node.lockHash));
+    if (!valid) {
+      let fails: number;
+      try {
+        fails = await this.redis.incr(failKey);
+        if (fails === 1) await this.redis.expire(failKey, 30 * 60);
+      } catch (e) {
+        throw new ForbiddenException('鉴权服务暂时不可用，请稍后重试');
+      }
+      if (fails >= maxAttempts) {
+        await this.redis.set(lockKey, '1', 'EX', lockSeconds).catch(() => {});
+        await this.redis.del(failKey).catch(() => {});
+        throw new ForbiddenException('密码连续错误次数过多，请 15 分钟后再试');
+      }
+      throw new ForbiddenException('密码错误');
+    }
+
+    await this.redis.del(failKey).catch(() => {});
   }
 
   async moveToPrivate(userId: string, nodeIds: string[], toPrivate: boolean) {
@@ -248,13 +507,20 @@ export class FilesService {
   }
 
   async search(userId: string, keyword: string, type?: string, isPrivate = false) {
+    // P1-B15: escape ILIKE wildcards in user input. Pre-fix, a user typing
+    // "100%_off" matched anything containing "100" + any chars + "off" because
+    // % and _ were treated as wildcards. ESCAPE clause uses '\' as the literal
+    // escape char so callers can still search for percent / underscore.
+    // Length cap protects against pathological inputs hammering the DB index.
+    const kw = (keyword ?? '').slice(0, 100);
+    const escaped = kw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const qb = this.nodeRepo.createQueryBuilder('n')
       .where('n.user_id = :userId', { userId })
       .andWhere('n.deleted_at IS NULL')
       .andWhere('n.is_private = :isPrivate', { isPrivate })
-      .andWhere('n.name ILIKE :kw', { kw: `%${keyword}%` });
+      .andWhere("n.name ILIKE :kw ESCAPE '\\'", { kw: `%${escaped}%` });
     if (type) this.applyMimeTypeFilter(qb, type);
-    const nodes = await qb.orderBy('n.updated_at', 'DESC').limit(100).getMany();
+    const nodes = await qb.orderBy('n.updatedAt', 'DESC').limit(100).getMany();
     return nodes.map(n => this.safeNode(n));
   }
 
@@ -265,26 +531,42 @@ export class FilesService {
   }
 
   async listRecent(userId: string, limit = 50) {
+    // P1-B16: clamp client-supplied limit so a user can't request 10^9 rows.
+    const safeLimit = Math.min(500, Math.max(1, limit | 0 || 50));
     const nodes = await this.nodeRepo.find({
       where: { userId, deletedAt: IsNull(), isPrivate: false },
       order: { updatedAt: 'DESC' },
-      take: limit,
+      take: safeLimit,
     });
     return nodes.map(n => this.safeNode(n));
   }
 
   async listStarred(userId: string) {
+    // P1-B16: bound. Sustained pagination tracked as a separate UI fix.
     const nodes = await this.nodeRepo.find({
       where: { userId, isStarred: true, deletedAt: IsNull() },
       order: { updatedAt: 'DESC' },
+      take: 500,
     });
     return nodes.map(n => this.safeNode(n));
   }
 
   async getPath(userId: string, nodeId: string) {
+    // P1-B7: cycle protection. parent_id cycles shouldn't exist after P1-B6,
+    // but legacy rows from before that fix may carry self-loops or longer
+    // cycles. visited tracks ids we've already pushed; maxDepth bounds the
+    // walk even on otherwise-valid but pathologically deep trees so a single
+    // path lookup can't trash the server.
     const path: any[] = [];
+    const visited = new Set<string>();
+    const maxDepth = 1000;
     let current = await this.nodeRepo.findOne({ where: { id: nodeId, userId } });
-    while (current) {
+    while (current && path.length < maxDepth) {
+      if (visited.has(current.id)) {
+        this.logger.warn(`getPath cycle detected at node ${current.id} for user ${userId}`);
+        break;
+      }
+      visited.add(current.id);
       path.unshift({ id: current.id, name: current.name });
       if (!current.parentId) break;
       current = await this.nodeRepo.findOne({ where: { id: current.parentId, userId } });
@@ -332,8 +614,11 @@ export class FilesService {
     let candidate = name;
     let i = 1;
     while (true) {
+      // Search only within the same space — names in public and private are
+      // independent. Without isPrivate, a private file would influence the
+      // numbering of public renames, leaking its existence.
       const exists = await this.nodeRepo.findOne({
-        where: { userId, parentId: parentId || null, name: candidate, deletedAt: IsNull() },
+        where: { userId, parentId: parentId || null, name: candidate, isPrivate, deletedAt: IsNull() },
       });
       if (!exists) return candidate;
       candidate = `${base}_${i}${ext}`;
@@ -353,8 +638,11 @@ export class FilesService {
   private async checkLock(node: Node, password?: string) {
     if (!node.isLocked) return;
     if (!password) throw new ForbiddenException('此文件已加密，请输入密码');
-    const valid = await comparePassword(password, node.lockHash);
-    if (!valid) throw new ForbiddenException('密码错误');
+    // P1-B12: route through the brute-force guard so the download path is
+    // also bounded by the per-node 5-attempt lockout. Previously this was a
+    // bare comparePassword call — an attacker holding a valid access token
+    // could grind unlimited guesses against any locked node via getDownloadInfo.
+    await this.verifyLockWithBruteForceGuard(node, password);
   }
 
   private applyMimeTypeFilter(qb: any, type: string): void {

@@ -112,23 +112,31 @@ export default function Sidebar() {
         <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 text-right">{usedPct}% 已使用</p>
       </div>
 
-      {/* User info + logout */}
+      {/* User info + logout. Clicking avatar/name navigates to /profile (where
+          password change, devices, audit logs, storage stats live). */}
       <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-        {/* Avatar */}
-        <div className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-          {user?.avatar
-            ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-            : (user?.nickname || user?.username || '?')[0].toUpperCase()
-          }
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-            {user?.nickname || user?.username}
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-            {user?.role === 'admin' ? '管理员' : '普通用户'}
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          title="个人中心 / 修改密码"
+          className="flex-1 min-w-0 flex items-center gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 transition text-left"
+        >
+          {/* Avatar */}
+          <div className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
+            {user?.avatar
+              ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+              : (user?.nickname || user?.username || '?')[0].toUpperCase()
+            }
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {user?.nickname || user?.username}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+              {user?.role === 'admin' ? '管理员' : '普通用户'}
+            </p>
+          </div>
+        </button>
         <button
           onClick={handleLogout}
           title="退出登录"

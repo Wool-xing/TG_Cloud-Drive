@@ -34,7 +34,10 @@ const WEAK_DEFAULTS: ReadonlyArray<string> = [
   'change-me-jwt-secret',
   'change-me-refresh-secret',
   'Admin@123456',
-  'admin',
+  // NOTE: 'admin' is a legitimate username convention (and what quickstart writes
+  // for ADMIN_USERNAME). Listing it here would block first-run setup with no
+  // safety benefit — admin username is not a secret; brute-force resistance comes
+  // from password strength + throttling, not username obscurity.
   'password',
   '123456',
 ];

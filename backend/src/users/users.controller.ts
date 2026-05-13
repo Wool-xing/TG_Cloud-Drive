@@ -15,7 +15,9 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import {
   UsersService,
   UpdateProfileDto,
@@ -23,6 +25,32 @@ import {
   SetPrivateSpaceDto,
 } from './users.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+// P1-A4: explicit DTO classes so ValidationPipe (registered globally) actually
+// runs class-validator over the body. The legacy SetPrivateSpaceDto in
+// users.service is an interface — TypeScript types are erased at runtime, so
+// interface-typed @Body() params were accepted as-is (including null / number /
+// nested objects), letting malformed payloads reach service-layer code that
+// expected strings. These class DTOs replace the controller-facing type.
+
+class SetPrivateSpacePasswordDto {
+  @IsString()
+  @MinLength(8, { message: '私密空间密码至少需要 8 位' })
+  @MaxLength(128)
+  password!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  currentPassword?: string;
+}
+
+class VerifyPrivateSpacePasswordDto {
+  @IsString()
+  @MinLength(1, { message: '请输入密码' })
+  @MaxLength(128)
+  password!: string;
+}
 
 @ApiTags('用户')
 @ApiBearerAuth()
@@ -103,7 +131,7 @@ export class UsersController {
   @ApiOperation({ summary: '设置私密空间密码' })
   setupPrivateSpace(
     @CurrentUser('id') userId: string,
-    @Body() dto: SetPrivateSpaceDto,
+    @Body() dto: SetPrivateSpacePasswordDto,
     @Req() req: Request,
   ) {
     return this.usersService.setPrivateSpacePassword(userId, dto, req.ip, req.headers['user-agent']);
@@ -113,15 +141,20 @@ export class UsersController {
    * POST /users/private-space/verify
    * Verify private space password and receive a short-lived session token.
    */
+  // P1-A3: tight per-IP rate limit on private-space password verification.
+  // Without this, attackers who already hold a stolen access token could
+  // brute-force the private-space password from anywhere. Pair with the
+  // per-user fail counter in users.service.verifyPrivateSpace (5 attempts → 15-min lock).
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('private-space/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '验证私密空间密码' })
   verifyPrivateSpace(
     @CurrentUser('id') userId: string,
-    @Body('password') password: string,
+    @Body() dto: VerifyPrivateSpacePasswordDto,
     @Req() req: Request,
   ) {
-    return this.usersService.verifyPrivateSpace(userId, password, req.ip, req.headers['user-agent']);
+    return this.usersService.verifyPrivateSpace(userId, dto.password, req.ip, req.headers['user-agent']);
   }
 
   /**

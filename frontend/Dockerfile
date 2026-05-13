@@ -6,8 +6,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies (cached layer)
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy source files
 COPY . .

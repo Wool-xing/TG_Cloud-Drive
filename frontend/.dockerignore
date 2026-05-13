@@ -1,0 +1,36 @@
+# Build artifacts
+dist
+node_modules
+
+# Local env (never bake into image — Vite reads VITE_* at build via --build-arg)
+.env
+.env.*
+!.env.example
+
+# VCS
+.git
+.gitignore
+
+# IDE / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / caches
+*.log
+.npm
+coverage
+
+# Tests
+test
+__tests__
+*.test.ts
+*.spec.ts
+*.test.tsx
+*.spec.tsx
+
+# Docker
+Dockerfile
+.dockerignore

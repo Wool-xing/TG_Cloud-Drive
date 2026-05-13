@@ -15,6 +15,12 @@ import {
   hashPassword, comparePassword, generateSecureToken, encryptField,
   generateSalt, hashIdentifier, normalizeEmail, normalizePhone,
 } from '../common/encryption';
+
+// Generated once per process to absorb the bcrypt cost during the non-existent
+// user branch in login(). Pure side-effect; the actual content is irrelevant
+// — what matters is that bcrypt.compare against this hash takes the same time
+// as comparing against a real user's hash.
+let __DUMMY_BCRYPT_HASH__: Promise<string> | null = null;
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerificationService } from '../verification/verification.service';
@@ -88,7 +94,17 @@ export class AuthService {
     const { identifier, password } = dto;
     const user = await this.findUserByIdentifier(identifier);
 
-    if (!user) throw new UnauthorizedException('用户名或密码错误');
+    if (!user) {
+      // P1-A2: prevent user-existence enumeration via login timing side-channel.
+      // Without this, the existing-user path runs bcrypt (cost=12 ≈ 200–300 ms)
+      // while the non-existent-user path returns in <5 ms — trivially measurable
+      // remotely, even with a few ms of network jitter. We burn an equivalent
+      // bcrypt op against a deterministic-but-unverifiable dummy hash so both
+      // branches converge to the same response-time distribution. The dummy
+      // hash is generated lazily once per process to avoid bootstrapping cost.
+      await comparePassword(password, await this.ensureDummyHash());
+      throw new UnauthorizedException('用户名或密码错误');
+    }
     if (user.status === UserStatus.DISABLED) throw new ForbiddenException('账号已被禁用');
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
@@ -124,13 +140,30 @@ export class AuthService {
       throw new UnauthorizedException('刷新令牌无效');
     }
 
+    // P1-A7: enforce token-type claim. Refresh tokens are minted with
+    // `{ type: 'refresh' }` in issueTokens(); reject anything else that
+    // happens to be signed with JWT_REFRESH_SECRET. Defense-in-depth in case
+    // a future feature reuses the refresh secret for a different token kind.
+    if (payload.type !== 'refresh') {
+      throw new UnauthorizedException('令牌类型无效');
+    }
+
     const device = await this.deviceRepo.findOne({ where: { id: payload.deviceId } });
     if (!device || device.expiresAt < new Date()) {
       throw new UnauthorizedException('登录已过期，请重新登录');
     }
 
-    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    if (device.refreshTokenHash !== tokenHash) {
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    // Constant-time comparison to prevent remote timing attacks on the
+    // stored hash. JS `!==` is a short-circuit string compare — an attacker
+    // measuring response timing could leak the hash byte-by-byte.
+    // crypto.timingSafeEqual throws on length mismatch, so length-check first.
+    const provided = Buffer.from(tokenHash);
+    const expected = Buffer.from(device.refreshTokenHash || '');
+    const tokenOk =
+      expected.length === provided.length &&
+      crypto.timingSafeEqual(expected, provided);
+    if (!tokenOk) {
       throw new UnauthorizedException('登录令牌已失效');
     }
 
@@ -181,15 +214,49 @@ export class AuthService {
       { sub: user.id, deviceId: device.id, type: 'refresh' },
       { secret: this.configService.get('JWT_REFRESH_SECRET'), expiresIn: '30d' },
     );
-    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    const tokenHash = this.hashRefreshToken(refreshToken);
     await this.deviceRepo.update(device.id, { refreshTokenHash: tokenHash });
 
     const accessToken = this.signAccess(user, device.id);
     return { accessToken, refreshToken, deviceId: device.id };
   }
 
+  /**
+   * Lazy-init a dummy bcrypt hash used by the non-existent-user branch of
+   * login() to equalize timing against the real-user branch (P1-A2).
+   * One bcrypt.hash per process is acceptable — runs once on first miss.
+   */
+  private ensureDummyHash(): Promise<string> {
+    if (!__DUMMY_BCRYPT_HASH__) {
+      __DUMMY_BCRYPT_HASH__ = hashPassword(
+        'TG-PAN-DUMMY-' + crypto.randomBytes(16).toString('hex'),
+      );
+    }
+    return __DUMMY_BCRYPT_HASH__;
+  }
+
   private signAccess(user: User, deviceId: string) {
     return this.jwtService.sign({ sub: user.id, role: user.role, deviceId });
+  }
+
+  /**
+   * Hash a refresh token for at-rest storage in `devices.refresh_token_hash`.
+   *
+   * HMAC-SHA256 with server-side pepper (JWT_REFRESH_SECRET) — NOT a plain
+   * SHA-256. Plain SHA-256 over a high-entropy token is reversible by table
+   * lookup only if the attacker also has the original tokens; the pepper here
+   * is defense-in-depth against a DB-only leak: even if the attacker dumps
+   * the devices table, they can't reverse-engineer the stored hashes without
+   * also breaching the server's signing secret. Pairs with the timing-safe
+   * compare in refresh().
+   *
+   * Reusing JWT_REFRESH_SECRET as the HMAC key is intentional: if that secret
+   * is compromised, the attacker can already forge refresh tokens directly —
+   * so a separate REFRESH_TOKEN_PEPPER would buy no additional security here.
+   */
+  private hashRefreshToken(refreshToken: string): string {
+    const pepper = this.configService.get<string>('JWT_REFRESH_SECRET');
+    return crypto.createHmac('sha256', pepper!).update(refreshToken).digest('hex');
   }
 
   private async findUserByIdentifier(identifier: string) {
