@@ -11,7 +11,7 @@
 前置：装好 [Docker Desktop](https://www.docker.com/products/docker-desktop) + 一个 [Telegram](https://telegram.org) 账号。
 
 ```bash
-git clone <this-repo-url> tg-pan
+git clone git clone https://github.com/Wool-xing/TG_Cloud-Drive tg-pan tg-pan
 cd tg-pan
 make quickstart
 ```
