@@ -1,5 +1,6 @@
 import { Injectable, Logger, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import * as FormData from 'form-data';
 
@@ -129,10 +130,18 @@ export class TelegramService {
   }
 
   buildSignedDownloadUrl(fileId: string, expiresInSeconds = 3600): string {
-    const crypto = require('crypto');
+    // P1-I12: require a dedicated secret. Falling back to JWT_SECRET coupled
+    // the Workers HMAC verifier with our JWT signing key — anyone who could
+    // forge a Worker-relay URL could also forge access tokens, and vice versa.
+    // Treat the absence of CF_WORKERS_SECRET as a configuration error rather
+    // than silently downgrading to a shared secret.
+    if (!this.workersSecret) {
+      throw new InternalServerErrorException(
+        '签名下载链接需要 CF_WORKERS_SECRET，请在环境变量中配置专用密钥',
+      );
+    }
     const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
-    const secret = this.workersSecret || this.cs.get('JWT_SECRET');
-    const sig = crypto.createHmac('sha256', secret).update(`${fileId}:${exp}`).digest('hex').slice(0, 16);
+    const sig = crypto.createHmac('sha256', this.workersSecret).update(`${fileId}:${exp}`).digest('hex').slice(0, 16);
     const token = Buffer.from(JSON.stringify({ fileId, exp, sig })).toString('base64url');
     if (this.workersUrl) return `${this.workersUrl}/file/${token}`;
     return `/api/files/download/${token}`;
