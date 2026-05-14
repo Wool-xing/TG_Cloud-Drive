@@ -11,7 +11,10 @@ import {
   Moon,
   SortAsc,
   SortDesc,
+  ArrowLeft,
+  Settings,
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useFileStore } from '../../stores/file.store';
 import { FileFilter, SortField } from '../../types';
 
@@ -80,6 +83,15 @@ export default function Topbar({ onUpload }: TopbarProps) {
     setSearch,
   } = useFileStore();
 
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  // P1-UX: file-tools row (breadcrumb / filter tabs / view mode / sort /
+  // upload) only makes sense inside the file browser. On /profile (and any
+  // future settings-style page) those controls look misplaced — the user
+  // sees "我的文件 > ..." while they are on the 账户设置 page. Render a
+  // minimal header with back-arrow + page title + dark toggle instead.
+  const isSettingsRoute = location.pathname.startsWith('/profile');
+
   const [dark, setDark] = useDarkMode();
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -114,6 +126,32 @@ export default function Topbar({ onUpload }: TopbarProps) {
 
   const handleBreadcrumbRoot = () => fileNavigate(null);
   const handleBreadcrumbItem = (index: number) => navigateTo(index);
+
+  // Settings-style minimal header — see isSettingsRoute comment above.
+  if (isSettingsRoute) {
+    return (
+      <div className="flex items-center gap-3 px-4 h-14">
+        <button
+          onClick={() => routerNavigate('/')}
+          title="返回文件"
+          className="p-1.5 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition"
+        >
+          <ArrowLeft className="h-4.5 w-4.5" />
+        </button>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <Settings className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">账户设置</span>
+        </div>
+        <button
+          onClick={() => setDark(d => !d)}
+          title={dark ? '切换亮色模式' : '切换暗色模式'}
+          className="p-1.5 rounded-xl text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition"
+        >
+          {dark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">

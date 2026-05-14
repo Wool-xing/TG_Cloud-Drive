@@ -257,13 +257,27 @@ export default function Login() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/30 p-8">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 dark:text-gray-100">登录账号</h2>
 
-              <form onSubmit={handleLogin} className="space-y-5">
+              {/* P1-UX: explicit form name + each input gets id + name so Chrome /
+                  Edge / Firefox password managers recognize the form and offer
+                  account autofill (the popup with saved accounts next to the
+                  username field). Pre-fix only autoComplete attrs were set, but
+                  browsers also key off form name / input name for auto-fill. */}
+              <form
+                name="login"
+                onSubmit={handleLogin}
+                className="space-y-5"
+                autoComplete="on"
+                method="post"
+                action="#"
+              >
                 {/* Identifier */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  <label htmlFor="login-identifier" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     用户名 / 手机号 / 邮箱
                   </label>
                   <input
+                    id="login-identifier"
+                    name="username"
                     type="text"
                     value={identifier}
                     onChange={e => setIdentifier(e.target.value)}
@@ -276,7 +290,7 @@ export default function Login() {
                 {/* Password */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">密码</label>
+                    <label htmlFor="login-password" className="text-sm font-medium text-gray-700 dark:text-gray-300">密码</label>
                     <button
                       type="button"
                       onClick={() => setShowForgot(true)}
@@ -287,6 +301,8 @@ export default function Login() {
                   </div>
                   <div className="relative">
                     <input
+                      id="login-password"
+                      name="password"
                       type={showPw ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
@@ -304,15 +320,25 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Remember me */}
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                {/* Remember me — P1-UX: explain what it does. Pre-fix the label
+                    just read "记住我" so users couldn't tell what would happen
+                    next: stay-logged-in across browser restart, or just a fancy
+                    no-op. The hint below makes the behaviour explicit. */}
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={e => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600 dark:border-gray-600"
+                    className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600 dark:border-gray-600"
                   />
-                  <span className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-300">记住我</span>
+                  <span className="flex-1 text-sm">
+                    <span className="text-gray-700 dark:text-gray-200">记住我</span>
+                    <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      {rememberMe
+                        ? '勾选后关闭浏览器再打开仍保持登录'
+                        : '未勾选则关闭浏览器后需重新登录（公共电脑推荐）'}
+                    </span>
+                  </span>
                 </label>
 
                 {/* Submit */}
