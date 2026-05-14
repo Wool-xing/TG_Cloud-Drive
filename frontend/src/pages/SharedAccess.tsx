@@ -18,7 +18,13 @@ import {
 import toast from 'react-hot-toast';
 
 import { sharesApi } from '../api/client';
-import { importShareDEK, decryptChunk, hexToBuffer, formatBytes } from '../utils/crypto';
+import { importShareDEK, decryptChunk, formatBytes } from '../utils/crypto';
+import { streamingDownload, BlobFallbackTooLargeError } from '../utils/streaming-download';
+
+// P1-F5: preview is the only path that still has to buffer the whole file
+// (Blob URL → <img>/<video>/<iframe src>). Above this size we refuse to
+// build the Blob and surface a "download then open locally" hint instead.
+const PREVIEW_BLOB_MAX_BYTES = 200 * 1024 * 1024;
 
 interface ShareInfo {
   node: {
@@ -145,45 +151,49 @@ export default function SharedAccess() {
         dek = await importShareDEK(shareKeyFragment);
       }
 
-      // Stream: fetch each chunk, decrypt if needed, accumulate
-      const buffers: ArrayBuffer[] = [];
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const chunkRes = await fetch(chunk.url);
-        if (!chunkRes.ok) throw new Error(`Failed to fetch chunk ${i}`);
-        const chunkData = await chunkRes.arrayBuffer();
-
-        if (dek && chunk.iv) {
-          const decrypted = await decryptChunk(chunkData, dek, chunk.iv);
-          buffers.push(decrypted);
-        } else {
-          buffers.push(chunkData);
-        }
-
-        setDownloadProgress(Math.round(((i + 1) / chunks.length) * 100));
-      }
-
-      // Concat all buffers into one blob
-      const totalLength = buffers.reduce((acc, b) => acc + b.byteLength, 0);
-      const merged = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const buf of buffers) {
-        merged.set(new Uint8Array(buf), offset);
-        offset += buf.byteLength;
-      }
-
-      const blob = new Blob([merged], { type: shareInfo.node.mimeType ?? 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = shareInfo.node.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      // P1-F5: stream chunks straight to disk via showSaveFilePicker, or
+      // fall back to the legacy Blob path with a soft cap on non-Chromium
+      // browsers. Only ONE chunk's worth of plaintext lives in memory at
+      // a time, so multi-GB shares no longer crash the tab.
+      let warnedFallback = false;
+      await streamingDownload(
+        {
+          count: chunks.length,
+          fetchChunk: async (i: number) => {
+            const chunk = chunks[i];
+            const chunkRes = await fetch(chunk.url);
+            if (!chunkRes.ok) throw new Error(`下载分片 ${i} 失败`);
+            const chunkData = await chunkRes.arrayBuffer();
+            const plain = dek && chunk.iv
+              ? await decryptChunk(chunkData, dek, chunk.iv)
+              : chunkData;
+            return new Uint8Array(plain);
+          },
+        },
+        {
+          filename: shareInfo.node.name,
+          mimeType: shareInfo.node.mimeType,
+          totalSize: shareInfo.node.size,
+          onProgress: (f) => setDownloadProgress(Math.round(f * 100)),
+          onLargeFileFallback: () => {
+            if (!warnedFallback) {
+              warnedFallback = true;
+              toast('当前浏览器将在内存中缓冲完整文件，大文件可能较慢。建议使用 Chrome / Edge 获得流式下载。');
+            }
+          },
+        },
+      );
 
       toast.success('下载完成');
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        // User cancelled the save dialog — silent.
+        return;
+      }
+      if (err instanceof BlobFallbackTooLargeError) {
+        toast.error(err.message);
+        return;
+      }
       console.error(err);
       toast.error('下载失败，请重试');
     } finally {
@@ -199,7 +209,17 @@ export default function SharedAccess() {
       return;
     }
 
+    // P1-F5: preview path *must* buffer (Blob URL → <img>/<video>/<iframe>),
+    // so cap size and surface a clear hint instead of letting the tab OOM.
+    if (shareInfo.node.size > PREVIEW_BLOB_MAX_BYTES) {
+      toast.error(
+        `文件超过 ${formatBytes(PREVIEW_BLOB_MAX_BYTES)}，在线预览容易使浏览器卡顿。请直接下载后用本地播放器/查看器打开。`,
+      );
+      return;
+    }
+
     setIsDownloading(true);
+    let createdUrl: string | null = null;
     try {
       const res = await sharesApi.access(token, password || undefined) as any;
       const info: ShareInfo = res?.share ?? res;
@@ -231,15 +251,29 @@ export default function SharedAccess() {
       }
 
       const blob = new Blob([merged], { type: shareInfo.node.mimeType ?? 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
+      createdUrl = URL.createObjectURL(blob);
+      setPreviewUrl(createdUrl);
       setShowPreview(true);
+      createdUrl = null; // ownership transferred to previewUrl state
     } catch {
+      // P1-F24: on the error path the partially-built blob URL would have
+      // leaked. Revoke it before bubbling up.
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
       toast.error('预览失败');
     } finally {
       setIsDownloading(false);
     }
   };
+
+  // P1-F24: revoke the preview blob URL when this page unmounts or when the
+  // user navigates to a different share token. Pre-fix the URL leaked for the
+  // lifetime of the tab.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
 
   // ── Password Gate ──────────────────────────────────────────────
   if (state === 'password') {
