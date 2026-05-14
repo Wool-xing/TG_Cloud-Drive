@@ -13,7 +13,13 @@ import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer } from '../../utils/crypto';
+import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
 import { Node, DownloadInfo } from '../../types';
+
+// P1-F24: preview path has to buffer into a Blob URL for <img>/<video>/<pdf>.
+// Above this size we refuse and tell the user to download instead — the
+// download path streams to disk without the Blob.
+const PREVIEW_BLOB_MAX_BYTES = 200 * 1024 * 1024;
 
 interface PreviewModalProps {
   nodes: Node[];
@@ -24,7 +30,8 @@ type PreviewState =
   | { status: 'error'; message: string }
   | { status: 'ready'; blobUrl: string; mimeType: string }
   | { status: 'text'; content: string; mimeType: string }
-  | { status: 'unencrypted'; downloadUrl: string };
+  | { status: 'unencrypted'; downloadUrl: string }
+  | { status: 'tooLarge'; size: number };
 
 function isPreviewable(mimeType?: string): boolean {
   if (!mimeType) return false;
@@ -57,7 +64,7 @@ async function fetchAndDecrypt(
   nodeId: string,
   mekDerived: boolean,
   lockPassword?: string,
-): Promise<{ blobUrl?: string; textContent?: string; mimeType: string; downloadUrl?: string; downloadInfo: DownloadInfo }> {
+): Promise<{ blobUrl?: string; textContent?: string; mimeType: string; downloadUrl?: string; downloadInfo: DownloadInfo; tooLargeForPreview?: boolean }> {
   const info = await filesApi.getDownloadInfo(nodeId, lockPassword) as unknown as DownloadInfo;
   const mimeType = info.node.mimeType ?? 'application/octet-stream';
   const mek = getSessionMEK();
@@ -66,6 +73,13 @@ async function fetchAndDecrypt(
     // Not encrypted or MEK not available — return direct download URL if available
     const downloadUrl = (info as any).downloadUrl ?? (info as any).url;
     return { downloadUrl, mimeType, downloadInfo: info };
+  }
+
+  // P1-F24: refuse to buffer huge files into a preview Blob — fall back to
+  // download (handled by caller via the `tooLargeForPreview` flag). The
+  // download path uses streamingDownload() which doesn't OOM the tab.
+  if (info.node.size > PREVIEW_BLOB_MAX_BYTES) {
+    return { mimeType, downloadInfo: info, tooLargeForPreview: true };
   }
 
   // Decrypt DEK
@@ -103,6 +117,9 @@ async function fetchAndDecrypt(
     return { textContent, mimeType, downloadInfo: info };
   }
 
+  // P1-F24: if the caller throws between this point and `setPreviewState`
+  // they would orphan this URL. We hand ownership of the URL to the caller
+  // — the loadPreview catch + outer revokeBlobUrl handle teardown.
   const blobUrl = URL.createObjectURL(blob);
   return { blobUrl, mimeType, downloadInfo: info };
 }
@@ -139,6 +156,13 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       try {
         const result = await fetchAndDecrypt(node.id, mekDerived, password);
         setDownloadInfo(result.downloadInfo);
+
+        // P1-F24: size cap path — skip Blob construction, offer streaming
+        // download instead via the 'tooLarge' state.
+        if (result.tooLargeForPreview) {
+          setPreviewState({ status: 'tooLarge', size: result.downloadInfo.node.size });
+          return;
+        }
 
         if (result.downloadUrl && !result.blobUrl && !result.textContent) {
           setPreviewState({ status: 'unencrypted', downloadUrl: result.downloadUrl });
@@ -207,12 +231,16 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         a.href = blobUrlRef.current;
         a.download = previewNode.name;
         a.click();
-      } else if (previewState.status === 'unencrypted') {
+        return;
+      }
+      if (previewState.status === 'unencrypted') {
         const a = document.createElement('a');
         a.href = (previewState as any).downloadUrl;
         a.download = previewNode.name;
         a.click();
-      } else if (previewState.status === 'text') {
+        return;
+      }
+      if (previewState.status === 'text') {
         const blob = new Blob([(previewState as any).content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -220,17 +248,62 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         a.download = previewNode.name;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      } else {
-        // Fallback: reload download info and trigger download
-        const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
-        const url = (info as any).downloadUrl ?? info.chunks?.[0];
-        if (url) {
-          window.open(url, '_blank');
+        return;
+      }
+
+      // tooLarge / loading / error path → re-fetch and stream to disk via
+      // showSaveFilePicker (Blob fallback for legacy browsers). Pre-fix this
+      // branch called window.open() on the first chunk URL — only delivered
+      // the first 20 MB to the user, silently.
+      const mek = getSessionMEK();
+      const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
+      const mimeType = info.node.mimeType ?? 'application/octet-stream';
+
+      if (!info.key || !mek || !mekDerived) {
+        const directUrl = (info as any).downloadUrl ?? (info as any).url;
+        if (directUrl) {
+          window.open(directUrl, '_blank');
         } else {
           toast.error('无法获取下载链接');
         }
+        return;
       }
-    } catch {
+
+      const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+
+      let warnedFallback = false;
+      await streamingDownload(
+        {
+          count: info.chunks.length,
+          fetchChunk: async (i: number) => {
+            const chunk = info.chunks[i];
+            if (!chunk.iv) throw new Error(`分片 ${i} 缺少 IV，可能是历史损坏文件`);
+            const res = await fetch(chunk.url);
+            if (!res.ok) throw new Error(`下载分片 ${i} 失败`);
+            const encrypted = await res.arrayBuffer();
+            const plain = await decryptBuffer(encrypted, dek, chunk.iv);
+            return new Uint8Array(plain);
+          },
+        },
+        {
+          filename: previewNode.name,
+          mimeType,
+          totalSize: info.node.size,
+          onLargeFileFallback: () => {
+            if (!warnedFallback) {
+              warnedFallback = true;
+              toast('当前浏览器将在内存中缓冲完整文件，大文件可能较慢。建议使用 Chrome / Edge 获得流式下载。');
+            }
+          },
+        },
+      );
+      toast.success('下载完成');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return; // user cancelled save dialog
+      if (err instanceof BlobFallbackTooLargeError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error('下载失败');
     }
   };
@@ -274,6 +347,25 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                 </button>
               </form>
             )}
+          </div>
+        );
+
+      case 'tooLarge':
+        return (
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8 text-center">
+            <File className="w-14 h-14 text-gray-300" />
+            <p className="text-sm">
+              文件大小 {formatBytes(previewState.size)} 超过在线预览上限 {formatBytes(PREVIEW_BLOB_MAX_BYTES)}。
+              <br />
+              直接下载后用本地播放器/查看器打开，体验更顺。
+            </p>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              下载文件
+            </button>
           </div>
         );
 
@@ -397,7 +489,8 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         <div className="flex items-center gap-2 ml-4 flex-shrink-0">
           {previewState.status === 'ready' ||
           previewState.status === 'text' ||
-          previewState.status === 'unencrypted' ? (
+          previewState.status === 'unencrypted' ||
+          previewState.status === 'tooLarge' ? (
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
