@@ -87,12 +87,12 @@ function ForgotModal({ onClose }: ForgotModalProps) {
       <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 shadow-2xl p-8">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors dark:text-gray-500"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">找回密码</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1 dark:text-gray-100">找回密码</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           {step === 'identify' && '输入您注册时使用的邮箱或手机号'}
           {step === 'verify' && `验证码已发送至 ${target}`}
@@ -109,7 +109,7 @@ function ForgotModal({ onClose }: ForgotModalProps) {
                   value={target}
                   onChange={e => setTarget(e.target.value)}
                   placeholder="请输入邮箱或手机号"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
                   onKeyDown={e => e.key === 'Enter' && handleSendCode()}
                 />
               </div>
@@ -134,14 +134,14 @@ function ForgotModal({ onClose }: ForgotModalProps) {
                   onChange={e => setCode(e.target.value)}
                   placeholder="6 位验证码"
                   maxLength={6}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
                 />
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={handleResend}
                   disabled={countdown > 0 || sending}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-60"
+                  className="flex-1 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-60 dark:hover:bg-gray-700/50"
                 >
                   {countdown > 0 ? `${countdown}s 后重发` : '重新发送'}
                 </button>
@@ -165,12 +165,12 @@ function ForgotModal({ onClose }: ForgotModalProps) {
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                     placeholder="至少 8 位"
-                    className="w-full px-4 py-2.5 pr-11 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    className="w-full px-4 py-2.5 pr-11 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPw(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 dark:text-gray-500"
                   >
                     {showPw ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -183,7 +183,7 @@ function ForgotModal({ onClose }: ForgotModalProps) {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="再次输入新密码"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
                 />
               </div>
               <button
@@ -223,7 +223,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await authApi.login({ identifier: identifier.trim(), password }) as any;
-      setAuth(res.user, res.accessToken, res.refreshToken, res.mekSalt);
+      setAuth(res.user, res.accessToken, res.refreshToken, res.mekSalt, rememberMe);
       await deriveMEK(password);
       toast.success(`欢迎回来，${res.user.nickname || res.user.username}！`);
       navigate('/');
@@ -238,7 +238,7 @@ export default function Login() {
     <>
       {showForgot && <ForgotModal onClose={() => setShowForgot(false)} />}
 
-      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 dark:bg-gray-900">
         {/* Blue gradient header strip */}
         <div className="h-1.5 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
 
@@ -249,13 +249,13 @@ export default function Login() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 mb-4">
                 <Cloud className="h-8 w-8 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">TG 云盘</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">TG 云盘</h1>
               <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">安全、私密的云端存储空间</p>
             </div>
 
             {/* Card */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/30 p-8">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">登录账号</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 dark:text-gray-100">登录账号</h2>
 
               <form onSubmit={handleLogin} className="space-y-5">
                 {/* Identifier */}
@@ -269,7 +269,7 @@ export default function Login() {
                     onChange={e => setIdentifier(e.target.value)}
                     placeholder="请输入用户名、手机号或邮箱"
                     autoComplete="username"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition text-sm dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
                   />
                 </div>
 
@@ -292,12 +292,12 @@ export default function Login() {
                       onChange={e => setPassword(e.target.value)}
                       placeholder="请输入密码"
                       autoComplete="current-password"
-                      className="w-full px-4 py-2.5 pr-11 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
+                      className="w-full px-4 py-2.5 pr-11 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPw(p => !p)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition dark:text-gray-500"
                     >
                       {showPw ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -310,9 +310,9 @@ export default function Login() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={e => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600 dark:border-gray-600"
                   />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">记住我</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-300">记住我</span>
                 </label>
 
                 {/* Submit */}
@@ -334,7 +334,7 @@ export default function Login() {
               </div>
             </div>
 
-            <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-600">
+            <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-600 dark:text-gray-500">
               登录即代表您同意我们的服务条款与隐私政策
             </p>
           </div>

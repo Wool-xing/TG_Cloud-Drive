@@ -14,6 +14,31 @@ import './index.css';
   }
 })();
 
+// "记住我" lifecycle.
+//
+// Pre-fix: the Login checkbox toggled a local state that nothing read — every
+// session was effectively "remember forever", because tokens were always
+// written to localStorage and survived browser close.
+//
+// Strategy: use a sessionStorage sentinel to detect a fresh browser session
+// (sessionStorage clears when the last tab of an origin closes). When the
+// sentinel is missing on boot AND rememberMe was set false, the previous
+// "session" has ended → purge tokens + auth state. localStorage stays the
+// single token source so existing axios / auth.store code is untouched.
+;(function () {
+  try {
+    const isNewBrowserSession = !sessionStorage.getItem('session-alive');
+    sessionStorage.setItem('session-alive', '1');
+    const wasRememberMe = localStorage.getItem('rememberMe') === '1';
+    if (isNewBrowserSession && !wasRememberMe) {
+      // Previous "no-remember" session ended (all tabs closed). Drop auth.
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('auth');
+    }
+  } catch { /* private mode / disabled storage — fall through */ }
+})();
+
 // Exported so non-component code (e.g. auth.store.logout) can clear cache too.
 export const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },

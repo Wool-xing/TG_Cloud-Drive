@@ -23,7 +23,7 @@ interface FileListProps {
 }
 
 function getMimeIcon(mimeType?: string) {
-  if (!mimeType) return <File className="w-5 h-5 text-gray-400" />;
+  if (!mimeType) return <File className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
   if (mimeType.startsWith('image/')) return <Image className="w-5 h-5 text-purple-500" />;
   if (mimeType.startsWith('video/')) return <Play className="w-5 h-5 text-red-500" />;
   if (mimeType.startsWith('audio/')) return <Music className="w-5 h-5 text-green-500" />;
@@ -35,7 +35,7 @@ function getMimeIcon(mimeType?: string) {
     mimeType.includes('gz') ||
     mimeType.includes('7z')
   )
-    return <Archive className="w-5 h-5 text-gray-500" />;
+    return <Archive className="w-5 h-5 text-gray-500 dark:text-gray-400" />;
   if (
     mimeType.includes('javascript') ||
     mimeType.includes('typescript') ||
@@ -46,7 +46,7 @@ function getMimeIcon(mimeType?: string) {
     mimeType.startsWith('text/x-')
   )
     return <Code className="w-5 h-5 text-blue-500" />;
-  return <File className="w-5 h-5 text-gray-400" />;
+  return <File className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
 }
 
 function formatDate(dateStr: string): string {
@@ -75,7 +75,7 @@ function getTypeBadge(node: Node): string {
 
 function SkeletonRow() {
   return (
-    <tr className="animate-pulse border-b border-gray-100 dark:border-gray-800">
+    <tr className="animate-pulse border-b border-gray-100 dark:border-gray-800 dark:border-gray-700">
       <td className="w-10 px-4 py-3">
         <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
       </td>
@@ -179,7 +179,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+        <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 dark:bg-gray-900">
           <tr>
             <th className="w-10 px-4 py-2">
               <input
@@ -189,7 +189,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
                   if (el) el.indeterminate = someSelected && !allSelected;
                 }}
                 onChange={handleHeaderCheckbox}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
               />
             </th>
             <th
@@ -213,7 +213,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800 dark:divide-gray-700">
           {isLoading
             ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
             : nodes.map((node) => {
@@ -237,7 +237,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
                         checked={isSelected}
                         onChange={() => selectNode(node.id, true)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
                       />
                     </td>
 
@@ -251,7 +251,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
                             getMimeIcon(node.mimeType)
                           )}
                           {node.isLocked && (
-                            <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5" />
+                            <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5 dark:text-gray-400" />
                           )}
                         </div>
                         <span className="truncate font-medium text-gray-800 dark:text-gray-100">{node.name}</span>

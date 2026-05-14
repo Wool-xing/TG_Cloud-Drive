@@ -54,11 +54,11 @@ function isImageMime(mimeType?: string) {
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-xl border border-gray-200 overflow-hidden bg-white">
-      <div className="h-36 bg-gray-200" />
+    <div className="animate-pulse rounded-xl border border-gray-200 overflow-hidden bg-white dark:bg-gray-800 dark:border-gray-700">
+      <div className="h-36 bg-gray-200 dark:bg-gray-700" />
       <div className="p-3 space-y-2">
-        <div className="h-3.5 bg-gray-200 rounded w-3/4" />
-        <div className="h-3 bg-gray-200 rounded w-1/3" />
+        <div className="h-3.5 bg-gray-200 rounded w-3/4 dark:bg-gray-700" />
+        <div className="h-3 bg-gray-200 rounded w-1/3 dark:bg-gray-700" />
       </div>
     </div>
   );
@@ -153,7 +153,7 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
             onContextMenu={(e) => handleContextMenu(e, node)}
           >
             {/* Thumbnail / Icon area */}
-            <div className="h-32 bg-gray-50 flex items-center justify-center relative overflow-hidden">
+            <div className="h-32 bg-gray-50 flex items-center justify-center relative overflow-hidden dark:bg-gray-900">
               {showThumbnail ? (
                 <img
                   src={`/api/files/thumbnail/${node.id}`}
@@ -173,7 +173,7 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
               )}
               {/* Fallback icon (hidden by default, shown on image error) */}
               {showThumbnail && (
-                <div className="absolute inset-0 hidden items-center justify-center bg-gray-50">
+                <div className="absolute inset-0 hidden items-center justify-center bg-gray-50 dark:bg-gray-900">
                   {getMimeIcon(node.mimeType, true)}
                 </div>
               )}
@@ -189,7 +189,7 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => {}}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer shadow"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer shadow dark:border-gray-600"
                 />
               </div>
 
@@ -197,7 +197,7 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
               {node.isLocked && (
                 <div className="absolute top-2 right-2">
                   <div className="bg-white/80 backdrop-blur-sm rounded-full p-1">
-                    <Lock className="w-3 h-3 text-gray-600" />
+                    <Lock className="w-3 h-3 text-gray-600 dark:text-gray-300" />
                   </div>
                 </div>
               )}
@@ -211,14 +211,14 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
             </div>
 
             {/* Info */}
-            <div className="px-3 py-2 border-t border-gray-100">
+            <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700">
               <p
-                className="text-sm font-medium text-gray-800 truncate"
+                className="text-sm font-medium text-gray-800 truncate dark:text-gray-100"
                 title={node.name}
               >
                 {node.name}
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5 dark:text-gray-500">
                 {node.type === 'folder' ? '文件夹' : formatBytes(node.size)}
               </p>
             </div>

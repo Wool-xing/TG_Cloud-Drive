@@ -312,7 +312,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
     switch (previewState.status) {
       case 'loading':
         return (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 dark:text-gray-500">
             <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
             <p className="text-sm">正在加载预览…</p>
           </div>
@@ -320,7 +320,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       case 'error':
         return (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8 dark:text-gray-500">
             <AlertTriangle className="w-10 h-10 text-orange-400" />
             <p className="text-sm text-center">{previewState.message}</p>
             {needsLockPassword && (
@@ -337,7 +337,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                   value={lockPassword}
                   onChange={(e) => setLockPassword(e.target.value)}
                   placeholder="输入文件锁定密码"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
                 />
                 <button
                   type="submit"
@@ -352,7 +352,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       case 'tooLarge':
         return (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8 text-center">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8 text-center dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
             <p className="text-sm">
               文件大小 {formatBytes(previewState.size)} 超过在线预览上限 {formatBytes(PREVIEW_BLOB_MAX_BYTES)}。
@@ -371,7 +371,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       case 'unencrypted':
         return (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
             <p className="text-sm">此文件无加密，可直接下载</p>
             <button
@@ -387,7 +387,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       case 'text':
         return (
           <div className="flex-1 overflow-auto p-6">
-            <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap break-words bg-gray-900 text-green-400 rounded-xl p-6 h-full overflow-auto">
+            <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap break-words bg-gray-900 text-green-400 rounded-xl p-6 h-full overflow-auto dark:text-gray-300">
               {previewState.content}
             </pre>
           </div>
@@ -446,7 +446,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           );
         }
         return (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
             <p className="text-sm">此格式暂不支持在线预览</p>
             <button

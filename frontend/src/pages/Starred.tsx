@@ -56,16 +56,16 @@ function getMimeCategory(node: Node): 'image' | 'video' | 'audio' | 'document' |
 }
 
 function getMimeIcon(mimeType?: string) {
-  if (!mimeType) return <File className="w-5 h-5 text-gray-400" />;
+  if (!mimeType) return <File className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
   if (mimeType.startsWith('image/')) return <Image className="w-5 h-5 text-purple-500" />;
   if (mimeType.startsWith('video/')) return <Play className="w-5 h-5 text-red-500" />;
   if (mimeType.startsWith('audio/')) return <Music className="w-5 h-5 text-green-500" />;
   if (mimeType === 'application/pdf') return <FileText className="w-5 h-5 text-orange-500" />;
   if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('gz'))
-    return <Archive className="w-5 h-5 text-gray-500" />;
+    return <Archive className="w-5 h-5 text-gray-500 dark:text-gray-400" />;
   if (mimeType.includes('javascript') || mimeType.includes('typescript') || mimeType.includes('json') || mimeType.startsWith('text/x-'))
     return <Code className="w-5 h-5 text-blue-500" />;
-  return <File className="w-5 h-5 text-gray-400" />;
+  return <File className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
 }
 
 function formatDate(dateStr: string): string {
@@ -148,12 +148,12 @@ export default function Starred() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 dark:bg-gray-800 dark:border-gray-700">
         <Star className="w-5 h-5 text-yellow-400 fill-yellow-300" />
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
           我的收藏
           {filteredNodes.length > 0 && (
-            <span className="ml-1.5 text-xs text-gray-400">({filteredNodes.length} 个项目)</span>
+            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({filteredNodes.length} 个项目)</span>
           )}
         </span>
       </div>
@@ -174,7 +174,7 @@ export default function Starred() {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 dark:bg-gray-900">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">名称</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">类型</th>
@@ -183,11 +183,11 @@ export default function Starred() {
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 dark:divide-gray-700">
               {filteredNodes.map(node => (
                 <tr
                   key={node.id}
-                  className="group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors dark:hover:bg-gray-700/50"
                   onClick={() => handleRowClick(node)}
                   onContextMenu={e => handleContextMenu(e, node)}
                 >
@@ -201,7 +201,7 @@ export default function Starred() {
                           getMimeIcon(node.mimeType)
                         )}
                         {node.isLocked && (
-                          <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5" />
+                          <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5 dark:text-gray-400" />
                         )}
                       </div>
                       <span className="truncate font-medium text-gray-800 dark:text-gray-100 max-w-[200px]">{node.name}</span>

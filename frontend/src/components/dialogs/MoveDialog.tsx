@@ -114,29 +114,29 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-colors dark:text-gray-500"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1 px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-gray-50 flex-wrap">
+        <div className="flex items-center gap-1 px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0 bg-gray-50 dark:bg-gray-900/40 flex-wrap dark:bg-gray-900">
           {browsePath.map((item, idx) => (
             <span key={idx} className="flex items-center gap-1">
-              {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+              {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />}
               <button
                 onClick={() => navigateTo(idx)}
                 className={`text-sm px-2 py-0.5 rounded-lg transition-colors ${
                   idx === browsePath.length - 1
-                    ? 'text-gray-800 font-medium bg-white shadow-sm border border-gray-200'
-                    : 'text-blue-600 hover:bg-blue-50'
+                    ? 'text-gray-800 dark:text-gray-100 font-medium bg-white dark:bg-gray-700 shadow-sm border border-gray-200 dark:border-gray-600'
+                    : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'
                 }`}
               >
                 {idx === 0 ? (
@@ -153,19 +153,19 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
         </div>
 
         {/* Hint */}
-        <div className="px-6 pt-2 pb-1 text-xs text-gray-400">
+        <div className="px-6 pt-2 pb-1 text-xs text-gray-400 dark:text-gray-500">
           单击选择目标文件夹，点击 <ArrowRight className="w-3 h-3 inline" /> 进入子目录
         </div>
 
         {/* Folder list */}
         <div className="flex-1 overflow-y-auto px-4 py-2 min-h-[200px]">
           {isLoading ? (
-            <div className="flex items-center justify-center h-24 text-gray-400">
+            <div className="flex items-center justify-center h-24 text-gray-400 dark:text-gray-500">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               <span className="text-sm">加载中…</span>
             </div>
           ) : folders.length === 0 ? (
-            <div className="flex items-center justify-center h-24 text-gray-400 text-sm">
+            <div className="flex items-center justify-center h-24 text-gray-400 dark:text-gray-500 text-sm">
               此文件夹没有子文件夹
             </div>
           ) : (
@@ -178,10 +178,10 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
                     key={folder.id}
                     className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
                       disabled
-                        ? 'opacity-40 cursor-not-allowed text-gray-500'
+                        ? 'opacity-40 cursor-not-allowed text-gray-500 dark:text-gray-400'
                         : isSelected
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'hover:bg-gray-50 text-gray-700 cursor-pointer'
+                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-200 cursor-pointer'
                     }`}
                     onClick={() => {
                       if (disabled) return;
@@ -198,7 +198,7 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
                           navigateInto(folder);
                         }}
                         title="进入子目录"
-                        className="p-1 rounded-lg hover:bg-blue-200 text-gray-400 hover:text-blue-700 transition-colors"
+                        className="p-1 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 text-gray-400 dark:text-gray-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors dark:text-gray-500"
                       >
                         <ArrowRight className="w-4 h-4" />
                       </button>
@@ -211,15 +211,15 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0 bg-gray-50">
-          <div className="text-sm text-gray-500">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between flex-shrink-0 bg-gray-50 dark:bg-gray-900/40 dark:bg-gray-900">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
             目标：
-            <span className="font-medium text-gray-800 ml-1">{targetName}</span>
+            <span className="font-medium text-gray-800 dark:text-gray-100 ml-1">{targetName}</span>
           </div>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors dark:border-gray-700"
             >
               取消
             </button>

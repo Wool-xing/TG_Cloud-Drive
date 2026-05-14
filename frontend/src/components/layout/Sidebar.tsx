@@ -64,11 +64,11 @@ export default function Sidebar() {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-100 dark:border-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
           <Cloud className="h-4 w-4 text-white" />
         </div>
-        <span className="text-base font-bold text-gray-900 dark:text-white tracking-tight">TG 云盘</span>
+        <span className="text-base font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">TG 云盘</span>
       </div>
 
       {/* Main nav */}
@@ -88,7 +88,7 @@ export default function Sidebar() {
         {/* Admin section */}
         {isAdmin() && (
           <>
-            <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+            <div className="my-2 border-t border-gray-100 dark:border-gray-800 dark:border-gray-700" />
             <NavLink to="/admin" className={navLinkCls}>
               <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
               <span>管理控制台</span>
@@ -98,7 +98,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Storage quota */}
-      <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+      <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
           <span>存储空间</span>
           <span>{formatBytes(usedBytes)} / {formatBytes(quotaBytes)}</span>
@@ -109,17 +109,17 @@ export default function Sidebar() {
             style={{ width: `${usedPct}%` }}
           />
         </div>
-        <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 text-right">{usedPct}% 已使用</p>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 text-right dark:text-gray-500">{usedPct}% 已使用</p>
       </div>
 
       {/* User info + logout. Clicking avatar/name navigates to /profile (where
           password change, devices, audit logs, storage stats live). */}
-      <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+      <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100 dark:border-gray-800 dark:border-gray-700">
         <button
           type="button"
           onClick={() => navigate('/profile')}
           title="个人中心 / 修改密码"
-          className="flex-1 min-w-0 flex items-center gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 transition text-left"
+          className="flex-1 min-w-0 flex items-center gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 transition text-left dark:hover:bg-gray-700/50"
         >
           {/* Avatar */}
           <div className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
@@ -129,7 +129,7 @@ export default function Sidebar() {
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate dark:text-gray-100">
               {user?.nickname || user?.username}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
@@ -140,7 +140,7 @@ export default function Sidebar() {
         <button
           onClick={handleLogout}
           title="退出登录"
-          className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+          className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition dark:text-gray-500"
         >
           <LogOut className="h-4 w-4" />
         </button>

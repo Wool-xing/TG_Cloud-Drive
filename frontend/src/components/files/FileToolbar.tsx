@@ -128,7 +128,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0 flex-wrap gap-2">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0 flex-wrap gap-2 dark:bg-gray-800">
         {/* Left side */}
         <div className="flex items-center gap-2 flex-wrap">
           {selectedCount > 0 ? (
@@ -138,7 +138,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
               </span>
               <button
                 onClick={clearSelection}
-                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 dark:text-gray-400"
               >
                 <X className="w-3.5 h-3.5" />
                 取消选择
@@ -173,7 +173,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 }}
                 placeholder="文件夹名称"
                 maxLength={500}
-                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
+                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 dark:text-gray-100"
                 disabled={creatingFolder}
               />
               <button
@@ -193,7 +193,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
           ) : (
             <button
               onClick={() => setNewFolderMode(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700/50"
             >
               <FolderPlus className="w-4 h-4" />
               新建文件夹

@@ -43,18 +43,18 @@ function PwInput({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{label}</label>
       <div className="relative">
         <input
           type={show ? 'text' : 'password'}
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
         />
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
         >
           {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
@@ -137,7 +137,7 @@ function ProfileTab() {
       <div className="flex items-center gap-6">
         <LetterAvatar name={user.username} size="lg" />
         <div>
-          <p className="font-semibold text-gray-900 text-lg">{user.username}</p>
+          <p className="font-semibold text-gray-900 text-lg dark:text-gray-100">{user.username}</p>
           <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium ${
             user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
           }`}>
@@ -149,26 +149,26 @@ function ProfileTab() {
       {/* Form */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">用户名</label>
           <input
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
             placeholder="登录用户名"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
           />
-          <p className="mt-1 text-xs text-gray-400">修改后需重新登录</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">修改后需重新登录</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">存储使用</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">存储使用</label>
           <div className="flex items-center gap-3">
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
+            <div className="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
               <div
                 className="bg-blue-500 h-2 rounded-full transition-all"
                 style={{ width: `${Math.min(100, (user.usedBytes / user.quotaBytes) * 100)}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500 whitespace-nowrap">
+            <span className="text-xs text-gray-500 whitespace-nowrap dark:text-gray-400">
               {formatBytes(user.usedBytes)} / {formatBytes(user.quotaBytes)}
             </span>
           </div>
@@ -261,7 +261,7 @@ function SecurityTab() {
     <div className="space-y-8 max-w-lg">
       {/* Change Password */}
       <section>
-        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">修改登录密码</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">修改登录密码</h3>
         <form onSubmit={handleChangePassword} className="space-y-4">
           <PwInput
             label="当前密码"
@@ -297,26 +297,26 @@ function SecurityTab() {
 
       {/* Private Space Password */}
       <section>
-        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">隐私空间密码</h3>
-        <p className="text-sm text-gray-500 mb-4">隐私空间密码用于加密访问私密文件夹，独立于登录密码。</p>
+        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">隐私空间密码</h3>
+        <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">隐私空间密码用于加密访问私密文件夹，独立于登录密码。</p>
         <form onSubmit={handleSetupPrivateSpace} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">新隐私空间密码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">新隐私空间密码</label>
             <input
               type="password"
               value={ppForm.newPassword}
               onChange={e => setPpForm(f => ({ ...f, newPassword: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
               placeholder="至少 6 位"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">确认密码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">确认密码</label>
             <input
               type="password"
               value={ppForm.confirm}
               onChange={e => setPpForm(f => ({ ...f, confirm: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
             />
           </div>
           <button
@@ -332,7 +332,7 @@ function SecurityTab() {
 
       {/* Notification Settings */}
       <section>
-        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">通知设置</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">通知设置</h3>
         <div className="space-y-3">
           {[
             { key: 'shareAccess', label: '有人访问我的分享链接时通知我', icon: <Bell className="w-4 h-4 text-blue-500" /> },
@@ -340,7 +340,7 @@ function SecurityTab() {
           ].map(({ key, label, icon }) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer group">
               <div className="w-5 flex-shrink-0">{icon}</div>
-              <span className="flex-1 text-sm text-gray-700">{label}</span>
+              <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">{label}</span>
               <div
                 onClick={() => setNotifs(n => ({ ...n, [key]: !n[key as keyof typeof n] }))}
                 className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
@@ -393,7 +393,7 @@ function DevicesTab() {
 
   return (
     <div className="space-y-3 max-w-2xl">
-      <p className="text-sm text-gray-500 mb-4">以下设备当前已登录您的账号。如有陌生设备，请立即下线并修改密码。</p>
+      <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">以下设备当前已登录您的账号。如有陌生设备，请立即下线并修改密码。</p>
       {devices.map(device => (
         <div
           key={device.id}
@@ -401,17 +401,17 @@ function DevicesTab() {
             device.isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
           }`}
         >
-          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <Monitor className="w-5 h-5 text-gray-500" />
+          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 dark:bg-gray-700">
+            <Monitor className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-medium text-gray-800 text-sm truncate">{device.deviceName ?? '未知设备'}</p>
+              <p className="font-medium text-gray-800 text-sm truncate dark:text-gray-100">{device.deviceName ?? '未知设备'}</p>
               {device.isCurrent && (
                 <span className="px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded font-medium">当前设备</span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5 dark:text-gray-400">
               IP: {device.ipAddress ?? '—'} &nbsp;·&nbsp; 最后活跃: {formatDate(device.lastActiveAt)}
             </p>
           </div>
@@ -427,7 +427,7 @@ function DevicesTab() {
         </div>
       ))}
       {devices.length === 0 && (
-        <p className="text-center text-gray-400 py-10">暂无登录设备</p>
+        <p className="text-center text-gray-400 py-10 dark:text-gray-500">暂无登录设备</p>
       )}
     </div>
   );
@@ -467,36 +467,36 @@ function AuditLogsTab() {
 
   return (
     <div className="max-w-3xl">
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm dark:bg-gray-800 dark:border-gray-700">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">文件</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">IP 地址</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">时间</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">操作</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell dark:text-gray-400">文件</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell dark:text-gray-400">IP 地址</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">时间</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-8 text-gray-400">暂无操作记录</td>
+                <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-500">暂无操作记录</td>
               </tr>
             ) : (
               logs.map(log => (
-                <tr key={log.id} className="hover:bg-gray-50">
+                <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${actionBadge(log.action)}`}>
                       {log.action}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
+                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell dark:text-gray-300">
                     <span className="truncate max-w-[160px] block">{log.nodeName ?? '—'}</span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs font-mono hidden lg:table-cell">
+                  <td className="px-4 py-3 text-gray-500 text-xs font-mono hidden lg:table-cell dark:text-gray-400">
                     {log.ipAddress ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3 text-gray-500 text-xs dark:text-gray-400">
                     {formatDate(log.createdAt)}
                   </td>
                 </tr>
@@ -509,22 +509,22 @@ function AuditLogsTab() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-xs text-gray-500">共 {total} 条记录</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">共 {total} 条记录</p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors dark:hover:bg-gray-700"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 dark:text-gray-300">
               {page} / {totalPages}
             </span>
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors dark:hover:bg-gray-700"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -556,43 +556,43 @@ function StorageTab() {
   return (
     <div className="max-w-lg space-y-6">
       {/* Total usage */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-end justify-between mb-3">
           <div>
-            <p className="text-sm text-gray-500">已使用存储</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{formatBytes(stats.usedBytes)}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">已使用存储</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1 dark:text-gray-100">{formatBytes(stats.usedBytes)}</p>
           </div>
-          <p className="text-sm text-gray-500">共 {formatBytes(stats.quotaBytes)}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">共 {formatBytes(stats.quotaBytes)}</p>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
+        <div className="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-700">
           <div
             className={`h-3 rounded-full transition-all ${usedPct > 90 ? 'bg-red-500' : usedPct > 70 ? 'bg-orange-500' : 'bg-blue-500'}`}
             style={{ width: `${usedPct}%` }}
           />
         </div>
-        <p className="text-xs text-gray-400 mt-1.5 text-right">{usedPct.toFixed(1)}% 已使用</p>
+        <p className="text-xs text-gray-400 mt-1.5 text-right dark:text-gray-500">{usedPct.toFixed(1)}% 已使用</p>
       </div>
 
       {/* By type bars */}
       {stats.byType && stats.byType.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">按类型分布</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4 dark:text-gray-100">按类型分布</h3>
           <div className="space-y-3">
             {stats.byType.map((item, idx) => {
               const pct = stats.usedBytes > 0 ? (item.bytes / stats.usedBytes) * 100 : 0;
               return (
                 <div key={item.type}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-600">{item.label}</span>
-                    <span className="text-gray-500 font-medium">{formatBytes(item.bytes)}</span>
+                    <span className="text-gray-600 dark:text-gray-300">{item.label}</span>
+                    <span className="text-gray-500 font-medium dark:text-gray-400">{formatBytes(item.bytes)}</span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className="w-full bg-gray-100 rounded-full h-2 dark:bg-gray-700">
                     <div
                       className={`h-2 rounded-full transition-all ${colors[idx % colors.length]}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5 text-right">{pct.toFixed(1)}%</p>
+                  <p className="text-xs text-gray-400 mt-0.5 text-right dark:text-gray-500">{pct.toFixed(1)}%</p>
                 </div>
               );
             })}
@@ -601,7 +601,7 @@ function StorageTab() {
           {/* Legend */}
           <div className="mt-4 flex flex-wrap gap-3">
             {stats.byType.map((item, idx) => (
-              <div key={item.type} className="flex items-center gap-1.5 text-xs text-gray-600">
+              <div key={item.type} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                 <div className={`w-2.5 h-2.5 rounded-full ${colors[idx % colors.length]}`} />
                 <span>{item.label}</span>
               </div>
@@ -630,7 +630,7 @@ export default function Profile() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Sidebar tabs */}
-      <aside className="w-48 flex-shrink-0 border-r border-gray-200 bg-white p-3 space-y-1">
+      <aside className="w-48 flex-shrink-0 border-r border-gray-200 bg-white p-3 space-y-1 dark:bg-gray-800 dark:border-gray-700">
         {TABS.map(tab => (
           <button
             key={tab.id}
@@ -648,8 +648,8 @@ export default function Profile() {
       </aside>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">
+      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900">
+        <h2 className="text-xl font-bold text-gray-900 mb-6 dark:text-gray-100">
           {TABS.find(t => t.id === activeTab)?.label}
         </h2>
         {renderTab()}
