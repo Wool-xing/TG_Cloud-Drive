@@ -44,20 +44,20 @@ function ConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 dark:bg-gray-800">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
             <AlertTriangle className="w-5 h-5 text-red-600" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">删除分享链接</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">删除分享链接</h3>
         </div>
-        <p className="text-sm text-gray-600 mb-6">
-          确定要删除 <strong className="text-gray-800">"{shareName}"</strong> 的分享链接吗？删除后该链接将立即失效。
+        <p className="text-sm text-gray-600 mb-6 dark:text-gray-300">
+          确定要删除 <strong className="text-gray-800 dark:text-gray-100">"{shareName}"</strong> 的分享链接吗？删除后该链接将立即失效。
         </p>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors dark:bg-gray-700 dark:text-gray-300"
           >
             取消
           </button>
@@ -111,7 +111,7 @@ export default function Shares() {
   const getStatusBadge = (share: Share) => {
     if (!share.isActive) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           <XCircle className="w-3 h-3" />
           已禁用
         </span>
@@ -153,12 +153,12 @@ export default function Shares() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700">
         <Share2 className="w-5 h-5 text-blue-500" />
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
           我的分享
           {shares.length > 0 && (
-            <span className="ml-1.5 text-xs text-gray-400">({shares.length} 个链接)</span>
+            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({shares.length} 个链接)</span>
           )}
         </span>
       </div>
@@ -170,47 +170,47 @@ export default function Shares() {
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
         ) : shares.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400">
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400 dark:text-gray-500">
             <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center">
               <Share2 className="w-10 h-10 text-blue-200" />
             </div>
-            <p className="text-lg font-medium text-gray-500">暂无分享</p>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">暂无分享</p>
             <p className="text-sm text-center max-w-xs">右键点击文件，选择"分享"来创建分享链接</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm dark:bg-gray-800 dark:border-gray-700">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文件名</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">分享链接</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">过期时间</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">下载次数</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">密码</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">创建时间</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">文件名</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell dark:text-gray-400">分享链接</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell dark:text-gray-400">过期时间</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell dark:text-gray-400">下载次数</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell dark:text-gray-400">密码</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell dark:text-gray-400">创建时间</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">状态</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">操作</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {shares.map(share => (
-                  <tr key={share.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={share.id} className="hover:bg-gray-50 transition-colors dark:hover:bg-gray-700/50">
                     {/* File name */}
                     <td className="px-4 py-3">
-                      <span className="font-medium text-gray-800 truncate max-w-[160px] block">
+                      <span className="font-medium text-gray-800 truncate max-w-[160px] block dark:text-gray-100">
                         {share.node?.name ?? '未知文件'}
                       </span>
                     </td>
 
                     {/* Link */}
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <code className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded truncate max-w-[180px] block">
+                      <code className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded truncate max-w-[180px] block dark:bg-gray-700 dark:text-gray-400">
                         /s/{share.token}
                       </code>
                     </td>
 
                     {/* Expiry */}
-                    <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">
+                    <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell dark:text-gray-400">
                       <span className={isExpired(share.expireAt) ? 'text-red-500' : ''}>
                         {formatDate(share.expireAt)}
                       </span>
@@ -218,11 +218,11 @@ export default function Shares() {
 
                     {/* Download count */}
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <div className="flex items-center gap-1 text-xs text-gray-600">
+                      <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
                         <Download className="w-3 h-3" />
                         <span>{share.downloadCount}</span>
                         {share.maxDownloads && (
-                          <span className="text-gray-400">/ {share.maxDownloads}</span>
+                          <span className="text-gray-400 dark:text-gray-500">/ {share.maxDownloads}</span>
                         )}
                       </div>
                     </td>
@@ -235,12 +235,12 @@ export default function Shares() {
                           有密码
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-400">无</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">无</span>
                       )}
                     </td>
 
                     {/* Created */}
-                    <td className="px-4 py-3 text-gray-500 text-xs hidden xl:table-cell">
+                    <td className="px-4 py-3 text-gray-500 text-xs hidden xl:table-cell dark:text-gray-400">
                       {formatDate(share.createdAt)}
                     </td>
 

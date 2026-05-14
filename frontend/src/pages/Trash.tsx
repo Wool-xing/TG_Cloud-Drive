@@ -48,17 +48,17 @@ function ConfirmModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 dark:bg-gray-800">
         <div className="flex items-center gap-3 mb-4">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${danger ? 'bg-red-100' : 'bg-yellow-100'}`}>
             <AlertTriangle className={`w-5 h-5 ${danger ? 'text-red-600' : 'text-yellow-600'}`} />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
         </div>
-        <p className="text-sm text-gray-600 mb-4">{message}</p>
+        <p className="text-sm text-gray-600 mb-4 dark:text-gray-300">{message}</p>
         {needsInput && (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
               {inputLabel ?? `请输入"${confirmWord}"以继续`}
             </label>
             <input
@@ -66,7 +66,7 @@ function ConfirmModal({
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               placeholder={confirmWord}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent dark:border-gray-600"
               autoFocus
             />
           </div>
@@ -74,7 +74,7 @@ function ConfirmModal({
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors dark:bg-gray-700 dark:text-gray-300"
           >
             取消
           </button>
@@ -193,11 +193,11 @@ export default function Trash() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
-        <span className="text-sm font-medium text-gray-700 mr-2">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700">
+        <span className="text-sm font-medium text-gray-700 mr-2 dark:text-gray-300">
           回收站
           {nodes.length > 0 && (
-            <span className="ml-1.5 text-xs text-gray-400">({nodes.length} 个文件)</span>
+            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({nodes.length} 个文件)</span>
           )}
         </span>
 
@@ -205,7 +205,7 @@ export default function Trash() {
 
         {someSelected && (
           <>
-            <span className="text-xs text-gray-500 mr-1">已选 {selectedIds.size} 项</span>
+            <span className="text-xs text-gray-500 mr-1 dark:text-gray-400">已选 {selectedIds.size} 项</span>
             <button
               onClick={handleRestore}
               disabled={isActing}
@@ -244,16 +244,16 @@ export default function Trash() {
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
         ) : nodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400">
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400 dark:text-gray-500">
+            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center dark:bg-gray-700">
               <Trash2 className="w-10 h-10 text-gray-300" />
             </div>
-            <p className="text-lg font-medium text-gray-500">回收站为空</p>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">回收站为空</p>
             <p className="text-sm">已删除的文件会出现在这里</p>
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 dark:bg-gray-900 dark:border-gray-700">
               <tr>
                 <th className="w-10 px-4 py-2">
                   <input
@@ -261,17 +261,17 @@ export default function Trash() {
                     checked={allSelected}
                     ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
                     onChange={toggleAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
                   />
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">原始位置</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">删除时间</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">大小</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">名称</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell dark:text-gray-400">原始位置</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell dark:text-gray-400">删除时间</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell dark:text-gray-400">大小</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {nodes.map(node => {
                 const isSelected = selectedIds.has(node.id);
                 return (
@@ -286,24 +286,24 @@ export default function Trash() {
                         checked={isSelected}
                         onChange={() => {}}
                         onClick={e => e.stopPropagation()}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
                       />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Trash2 className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                        <span className="font-medium text-gray-700 truncate max-w-[200px]">{node.name}</span>
+                        <span className="font-medium text-gray-700 truncate max-w-[200px] dark:text-gray-300">{node.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
+                    <td className="px-4 py-3 text-gray-500 hidden md:table-cell dark:text-gray-400">
                       <span className="text-xs truncate max-w-[160px] block">
                         {node.parentId ? `/${node.parentId}` : '/根目录'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">
+                    <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell dark:text-gray-400">
                       {node.deletedAt ? formatDate(node.deletedAt) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
+                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell dark:text-gray-400">
                       {node.type === 'folder' ? '—' : formatBytes(node.size)}
                     </td>
                     <td className="px-4 py-3">

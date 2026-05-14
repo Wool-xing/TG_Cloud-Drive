@@ -123,7 +123,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
           <nav className="flex items-center gap-1 flex-1 min-w-0 text-sm">
             <button
               onClick={handleBreadcrumbRoot}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition dark:hover:bg-gray-700"
             >
               <Home className="h-4 w-4" />
               <span className="font-medium">我的文件</span>
@@ -131,7 +131,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
 
             {currentPath.map((crumb, idx) => (
               <React.Fragment key={crumb.id}>
-                <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0 dark:text-gray-500" />
                 <button
                   onClick={() => handleBreadcrumbItem(idx)}
                   className={`px-2 py-1 rounded-lg transition truncate max-w-[140px] ${
@@ -148,13 +148,13 @@ export default function Topbar({ onUpload }: TopbarProps) {
 
           {/* Search */}
           <div className="relative w-52">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none dark:text-gray-500" />
             <input
               type="text"
               value={localSearch}
               onChange={e => setLocalSearch(e.target.value)}
               placeholder="搜索文件…"
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
             />
           </div>
 
@@ -180,7 +180,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
           <div className="relative" ref={sortRef}>
             <button
               onClick={() => setShowSortMenu(p => !p)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition dark:hover:bg-gray-700/50"
             >
               <ArrowUpDown className="h-3.5 w-3.5" />
               <span>{sortOptions.find(s => s.value === sortField)?.label ?? '排序'}</span>
@@ -224,14 +224,14 @@ export default function Topbar({ onUpload }: TopbarProps) {
           <button
             onClick={() => setDark(d => !d)}
             title={dark ? '切换亮色模式' : '切换暗色模式'}
-            className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+            className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition dark:text-gray-500 dark:hover:bg-gray-700"
           >
             {dark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
           </button>
         </div>
 
         {/* Lower row: filter tabs */}
-        <div className="flex items-center gap-1 px-4 pb-1.5 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-1 px-4 pb-1.5 border-t border-gray-100 dark:border-gray-800 dark:border-gray-700">
           {filterTabs.map(tab => (
             <button
               key={tab.value}

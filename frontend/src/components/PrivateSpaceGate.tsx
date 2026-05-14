@@ -52,11 +52,11 @@ export default function PrivateSpaceGate() {
   if (!user.hasPrivateSpace) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 text-gray-500 dark:text-gray-400 p-8">
-        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center dark:bg-gray-700">
           <ShieldAlert className="w-10 h-10 text-gray-400 dark:text-gray-500" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-700 dark:text-gray-200">尚未设置隐私空间密码</p>
+          <p className="text-lg font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">尚未设置隐私空间密码</p>
           <p className="mt-1 text-sm">请前往「个人资料」页面设置隐私空间密码后再访问</p>
         </div>
         <button
@@ -120,7 +120,7 @@ export default function PrivateSpaceGate() {
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 dark:text-gray-500 dark:hover:text-gray-200"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>

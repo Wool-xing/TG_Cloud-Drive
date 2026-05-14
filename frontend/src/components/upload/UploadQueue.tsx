@@ -32,7 +32,7 @@ function StatusIcon({ status }: { status: UploadTask['status'] }) {
       return <Pause className="h-4 w-4 text-yellow-500" />;
     case 'pending':
     default:
-      return <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />;
+      return <Loader2 className="h-4 w-4 text-gray-400 animate-spin dark:text-gray-500" />;
   }
 }
 
@@ -81,7 +81,7 @@ function TaskRow({ task }: TaskRowProps) {
         <StatusIcon status={task.status} />
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title={task.file.name}>
+          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate dark:text-gray-100" title={task.file.name}>
             {task.file.name}
           </p>
           <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 mt-0.5">
@@ -119,7 +119,7 @@ function TaskRow({ task }: TaskRowProps) {
             <button
               onClick={() => pauseTask(task.id)}
               title="暂停"
-              className="p-1 rounded-lg text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-950/30 transition"
+              className="p-1 rounded-lg text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-950/30 transition dark:text-gray-500"
             >
               <Pause className="h-3.5 w-3.5" />
             </button>
@@ -128,7 +128,7 @@ function TaskRow({ task }: TaskRowProps) {
             <button
               onClick={() => resumeTask(task.id)}
               title="继续"
-              className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition"
+              className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition dark:text-gray-500"
             >
               <Play className="h-3.5 w-3.5" />
             </button>
@@ -137,7 +137,7 @@ function TaskRow({ task }: TaskRowProps) {
             <button
               onClick={() => cancelTask(task.id)}
               title="取消"
-              className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+              className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition dark:text-gray-500"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -194,7 +194,7 @@ export default function UploadQueue() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white dark:text-gray-100">
             {activeCount > 0 ? `上传中 (${activeCount})` : `已完成 ${doneCount} 个`}
           </p>
           {totalProgress !== null && (
@@ -216,7 +216,7 @@ export default function UploadQueue() {
               {totalProgress}%
             </span>
           )}
-          <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+          <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition dark:text-gray-500">
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </button>
         </div>
@@ -233,7 +233,7 @@ export default function UploadQueue() {
               </span>
               <button
                 onClick={clearDone}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition"
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition dark:text-gray-500"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 清除已完成
@@ -244,7 +244,7 @@ export default function UploadQueue() {
           {/* Task list */}
           <div className="overflow-y-auto max-h-72 p-1.5">
             {tasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-600 gap-2">
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-600 gap-2 dark:text-gray-500">
                 <UploadCloud className="h-8 w-8" />
                 <p className="text-sm">暂无上传任务</p>
               </div>

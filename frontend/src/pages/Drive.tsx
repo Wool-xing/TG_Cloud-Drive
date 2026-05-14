@@ -123,7 +123,7 @@ export default function Drive({ isPrivate = false }: DriveProps) {
 
   if (listError && !searchQuery) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3">
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3 dark:text-gray-400">
         <p className="text-red-500">加载失败，请刷新重试</p>
       </div>
     );
@@ -135,7 +135,7 @@ export default function Drive({ isPrivate = false }: DriveProps) {
 
       <div className="flex-1 overflow-y-auto">
         {isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-4 py-20">
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-4 py-20 dark:text-gray-500">
             <UploadCloud className="w-16 h-16 text-gray-300" />
             <p className="text-lg font-medium">
               {searchQuery ? '没有找到匹配的文件' : '此文件夹为空'}

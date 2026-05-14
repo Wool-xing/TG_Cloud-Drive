@@ -64,17 +64,17 @@ function TagInput({
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 min-h-[40px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent bg-white dark:bg-gray-700">
+    <div className="flex flex-wrap gap-1.5 min-h-[40px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent bg-white dark:bg-gray-700 dark:bg-gray-800">
       {tags.map(tag => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-full"
+          className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-full dark:bg-gray-700"
         >
           {tag}
           <button
             type="button"
             onClick={() => removeTag(tag)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 dark:text-gray-500"
           >
             <X className="w-3 h-3" />
           </button>
@@ -87,7 +87,7 @@ function TagInput({
         onKeyDown={handleKeyDown}
         onBlur={() => addTag(input)}
         placeholder={tags.length === 0 ? placeholder : ''}
-        className="flex-1 min-w-[100px] text-sm outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+        className="flex-1 min-w-[100px] text-sm outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 dark:text-gray-100"
       />
     </div>
   );
@@ -97,8 +97,8 @@ function TagInput({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 dark:bg-gray-900">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white dark:text-gray-100">{title}</h3>
       </div>
       <div className="px-6 py-5 space-y-4">{children}</div>
     </div>
@@ -225,7 +225,7 @@ export default function AdminConfig() {
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">系统配置</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white dark:text-gray-100">系统配置</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">管理全局系统设置</p>
         </div>
         <button

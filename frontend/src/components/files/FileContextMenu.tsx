@@ -223,7 +223,7 @@ export default function FileContextMenu() {
           <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
             <p className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate max-w-[200px]">{node.name}</p>
             {isFile && (
-              <p className="text-xs text-gray-400 mt-0.5">{formatBytes(node.size)}</p>
+              <p className="text-xs text-gray-400 mt-0.5 dark:text-gray-500">{formatBytes(node.size)}</p>
             )}
           </div>
 

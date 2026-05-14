@@ -92,12 +92,12 @@ export default function ConfirmPasswordDialog({
             <div className={`w-9 h-9 rounded-full ${themeIconBg} flex items-center justify-center`}>
               <AlertTriangle className={`w-5 h-5 ${themeIcon}`} />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-gray-100">{title}</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors dark:text-gray-500 dark:hover:text-gray-200"
           >
             <X className="w-5 h-5" />
           </button>
@@ -129,7 +129,7 @@ export default function ConfirmPasswordDialog({
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
               >
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>

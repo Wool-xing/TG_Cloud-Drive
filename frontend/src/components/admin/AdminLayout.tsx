@@ -31,7 +31,7 @@ export default function AdminLayout() {
           </div>
           <div>
             <p className="text-sm font-bold text-white leading-tight">管理后台</p>
-            <p className="text-xs text-gray-400 leading-tight">TG 云盘</p>
+            <p className="text-xs text-gray-400 leading-tight dark:text-gray-500">TG 云盘</p>
           </div>
         </div>
 
@@ -39,7 +39,7 @@ export default function AdminLayout() {
         <div className="px-3 py-3 border-b border-gray-800">
           <Link
             to="/"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors dark:text-gray-500"
           >
             <ArrowLeft className="w-4 h-4" />
             返回云盘
@@ -79,7 +79,7 @@ export default function AdminLayout() {
               <p className="text-xs font-medium text-gray-300 truncate">
                 {user?.nickname ?? user?.username}
               </p>
-              <p className="text-xs text-gray-500">管理员</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">管理员</p>
             </div>
           </div>
         </div>

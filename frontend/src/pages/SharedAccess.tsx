@@ -284,23 +284,23 @@ export default function SharedAccess() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4">
               <Cloud className="w-9 h-9 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">TG 云盘</h1>
-            <p className="text-gray-500 mt-1 text-sm">安全文件分享</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">TG 云盘</h1>
+            <p className="text-gray-500 mt-1 text-sm dark:text-gray-400">安全文件分享</p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 dark:bg-gray-800 dark:border-gray-700">
             <div className="flex items-center justify-center w-12 h-12 bg-amber-100 rounded-xl mx-auto mb-4">
               <Lock className="w-6 h-6 text-amber-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 text-center mb-1">此分享受密码保护</h2>
-            <p className="text-sm text-gray-500 text-center mb-6">请输入访问密码以继续</p>
+            <h2 className="text-lg font-semibold text-gray-900 text-center mb-1 dark:text-gray-100">此分享受密码保护</h2>
+            <p className="text-sm text-gray-500 text-center mb-6 dark:text-gray-400">请输入访问密码以继续</p>
             <form onSubmit={handlePasswordSubmit}>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="输入密码"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 dark:border-gray-600"
                 autoFocus
               />
               <button
@@ -325,12 +325,12 @@ export default function SharedAccess() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4">
             <Cloud className="w-9 h-9 text-white" />
           </div>
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 dark:bg-gray-800 dark:border-gray-700">
             <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-xl mx-auto mb-4">
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">链接无效</h2>
-            <p className="text-sm text-gray-500">{errorMessage}</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2 dark:text-gray-100">链接无效</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{errorMessage}</p>
           </div>
         </div>
       </div>
@@ -358,12 +358,12 @@ export default function SharedAccess() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4 shadow-lg">
             <Cloud className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">TG 云盘</h1>
-          <p className="text-gray-500 mt-1 text-sm">端对端加密文件分享</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">TG 云盘</h1>
+          <p className="text-gray-500 mt-1 text-sm dark:text-gray-400">端对端加密文件分享</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
           {/* File info header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6 text-white">
             <div className="flex items-center gap-4">
@@ -383,23 +383,23 @@ export default function SharedAccess() {
           </div>
 
           {/* Metadata */}
-          <div className="px-8 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="px-8 py-4 border-b border-gray-100 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
               <div className="flex justify-between">
-                <dt className="text-gray-500">文件大小</dt>
-                <dd className="font-medium text-gray-800">{formatBytes(node.size)}</dd>
+                <dt className="text-gray-500 dark:text-gray-400">文件大小</dt>
+                <dd className="font-medium text-gray-800 dark:text-gray-100">{formatBytes(node.size)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-500">下载次数</dt>
-                <dd className="font-medium text-gray-800">
+                <dt className="text-gray-500 dark:text-gray-400">下载次数</dt>
+                <dd className="font-medium text-gray-800 dark:text-gray-100">
                   {shareInfo.downloadCount}
                   {shareInfo.maxDownloads ? ` / ${shareInfo.maxDownloads}` : ''}
                 </dd>
               </div>
               {shareInfo.expireAt && (
                 <div className="flex justify-between col-span-2">
-                  <dt className="text-gray-500">过期时间</dt>
-                  <dd className="font-medium text-gray-800">
+                  <dt className="text-gray-500 dark:text-gray-400">过期时间</dt>
+                  <dd className="font-medium text-gray-800 dark:text-gray-100">
                     {new Date(shareInfo.expireAt).toLocaleDateString('zh-CN', {
                       year: 'numeric', month: 'short', day: 'numeric',
                     })}
@@ -414,11 +414,11 @@ export default function SharedAccess() {
             {/* Download progress */}
             {isDownloading && downloadProgress > 0 && (
               <div className="mb-4">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <div className="flex justify-between text-xs text-gray-500 mb-1 dark:text-gray-400">
                   <span>正在下载...</span>
                   <span>{downloadProgress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                   <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${downloadProgress}%` }}
@@ -444,7 +444,7 @@ export default function SharedAccess() {
               <button
                 onClick={handlePreview}
                 disabled={isDownloading}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition-colors disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition-colors disabled:opacity-60 dark:bg-gray-700 dark:text-gray-300"
               >
                 {isDownloading && downloadProgress === 0 ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -457,7 +457,7 @@ export default function SharedAccess() {
           </div>
 
           {/* Footer */}
-          <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-1.5 text-xs text-gray-400">
+          <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-1.5 text-xs text-gray-400 dark:bg-gray-900 dark:text-gray-500 dark:border-gray-700">
             <CheckCircle className="w-3.5 h-3.5 text-green-500" />
             <span>端对端加密保护 • 文件内容仅对您可见</span>
           </div>
@@ -478,9 +478,9 @@ export default function SharedAccess() {
               <video src={previewUrl} controls className="w-full rounded-xl" />
             )}
             {shareInfo.node.mimeType.startsWith('audio/') && (
-              <div className="bg-white rounded-xl p-8 text-center">
+              <div className="bg-white rounded-xl p-8 text-center dark:bg-gray-800">
                 <Music className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <p className="font-medium text-gray-800 mb-4">{shareInfo.node.name}</p>
+                <p className="font-medium text-gray-800 mb-4 dark:text-gray-100">{shareInfo.node.name}</p>
                 <audio src={previewUrl} controls className="w-full" />
               </div>
             )}

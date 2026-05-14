@@ -102,12 +102,12 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
 
   // Simple QR text representation
   const QRPlaceholder = () => (
-    <div className="mt-4 p-4 border border-dashed border-gray-300 rounded-xl text-center">
-      <div className="text-xs text-gray-400 mb-2">扫码访问</div>
-      <div className="inline-block p-2 bg-white border border-gray-200 rounded-lg">
-        <div className="text-xs font-mono text-gray-600 max-w-[200px] break-all">{shareUrl}</div>
+    <div className="mt-4 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-center">
+      <div className="text-xs text-gray-400 dark:text-gray-500 mb-2">扫码访问</div>
+      <div className="inline-block p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:border-gray-700">
+        <div className="text-xs font-mono text-gray-600 dark:text-gray-300 max-w-[200px] break-all">{shareUrl}</div>
       </div>
-      <p className="text-xs text-gray-400 mt-2">可使用手机扫码或直接分享链接</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">可使用手机扫码或直接分享链接</p>
     </div>
   );
 
@@ -116,16 +116,16 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Share2 className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-800">分享文件</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">分享文件</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-colors dark:text-gray-500"
           >
             <X className="w-5 h-5" />
           </button>
@@ -136,14 +136,14 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
             /* Creation form */
             <div className="space-y-5">
               <div>
-                <p className="text-sm text-gray-600 mb-1">
-                  文件：<span className="font-medium text-gray-800">{node.name}</span>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+                  文件：<span className="font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
                 </p>
               </div>
 
               {/* Expiry */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">有效期</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">有效期</label>
                 <div className="grid grid-cols-4 gap-2">
                   {EXPIRY_OPTIONS.map((opt) => (
                     <button
@@ -152,7 +152,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                       className={`py-2 rounded-xl text-sm font-medium border transition-colors ${
                         expiry === opt.value
                           ? 'bg-blue-600 text-white border-blue-600'
-                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
                       {opt.label}
@@ -163,7 +163,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
 
               {/* Max downloads */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">最大下载次数</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">最大下载次数</label>
                 <div className="grid grid-cols-4 gap-2">
                   {DOWNLOAD_OPTIONS.map((opt) => (
                     <button
@@ -172,7 +172,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                       className={`py-2 rounded-xl text-sm font-medium border transition-colors ${
                         maxDownloadsType === opt.value
                           ? 'bg-blue-600 text-white border-blue-600'
-                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
                       {opt.label}
@@ -185,7 +185,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                     min={1}
                     value={customDownloads}
                     onChange={(e) => setCustomDownloads(e.target.value)}
-                    className="mt-2 w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
                     placeholder="输入次数"
                   />
                 )}
@@ -193,16 +193,16 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   访问密码
-                  <span className="text-gray-400 font-normal ml-1.5">(可选)</span>
+                  <span className="text-gray-400 dark:text-gray-500 font-normal ml-1.5">(可选)</span>
                 </label>
                 <input
                   type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="留空则不设置密码"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
                 />
               </div>
 
@@ -211,7 +211,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                   Pre-fix the dialog silently created such links; users routinely
                   shipped "永久免密" share URLs not realizing the leakage surface. */}
               {expiry === 'never' && !password.trim() && (
-                <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-xl border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 px-4 py-3 text-sm text-red-700 dark:text-red-300">
                   <div className="font-semibold mb-0.5">⚠ 永久 + 无密码 = 公开访问</div>
                   <div className="text-xs leading-relaxed">
                     任何拿到此链接的人都可直接访问该文件，且永不过期。强烈建议设置密码或选择有效期。
@@ -223,7 +223,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
               <div className="flex justify-end gap-3 pt-1">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors dark:border-gray-700"
                 >
                   取消
                 </button>
@@ -239,21 +239,21 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
           ) : (
             /* Share result */
             <div className="space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <p className="text-sm font-medium text-green-700">分享链接已创建</p>
+              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl px-4 py-3">
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">分享链接已创建</p>
                 {share.expireAt && (
-                  <p className="text-xs text-green-600 mt-1">
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                     有效期至：{new Date(share.expireAt).toLocaleString('zh-CN')}
                   </p>
                 )}
                 {share.hasPassword && (
-                  <p className="text-xs text-green-600 mt-0.5">已设置访问密码</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">已设置访问密码</p>
                 )}
               </div>
 
               {/* Link */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   <Link className="w-3.5 h-3.5 inline mr-1" />
                   分享链接
                 </label>
@@ -261,13 +261,13 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                   <input
                     readOnly
                     value={shareUrl}
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 text-gray-700 font-mono truncate"
+                    className="flex-1 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-200 font-mono truncate dark:text-gray-300 dark:border-gray-700"
                   />
                   <button
                     onClick={handleCopy}
                     className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                       copied
-                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >

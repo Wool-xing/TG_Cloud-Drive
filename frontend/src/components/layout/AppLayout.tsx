@@ -56,7 +56,7 @@ export default function AppLayout() {
   if (!user) return null;
 
   return (
-    <div {...getRootProps()} className="relative flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div {...getRootProps()} className="relative flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950 dark:bg-gray-900">
       {/* Hidden dropzone input */}
       <input {...getInputProps()} />
 
@@ -68,7 +68,7 @@ export default function AppLayout() {
               <UploadCloud className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="text-center">
-              <p className="text-xl font-bold text-gray-900 dark:text-white">松开以上传文件</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white dark:text-gray-100">松开以上传文件</p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {isPrivate ? '将上传到隐私空间' : '将上传到当前文件夹'}
               </p>
@@ -78,14 +78,14 @@ export default function AppLayout() {
       )}
 
       {/* Left sidebar – fixed 240px */}
-      <aside className="w-60 shrink-0 flex flex-col h-full border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
+      <aside className="w-60 shrink-0 flex flex-col h-full border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10 dark:bg-gray-800 dark:border-gray-700">
         <Sidebar />
       </aside>
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top navbar */}
-        <header className="shrink-0 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-20">
+        <header className="shrink-0 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-20 dark:bg-gray-800 dark:border-gray-700">
           <Topbar onUpload={open} />
         </header>
 

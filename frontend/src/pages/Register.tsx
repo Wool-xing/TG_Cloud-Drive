@@ -130,7 +130,7 @@ export default function Register() {
     `w-full px-4 py-2.5 rounded-xl border ${errors[field] ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'} bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition text-sm`;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 dark:bg-gray-900">
       <div className="h-1.5 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
@@ -140,13 +140,13 @@ export default function Register() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 mb-4">
               <Cloud className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">TG 云盘</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">TG 云盘</h1>
             <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">创建您的账号，开始安全存储</p>
           </div>
 
           {/* Card */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/30 p-8">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">注册账号</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 dark:text-gray-100">注册账号</h2>
 
             <form onSubmit={handleRegister} className="space-y-4" noValidate>
               {/* Username */}
@@ -178,7 +178,7 @@ export default function Register() {
                   <button
                     type="button"
                     onClick={() => setShowPw(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition dark:text-gray-500"
                   >
                     {showPw ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -202,7 +202,7 @@ export default function Register() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPw(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition dark:text-gray-500"
                   >
                     {showConfirmPw ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -253,7 +253,7 @@ export default function Register() {
                     type="button"
                     onClick={handleSendCode}
                     disabled={countdown > 0 || sending}
-                    className="shrink-0 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-60 whitespace-nowrap flex items-center gap-1.5"
+                    className="shrink-0 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-60 whitespace-nowrap flex items-center gap-1.5 dark:hover:bg-gray-700/50"
                   >
                     {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                     {countdown > 0 ? `${countdown}s` : '发送验证码'}
