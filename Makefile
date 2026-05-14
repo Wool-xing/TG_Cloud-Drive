@@ -1,4 +1,4 @@
-.PHONY: help quickstart prod dev stop restart logs seed clean status worker-deploy certs-dev
+.PHONY: help quickstart prod dev stop restart logs seed clean status worker-deploy certs-dev doctor
 
 # ─── TG 云盘 Makefile ────────────────────────────────────────────────────────
 # Usage: make <target>
@@ -15,6 +15,28 @@ help: ## 显示帮助信息
 
 quickstart: ## 🚀 全新部署：交互式问 2 个 TG 值，其余全自动（密钥/证书/起容器/seed）
 	@bash ./quickstart.sh
+
+# P1-I13: precheck script — refuses to proceed if any CHANGE_ME_ placeholder
+# is still in .env. quickstart writes real secrets, but operators editing .env
+# by hand may forget to replace placeholders → admin/JWT/encryption keys end
+# up as well-known strings. Doctor catches that before `make prod` boots.
+doctor: ## 🩺 检查 .env 中的占位符 / 弱默认值，确认可安全启动
+	@[ -f .env ] || (echo "❌ 缺少 .env (运行 make quickstart 或 cp .env.example .env)" && exit 1)
+	@if grep -E '^[A-Z_]+=(CHANGE_ME_|TODO_|REPLACE_ME_)' .env > /dev/null; then \
+		echo "❌ .env 中仍存在占位符:"; \
+		grep -nE '^[A-Z_]+=(CHANGE_ME_|TODO_|REPLACE_ME_)' .env; \
+		echo "请用真实值替换后再启动"; \
+		exit 1; \
+	fi
+	@if grep -E '^ADMIN_INITIAL_PASSWORD=(admin|password|123456|Admin@123456)$$' .env > /dev/null; then \
+		echo "❌ ADMIN_INITIAL_PASSWORD 是弱默认值，请改成 24 位以上随机字符串"; \
+		exit 1; \
+	fi
+	@if grep -E '^JWT_SECRET=[a-zA-Z0-9]{0,31}$$' .env > /dev/null; then \
+		echo "❌ JWT_SECRET 长度 < 32, 请用 openssl rand -hex 32 生成"; \
+		exit 1; \
+	fi
+	@echo "✅ .env 检查通过：无占位符，无弱默认值"
 
 # ─── Docker 生产环境 ─────────────────────────────────────────────────────────
 
