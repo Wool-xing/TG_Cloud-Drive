@@ -126,6 +126,21 @@ export function validateEnvOrExit(): void {
       });
     }
 
+    // P1-B20: production must NOT run in direct-Telegram mode. getFileUrl()
+    // returns https://api.telegram.org/file/bot{TOKEN}/{path} when CF_WORKERS_URL
+    // is empty — that URL is then handed to the browser, leaking the bot
+    // token to every authenticated downloader (zero-day knowledge: anyone
+    // who downloads a single file walks away with full bot control).
+    const workersUrl = process.env.CF_WORKERS_URL;
+    if (!workersUrl || isPlaceholder(workersUrl)) {
+      errors.push({
+        key: 'CF_WORKERS_URL',
+        reason: '生产环境必填：未设置时下载/预览 URL 会包含 bot token 并暴露给浏览器（zero-day token 泄漏）。请先部署 Cloudflare Worker 并配置此值',
+      });
+    } else if (!/^https?:\/\//.test(workersUrl)) {
+      errors.push({ key: 'CF_WORKERS_URL', reason: '必须以 http:// 或 https:// 开头' });
+    }
+
     // REDIS_PASS: dev can run Redis without password locally, but production
     // MUST set a strong password. The compose file binds 6379 to 127.0.0.1 only,
     // but defense-in-depth requires Redis auth too — host kernel exploits or
