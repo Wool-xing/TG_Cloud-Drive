@@ -88,7 +88,10 @@ services:
     networks:
       - tgpan
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      # P1-I11: production node:20-alpine image does NOT ship wget; the old
+      # wget-based check returned "command not found" → healthcheck flapped
+      # "unhealthy" within seconds of boot. Use node's built-in http module.
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
