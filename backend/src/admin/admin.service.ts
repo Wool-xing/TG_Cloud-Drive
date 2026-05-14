@@ -17,7 +17,7 @@ import { Device } from '../users/entities/device.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { Node } from '../files/entities/node.entity';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
-import { decryptField, encryptField, hashPassword, generateSalt } from '../common/encryption';
+import { decryptField, encryptField, hashPassword, generateSalt, comparePassword } from '../common/encryption';
 import { MailService } from '../mail/mail.service';
 
 export interface UpdateUserAdminDto {
@@ -91,12 +91,19 @@ export class AdminService {
   async updateUser(
     adminId: string,
     userId: string,
-    dto: UpdateUserAdminDto,
+    dto: UpdateUserAdminDto & { confirmPassword?: string },
     ip?: string,
     ua?: string,
   ): Promise<any> {
     if (adminId === userId) {
       throw new BadRequestException('不能修改自身账户角色或状态');
+    }
+
+    // P1-I7: role / status changes are high-risk (privilege escalation, account
+    // lockout). Quota / nickname / username changes are cosmetic — keep them
+    // free of MFA so admin UX stays usable.
+    if (dto.role !== undefined || dto.status !== undefined) {
+      await this.requireConfirm(adminId, dto.confirmPassword);
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId, deletedAt: IsNull() } });
@@ -126,10 +133,13 @@ export class AdminService {
     return this.safeUserAdmin(user, masterKey);
   }
 
-  async deleteUser(adminId: string, userId: string, ip?: string, ua?: string): Promise<{ message: string }> {
+  async deleteUser(adminId: string, userId: string, confirmPassword?: string, ip?: string, ua?: string): Promise<{ message: string }> {
     if (adminId === userId) {
       throw new BadRequestException('不能删除自己的账户');
     }
+
+    // P1-I7: hard delete + cascade device delete — needs MFA.
+    await this.requireConfirm(adminId, confirmPassword);
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
@@ -142,7 +152,10 @@ export class AdminService {
     return { message: '用户已删除' };
   }
 
-  async forceLogout(adminId: string, userId: string, ip?: string, ua?: string): Promise<{ message: string }> {
+  async forceLogout(adminId: string, userId: string, confirmPassword?: string, ip?: string, ua?: string): Promise<{ message: string }> {
+    // P1-I7: kills all sessions for target user — high-risk operation.
+    await this.requireConfirm(adminId, confirmPassword);
+
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
 
@@ -294,9 +307,13 @@ export class AdminService {
   async deleteFileAdmin(
     adminId: string,
     nodeId: string,
+    confirmPassword?: string,
     ip?: string,
     ua?: string,
   ): Promise<{ message: string }> {
+    // P1-I7: admin force-delete on another user's file — MFA.
+    await this.requireConfirm(adminId, confirmPassword);
+
     const node = await this.nodeRepo.findOne({ where: { id: nodeId, deletedAt: IsNull() } });
     if (!node) throw new NotFoundException('文件不存在');
 
@@ -353,10 +370,13 @@ export class AdminService {
 
   async updateSystemConfig(
     adminId: string,
-    dto: UpdateSystemConfigDto,
+    dto: UpdateSystemConfigDto & { confirmPassword?: string },
     ip?: string,
     ua?: string,
   ): Promise<any> {
+    // P1-I7: system config changes (SMTP, registration mode, share defaults...)
+    // affect every user — MFA.
+    await this.requireConfirm(adminId, dto.confirmPassword);
     const allowedKeys = new Set([
       'defaultQuotaGB',
       'maxFoldersPerDir',
@@ -501,6 +521,74 @@ export class AdminService {
     await this.mailService.sendVerificationCode(to, '123456');
     await this.audit(adminId, 'admin.test-email', null, ip ?? null, ua ?? null, { to });
     return { message: `测试邮件已发送至 ${to}，请检查收件箱` };
+  }
+
+  /**
+   * P1-I7: re-prompt admin password before high-risk operations. Pre-fix any
+   * compromised access token (even short-lived) could delete users / change
+   * roles / wipe system config — auth boundary collapsed to the JWT alone.
+   * Per-admin Redis lock kicks in after 5 wrong attempts (15-min cooldown) to
+   * stop a stolen token from grinding through the admin's password.
+   *
+   * Throws UnauthorizedException with structured `code` so the frontend can
+   * distinguish "missing password" vs "wrong password" vs "locked out".
+   */
+  async requireConfirm(adminId: string, confirmPassword: string | undefined): Promise<void> {
+    if (!confirmPassword) {
+      throw new BadRequestException({
+        code: 'ADMIN_CONFIRM_REQUIRED',
+        message: '危险操作需要再次输入管理员密码',
+      });
+    }
+    const failKey = `admin:confirm:fail:${adminId}`;
+    const lockKey = `admin:confirm:lock:${adminId}`;
+    const maxAttempts = 5;
+    const lockSeconds = 15 * 60;
+
+    let locked: string | null;
+    try {
+      locked = await this.redis.get(lockKey);
+    } catch (e) {
+      throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+    }
+    if (locked) {
+      throw new ForbiddenException({
+        code: 'ADMIN_CONFIRM_LOCKED',
+        message: '管理员二次确认连续错误过多，请 15 分钟后再试',
+      });
+    }
+
+    const admin = await this.userRepo.findOne({ where: { id: adminId } });
+    if (!admin) {
+      throw new ForbiddenException('管理员账号不存在');
+    }
+
+    const valid = await comparePassword(confirmPassword, admin.passwordHash);
+    if (!valid) {
+      let fails: number;
+      try {
+        fails = await this.redis.incr(failKey);
+        if (fails === 1) await this.redis.expire(failKey, 30 * 60);
+      } catch (e) {
+        throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+      }
+      if (fails >= maxAttempts) {
+        await this.redis.set(lockKey, '1', 'EX', lockSeconds).catch(() => {});
+        await this.redis.del(failKey).catch(() => {});
+        throw new ForbiddenException({
+          code: 'ADMIN_CONFIRM_LOCKED',
+          message: '管理员二次确认连续错误过多，请 15 分钟后再试',
+        });
+      }
+      throw new ForbiddenException({
+        code: 'ADMIN_CONFIRM_INVALID',
+        message: '管理员密码错误',
+      });
+    }
+
+    // Success — clear failure counter so legitimate typos earlier don't haunt
+    // future operations within the same session.
+    await this.redis.del(failKey).catch(() => {});
   }
 
   private async audit(
