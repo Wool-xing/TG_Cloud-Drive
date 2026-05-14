@@ -21,25 +21,26 @@ export default function AdminLayout() {
   const user = useAuthStore(s => s.user);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-950">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 flex flex-col bg-gray-900 border-r border-gray-800">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {/* Sidebar — follow global theme (white in light mode, near-black in dark)
+          so the admin console stops looking glued-on next to a white Drive. */}
+      <aside className="w-56 flex-shrink-0 flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-gray-800">
+        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-gray-200 dark:border-gray-800">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <Shield className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white leading-tight">管理后台</p>
-            <p className="text-xs text-gray-400 leading-tight dark:text-gray-500">TG 云盘</p>
+            <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">管理后台</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">TG 云盘</p>
           </div>
         </div>
 
         {/* Back to drive */}
-        <div className="px-3 py-3 border-b border-gray-800">
+        <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800">
           <Link
             to="/"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors dark:text-gray-500"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             返回云盘
@@ -57,7 +58,7 @@ export default function AdminLayout() {
                 `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`
               }
             >
@@ -68,7 +69,7 @@ export default function AdminLayout() {
         </nav>
 
         {/* User info */}
-        <div className="px-4 py-4 border-t border-gray-800">
+        <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-white">
@@ -76,7 +77,7 @@ export default function AdminLayout() {
               </span>
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-300 truncate">
+              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
                 {user?.nickname ?? user?.username}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">管理员</p>

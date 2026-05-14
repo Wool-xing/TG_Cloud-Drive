@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   User,
@@ -314,7 +315,7 @@ function SecurityTab() {
       </section>
 
       {/* Private Space Password */}
-      <section>
+      <section id="private-space" className="scroll-mt-4">
         <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">隐私空间密码</h3>
         <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">隐私空间密码用于加密访问私密文件夹，独立于登录密码。</p>
         <form onSubmit={handleSetupPrivateSpace} className="space-y-4">
@@ -731,8 +732,31 @@ function StorageTab() {
 }
 
 // ── Main Profile Page ─────────────────────────────────────────
+const VALID_TABS: Tab[] = ['profile', 'security', 'devices', 'logs', 'storage'];
+
 export default function Profile() {
-  const [activeTab, setActiveTab] = useState<Tab>('profile');
+  // P1-UX: support ?tab=security#private-space deep-link so PrivateSpaceGate's
+  // "前往设置" button lands users right at the 隐私空间密码 section instead
+  // of the default 资料 tab.
+  const location = useLocation();
+  const initialTab: Tab = (() => {
+    const params = new URLSearchParams(location.search);
+    const t = params.get('tab');
+    return (t && VALID_TABS.includes(t as Tab)) ? (t as Tab) : 'profile';
+  })();
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  // After security tab renders, scroll to the anchor (#private-space) if present.
+  useEffect(() => {
+    if (activeTab !== 'security') return;
+    if (location.hash !== '#private-space') return;
+    // Wait a tick for the section to mount before scrolling.
+    const t = setTimeout(() => {
+      const el = document.getElementById('private-space');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [activeTab, location.hash]);
 
   const renderTab = () => {
     switch (activeTab) {

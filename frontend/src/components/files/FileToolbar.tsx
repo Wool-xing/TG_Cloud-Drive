@@ -6,14 +6,34 @@ import {
   Copy,
   Download,
   X,
+  Edit,
+  Star,
+  Lock,
+  Unlock,
+  Share2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
-import { Node } from '../../types';
+import { useAuthStore } from '../../stores/auth.store';
+import { Node, DownloadInfo } from '../../types';
+import {
+  getSessionMEK,
+  decryptDEK,
+  decryptBuffer,
+} from '../../utils/crypto';
+import {
+  streamingDownload,
+  BlobFallbackTooLargeError,
+} from '../../utils/streaming-download';
 import MoveDialog from '../dialogs/MoveDialog';
+import RenameDialog from '../dialogs/RenameDialog';
+import ShareDialog from '../dialogs/ShareDialog';
+import LockDialog from '../dialogs/LockDialog';
 
 interface FileToolbarProps {
   nodes: Node[];
