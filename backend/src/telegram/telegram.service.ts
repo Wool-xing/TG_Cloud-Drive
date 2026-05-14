@@ -55,7 +55,22 @@ export class TelegramService {
         }
       }
     }
-    throw new ServiceUnavailableException(`Telegram 上游不可用：${lastErr?.message || 'unknown'}`);
+    // P1-B20 (续): sanitize error message before bubbling to the client.
+    // Pre-fix `lastErr.message` from node-fetch on a network failure included
+    // the full URL — `request to https://api.telegram.org/bot{TOKEN}/...` —
+    // which then surfaced as a frontend toast / 5xx body. The bot token was
+    // leaked verbatim every time the upstream was unreachable. Strip any
+    // bot{...} segment so a user sees `Telegram 上游不可用：网络错误` while
+    // the full message stays in server logs only.
+    const rawMsg = lastErr?.message || 'unknown';
+    this.logger.error(`Telegram upstream failed (full): ${rawMsg}`);
+    const safeMsg = rawMsg
+      .replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot[REDACTED]')
+      // node-fetch wraps the URL in 'request to <url> failed, reason: ...'.
+      // Drop everything up through the URL so the reason is the only thing
+      // returned to the client.
+      .replace(/request to https?:\/\/[^\s]+ failed, reason:\s*/i, '');
+    throw new ServiceUnavailableException(`Telegram 上游不可用：${safeMsg.slice(0, 200)}`);
   }
 
   private get apiBase() {
@@ -70,13 +85,24 @@ export class TelegramService {
   }
 
   async sendDocument(buffer: Buffer, filename: string, mimeType: string): Promise<{ fileId: string; messageId: number }> {
+    // P1-B20 (续): same workersUrl gate as getFileUrl. Pre-fix, with a placeholder
+    // CF_WORKERS_URL the direct mode hit api.telegram.org via fetch — and on
+    // failure the node-fetch error message `request to .../bot{TOKEN}/sendDocument
+    // failed` was relayed to the frontend toast, leaking the token. Refuse the
+    // direct-mode path entirely (env-validator already gates production startup;
+    // this is the runtime double-gate for dev / config drift).
+    if (!this.workersUrl) {
+      this.logger.error('sendDocument called without CF_WORKERS_URL — direct mode would leak bot token, refusing');
+      throw new ServiceUnavailableException(
+        '上传服务未配置：CF_WORKERS_URL 缺失。请部署 Cloudflare Worker 后再用上传功能（避免 bot token 经错误消息泄漏）',
+      );
+    }
+
     const form = new FormData();
     form.append('chat_id', this.channelId);
     form.append('document', buffer, { filename, contentType: mimeType });
 
-    const url = this.workersUrl
-      ? `${this.workersUrl}/upload-chunk`
-      : `https://api.telegram.org/bot${this.token}/sendDocument`;
+    const url = `${this.workersUrl}/upload-chunk`;
 
     const headers = form.getHeaders();
     if (this.workersSecret) headers['X-Workers-Secret'] = this.workersSecret;
