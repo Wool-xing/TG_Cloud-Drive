@@ -14,9 +14,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ? exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    // P1-F6: pull both message + machine-readable `code` out of the exception
+    // response when the thrower passed `throw new HttpException({ code, message }, status)`.
+    // Pre-fix, frontends had to do `message.includes('password')` — fragile and
+    // i18n-hostile. `code` lives in the response envelope so clients can switch
+    // cleanly. Missing code is fine; the field is optional.
+    const exRes: any = exception instanceof HttpException ? exception.getResponse() : null;
     const message = exception instanceof HttpException
-      ? (exception.getResponse() as any)?.message || exception.message
+      ? (exRes?.message ?? exception.message)
       : 'Internal server error';
+    const code = exRes && typeof exRes === 'object' ? exRes.code : undefined;
 
     // Non-HttpException = unexpected error. Log full stack so operators can
     // diagnose 500s without re-deploying with extra instrumentation.
@@ -27,12 +34,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       );
     }
 
-    response.status(status).json({
+    const body: any = {
       ok: false,
       statusCode: status,
       message: Array.isArray(message) ? message[0] : message,
       path: request.url,
       timestamp: new Date().toISOString(),
-    });
+    };
+    if (code) body.code = code;
+    response.status(status).json(body);
   }
 }

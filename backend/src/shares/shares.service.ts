@@ -222,20 +222,30 @@ export class SharesService {
     }
 
     // Password verification: load hash from DB only when needed.
+    // P1-F6: throw with structured `code` so the frontend can distinguish
+    // "missing password" (prompt for input) vs "wrong password" (toast error)
+    // without parsing localized error messages.
     if (summary.hasPassword) {
       if (!password) {
-        throw new UnauthorizedException('此分享需要密码');
+        throw new UnauthorizedException({
+          code: 'SHARE_PASSWORD_REQUIRED',
+          message: '此分享需要密码',
+        });
       }
       const row = share ?? await this.shareRepo.findOne({ where: { id: summary.id, isActive: true } });
       if (!row || !row.passwordHash) {
-        // Race: share was deactivated or password cleared between cache write
-        // and this read. Invalidate and refuse rather than treating as no-password.
         await this.invalidateCache(token);
-        throw new UnauthorizedException('分享密码错误');
+        throw new UnauthorizedException({
+          code: 'SHARE_PASSWORD_INVALID',
+          message: '分享密码错误',
+        });
       }
       const valid = await comparePassword(password, row.passwordHash);
       if (!valid) {
-        throw new UnauthorizedException('分享密码错误');
+        throw new UnauthorizedException({
+          code: 'SHARE_PASSWORD_INVALID',
+          message: '分享密码错误',
+        });
       }
     }
 
