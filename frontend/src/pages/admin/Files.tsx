@@ -2,11 +2,9 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
-  Loader2,
   Trash2,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
   File,
   Folder,
 } from 'lucide-react';
@@ -15,41 +13,12 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/crypto';
+import ConfirmPasswordDialog from '../../components/dialogs/ConfirmPasswordDialog';
 
 const PAGE_SIZE = 20;
 
 interface AdminNode extends Node {
   username?: string;
-}
-
-function DeleteModal({
-  name,
-  onConfirm,
-  onClose,
-}: {
-  name: string;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">删除文件</h3>
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          确定要永久删除 <strong>"{name}"</strong> 吗？此操作无法撤销。
-        </p>
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">取消</button>
-          <button onClick={onConfirm} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">确认删除</button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function AdminFiles() {
@@ -73,16 +42,13 @@ export default function AdminFiles() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'files'] });
 
-  const handleDelete = async (node: AdminNode) => {
-    try {
-      await adminApi.deleteFile(node.id);
-      invalidate();
-      toast.success('文件已删除');
-    } catch {
-      // interceptor handles error toast
-    } finally {
-      setDeleteTarget(null);
-    }
+  // P1-I7: admin force-delete on another user's file requires re-typing the
+  // admin password — backend gates with requireConfirm.
+  const handleDelete = async (pw: string) => {
+    if (!deleteTarget) return;
+    await adminApi.deleteFile(deleteTarget.id, pw);
+    invalidate();
+    toast.success('文件已删除');
   };
 
   return (
@@ -210,9 +176,16 @@ export default function AdminFiles() {
       </div>
 
       {deleteTarget && (
-        <DeleteModal
-          name={deleteTarget.name}
-          onConfirm={() => handleDelete(deleteTarget)}
+        <ConfirmPasswordDialog
+          title="删除文件"
+          destructive
+          confirmLabel="确认删除"
+          description={
+            <>
+              确定要永久删除 <strong>{deleteTarget.name}</strong> 吗？此操作<strong>无法撤销</strong>。请输入您的管理员密码以确认。
+            </>
+          }
+          onConfirm={handleDelete}
           onClose={() => setDeleteTarget(null)}
         />
       )}
