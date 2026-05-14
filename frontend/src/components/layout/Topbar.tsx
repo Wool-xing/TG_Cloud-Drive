@@ -86,11 +86,23 @@ export default function Topbar({ onUpload }: TopbarProps) {
   const location = useLocation();
   const routerNavigate = useNavigate();
   // P1-UX: file-tools row (breadcrumb / filter tabs / view mode / sort /
-  // upload) only makes sense inside the file browser. On /profile (and any
-  // future settings-style page) those controls look misplaced — the user
-  // sees "我的文件 > ..." while they are on the 账户设置 page. Render a
-  // minimal header with back-arrow + page title + dark toggle instead.
-  const isSettingsRoute = location.pathname.startsWith('/profile');
+  // upload) only makes sense inside the public file browser at `/`. Every
+  // other authenticated route (profile / recent / starred / shares / trash)
+  // owns its own data shape and ignores the file-store filters — leaving
+  // the controls visible there means clicks did nothing ("用不了"). The
+  // route map below renders a minimal header (← 返回 / page title / dark
+  // toggle) for those routes.
+  const path = location.pathname;
+  const pageTitle = (() => {
+    if (path.startsWith('/profile')) return '账户设置';
+    if (path.startsWith('/recent')) return '最近文件';
+    if (path.startsWith('/starred')) return '收藏';
+    if (path.startsWith('/shares')) return '我的分享';
+    if (path.startsWith('/trash')) return '回收站';
+    if (path.startsWith('/private')) return '隐私空间';
+    return '';
+  })();
+  const isMinimalRoute = pageTitle !== '';
 
   const [dark, setDark] = useDarkMode();
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -127,8 +139,8 @@ export default function Topbar({ onUpload }: TopbarProps) {
   const handleBreadcrumbRoot = () => fileNavigate(null);
   const handleBreadcrumbItem = (index: number) => navigateTo(index);
 
-  // Settings-style minimal header — see isSettingsRoute comment above.
-  if (isSettingsRoute) {
+  // Settings-style minimal header — see isMinimalRoute comment above.
+  if (isMinimalRoute) {
     return (
       <div className="flex items-center gap-3 px-4 h-14">
         <button
@@ -140,7 +152,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Settings className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">账户设置</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{pageTitle}</span>
         </div>
         <button
           onClick={() => setDark(d => !d)}
@@ -196,19 +208,20 @@ export default function Topbar({ onUpload }: TopbarProps) {
             />
           </div>
 
-          {/* View mode */}
+          {/* View mode — active state uses solid bg (not the dim blue-950/60) so
+              暗色模式下高亮跟其他 active 一致, 不会跟周围背景糊在一起 */}
           <div className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
               title="列表视图"
-              className={`p-1.5 transition ${viewMode === 'list' ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+              className={`p-1.5 transition ${viewMode === 'list' ? 'bg-blue-600 text-white dark:bg-blue-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
               <LayoutList className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
               title="网格视图"
-              className={`p-1.5 transition ${viewMode === 'grid' ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+              className={`p-1.5 transition ${viewMode === 'grid' ? 'bg-blue-600 text-white dark:bg-blue-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>

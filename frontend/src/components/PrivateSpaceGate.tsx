@@ -60,7 +60,7 @@ export default function PrivateSpaceGate() {
           <p className="mt-1 text-sm">请前往「个人资料」页面设置隐私空间密码后再访问</p>
         </div>
         <button
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate('/profile?tab=security#private-space')}
           className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
         >
           前往设置

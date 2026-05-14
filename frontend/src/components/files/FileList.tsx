@@ -94,6 +94,9 @@ function SkeletonRow() {
       <td className="px-4 py-3">
         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
       </td>
+      <td className="px-4 py-3">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+      </td>
     </tr>
   );
 }
@@ -207,6 +210,12 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
             </th>
             <th
               className={sortableTh}
+              onClick={() => setSort('createdAt')}
+            >
+              上传时间 <SortIcon field="createdAt" />
+            </th>
+            <th
+              className={sortableTh}
               onClick={() => setSort('updatedAt')}
             >
               修改时间 <SortIcon field="updatedAt" />
@@ -273,7 +282,12 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
                       {node.type === 'folder' ? '—' : formatBytes(node.size)}
                     </td>
 
-                    {/* Date */}
+                    {/* Created (上传时间) */}
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                      {formatDate(node.createdAt)}
+                    </td>
+
+                    {/* Updated (修改时间) */}
                     <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {formatDate(node.updatedAt)}
                     </td>
