@@ -49,7 +49,7 @@ function PwInput({
           type={show ? 'text' : 'password'}
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
+          className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="button"
@@ -398,7 +398,9 @@ function DevicesTab() {
         <div
           key={device.id}
           className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
-            device.isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+            device.isCurrent
+              ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+              : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700/50'
           }`}
         >
           <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 dark:bg-gray-700">
@@ -418,7 +420,7 @@ function DevicesTab() {
           {!device.isCurrent && (
             <button
               onClick={() => handleRevoke(device.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors flex-shrink-0"
             >
               <LogOut className="w-4 h-4" />
               下线
@@ -453,14 +455,14 @@ function AuditLogsTab() {
 
   const actionBadge = (action: string) => {
     const map: Record<string, string> = {
-      upload: 'bg-green-100 text-green-700',
-      download: 'bg-blue-100 text-blue-700',
-      delete: 'bg-red-100 text-red-700',
-      login: 'bg-purple-100 text-purple-700',
-      share: 'bg-yellow-100 text-yellow-700',
+      upload:   'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+      download: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+      delete:   'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+      login:    'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+      share:    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
     };
     const key = Object.keys(map).find(k => action.toLowerCase().includes(k)) ?? '';
-    return map[key] || 'bg-gray-100 text-gray-600';
+    return map[key] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
   };
 
   if (isLoading) return <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
@@ -483,8 +485,13 @@ function AuditLogsTab() {
                 <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-500">暂无操作记录</td>
               </tr>
             ) : (
+              // P1-UX: audit log rows are read-only. Pre-fix the hover:bg-gray-50
+              // class made rows look clickable but nothing happened on click
+              // ("点击空白" — user clicked expecting detail and saw nothing).
+              // Drop the hover style + cursor-default explicitly so users don't
+              // misread the rows as interactive.
               logs.map(log => (
-                <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <tr key={log.id} className="cursor-default">
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${actionBadge(log.action)}`}>
                       {log.action}
@@ -637,8 +644,8 @@ export default function Profile() {
             onClick={() => setActiveTab(tab.id)}
             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
               activeTab === tab.id
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100'
             }`}
           >
             {tab.icon}
