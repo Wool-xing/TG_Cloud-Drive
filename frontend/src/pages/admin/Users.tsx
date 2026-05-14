@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
@@ -9,7 +9,6 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
   X,
   Eye,
   EyeOff,
@@ -19,43 +18,13 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
 import { User } from '../../types';
 import { formatBytes } from '../../utils/crypto';
+import ConfirmPasswordDialog from '../../components/dialogs/ConfirmPasswordDialog';
 
 const PAGE_SIZE = 20;
 
 interface AdminUser extends User {
   email?: string;
   status: 'active' | 'disabled';
-}
-
-// ── Confirm Delete Modal ────────────────────────────────────────
-function DeleteModal({
-  username,
-  onConfirm,
-  onClose,
-}: {
-  username: string;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">删除用户</h3>
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          确定要删除用户 <strong>"{username}"</strong> 吗？此操作将同时删除该用户的所有文件，无法撤销。
-        </p>
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">取消</button>
-          <button onClick={onConfirm} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">确认删除</button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Edit User Modal ─────────────────────────────────────────────
@@ -75,20 +44,34 @@ function EditModal({
     quotaGB: Math.round(user.quotaBytes / (1024 ** 3)),
   });
   const [saving, setSaving] = useState(false);
+  const [confirmPending, setConfirmPending] = useState<null | {
+    dto: any;
+  }>(null);
+
+  const buildDto = () => ({
+    username: form.username,
+    role: form.role,
+    status: form.status,
+    quotaBytes: Math.max(1, form.quotaGB) * (1024 ** 3),
+  });
+
+  // P1-I7: role / status changes are high-risk on the backend
+  // (admin.service.ts#updateUser gates them behind requireConfirm). Other
+  // edits — rename / quota — stay low-friction.
+  const needsConfirm = () => form.role !== user.role || form.status !== (user.status ?? 'active');
 
   const handleSave = async () => {
     if (form.quotaGB < 1) {
       toast.error('存储配额不能小于1GB');
       return;
     }
+    if (needsConfirm()) {
+      setConfirmPending({ dto: buildDto() });
+      return;
+    }
     setSaving(true);
     try {
-      await adminApi.updateUser(user.id, {
-        username: form.username,
-        role: form.role,
-        status: form.status,
-        quotaBytes: Math.max(1, form.quotaGB) * (1024 ** 3),
-      });
+      await adminApi.updateUser(user.id, buildDto());
       toast.success('用户信息已更新');
       onSuccess();
     } catch {
@@ -101,6 +84,7 @@ function EditModal({
   const inputCls = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-6">
@@ -164,6 +148,25 @@ function EditModal({
         </div>
       </div>
     </div>
+    {confirmPending && (
+      <ConfirmPasswordDialog
+        title="确认权限变更"
+        description={
+          <>
+            您正在修改 <strong>{user.username}</strong> 的角色或状态。该操作可能影响账号访问权限，需再次输入您的管理员密码确认。
+          </>
+        }
+        confirmLabel="确认修改"
+        destructive
+        onConfirm={async (pw) => {
+          await adminApi.updateUser(user.id, { ...confirmPending.dto, confirmPassword: pw });
+          toast.success('用户信息已更新');
+          onSuccess();
+        }}
+        onClose={() => setConfirmPending(null)}
+      />
+    )}
+    </>
   );
 }
 
@@ -279,13 +282,21 @@ function CreateModal({
 }
 
 // ── Main Users Page ─────────────────────────────────────────────
+interface ConfirmAction {
+  title: string;
+  description: ReactNode;
+  destructive: boolean;
+  confirmLabel: string;
+  run: (password: string) => Promise<void>;
+}
+
 export default function AdminUsers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   const { data, isLoading } = useQuery<{ users: AdminUser[]; total: number }>({
     queryKey: ['admin', 'users', search, page],
@@ -302,36 +313,63 @@ export default function AdminUsers() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
 
-  const handleForceLogout = async (user: AdminUser) => {
-    try {
-      await adminApi.forceLogout(user.id);
-      toast.success(`已强制下线用户 ${user.username}`);
-    } catch {
-      // interceptor
-    }
+  // P1-I7: every high-risk admin action funnels through ConfirmPasswordDialog.
+  // The backend (requireConfirm) verifies the password before any state change,
+  // so a stolen access token alone cannot delete users / force-logout / toggle
+  // status — the operator must still know the admin's own password.
+  const handleForceLogout = (user: AdminUser) => {
+    setConfirmAction({
+      title: '强制下线',
+      destructive: false,
+      confirmLabel: '强制下线',
+      description: (
+        <>
+          将立即终止用户 <strong>{user.username}</strong> 的全部活跃会话。请输入您的管理员密码以确认。
+        </>
+      ),
+      run: async (pw) => {
+        await adminApi.forceLogout(user.id, pw);
+        toast.success(`已强制下线用户 ${user.username}`);
+      },
+    });
   };
 
-  const handleDelete = async (user: AdminUser) => {
-    try {
-      await adminApi.deleteUser(user.id);
-      invalidate();
-      toast.success('用户已删除');
-    } catch {
-      // interceptor
-    } finally {
-      setDeleteTarget(null);
-    }
+  const handleDelete = (user: AdminUser) => {
+    setConfirmAction({
+      title: '删除用户',
+      destructive: true,
+      confirmLabel: '确认删除',
+      description: (
+        <>
+          确定要删除用户 <strong>{user.username}</strong> 吗？此操作将同时删除该用户的所有文件，<strong>无法撤销</strong>。请输入您的管理员密码以确认。
+        </>
+      ),
+      run: async (pw) => {
+        await adminApi.deleteUser(user.id, pw);
+        invalidate();
+        toast.success('用户已删除');
+      },
+    });
   };
 
-  const handleToggleStatus = async (user: AdminUser) => {
+  const handleToggleStatus = (user: AdminUser) => {
     const newStatus = user.status === 'active' ? 'disabled' : 'active';
-    try {
-      await adminApi.updateUser(user.id, { status: newStatus });
-      invalidate();
-      toast.success(newStatus === 'active' ? '已解除封禁' : '已封禁用户');
-    } catch {
-      // interceptor
-    }
+    const verb = newStatus === 'active' ? '解除封禁' : '封禁';
+    setConfirmAction({
+      title: `${verb}用户`,
+      destructive: newStatus === 'disabled',
+      confirmLabel: `确认${verb}`,
+      description: (
+        <>
+          您正在{verb} <strong>{user.username}</strong>。该操作会立即影响其登录与访问能力，请输入您的管理员密码以确认。
+        </>
+      ),
+      run: async (pw) => {
+        await adminApi.updateUser(user.id, { status: newStatus, confirmPassword: pw });
+        invalidate();
+        toast.success(newStatus === 'active' ? '已解除封禁' : '已封禁用户');
+      },
+    });
   };
 
   return (
@@ -469,7 +507,7 @@ export default function AdminUsers() {
                               <LogOut className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => setDeleteTarget(user)}
+                              onClick={() => handleDelete(user)}
                               className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                               title="删除"
                             >
@@ -516,17 +554,20 @@ export default function AdminUsers() {
           onSuccess={() => { setEditUser(null); invalidate(); }}
         />
       )}
-      {deleteTarget && (
-        <DeleteModal
-          username={deleteTarget.username}
-          onConfirm={() => handleDelete(deleteTarget)}
-          onClose={() => setDeleteTarget(null)}
-        />
-      )}
       {showCreate && (
         <CreateModal
           onClose={() => setShowCreate(false)}
           onSuccess={() => { setShowCreate(false); invalidate(); }}
+        />
+      )}
+      {confirmAction && (
+        <ConfirmPasswordDialog
+          title={confirmAction.title}
+          description={confirmAction.description}
+          confirmLabel={confirmAction.confirmLabel}
+          destructive={confirmAction.destructive}
+          onConfirm={confirmAction.run}
+          onClose={() => setConfirmAction(null)}
         />
       )}
     </div>

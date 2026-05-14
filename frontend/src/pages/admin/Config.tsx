@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 
 import { adminApi } from '../../api/client';
+import ConfirmPasswordDialog from '../../components/dialogs/ConfirmPasswordDialog';
 
 interface SystemConfig {
   defaultQuotaGB: number;
@@ -156,6 +157,7 @@ export default function AdminConfig() {
   const [saving, setSaving] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailTarget, setTestEmailTarget] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (remoteConfig) setConfig(remoteConfig);
@@ -165,19 +167,31 @@ export default function AdminConfig() {
   const setSmtp = (partial: Partial<SystemConfig['smtp']>) =>
     setConfig(c => ({ ...c, smtp: { ...c.smtp, ...partial } }));
 
-  const handleSave = async () => {
-    if (config.defaultQuotaGB < 1) { toast.error('默认配额不能小于1GB'); return; }
-    if (config.maxFoldersPerDir < 1) { toast.error('每目录最大文件夹数不能小于1'); return; }
-    if (config.loginFailLockCount < 1) { toast.error('登录失败锁定次数不能小于1'); return; }
-    if (config.loginLockDuration < 1) { toast.error('锁定时长不能小于1秒'); return; }
-    if (config.shareDefaultExpireDays < 0) { toast.error('分享有效期不能为负数'); return; }
-    if (config.smtp.port < 1 || config.smtp.port > 65535) { toast.error('SMTP端口需在1-65535范围内'); return; }
+  const validate = (): boolean => {
+    if (config.defaultQuotaGB < 1) { toast.error('默认配额不能小于1GB'); return false; }
+    if (config.maxFoldersPerDir < 1) { toast.error('每目录最大文件夹数不能小于1'); return false; }
+    if (config.loginFailLockCount < 1) { toast.error('登录失败锁定次数不能小于1'); return false; }
+    if (config.loginLockDuration < 1) { toast.error('锁定时长不能小于1秒'); return false; }
+    if (config.shareDefaultExpireDays < 0) { toast.error('分享有效期不能为负数'); return false; }
+    if (config.smtp.port < 1 || config.smtp.port > 65535) { toast.error('SMTP端口需在1-65535范围内'); return false; }
+    return true;
+  };
+
+  // P1-I7: system config writes (SMTP / registration / share defaults …)
+  // affect every user, so the backend gates them behind requireConfirm. The
+  // top-level Save button only opens the confirm dialog; the actual PATCH
+  // ships from inside the dialog's onConfirm so the admin password rides on
+  // the same request.
+  const handleSave = () => {
+    if (!validate()) return;
+    setConfirmOpen(true);
+  };
+
+  const submitConfig = async (pw: string) => {
     setSaving(true);
     try {
-      await adminApi.updateConfig(config);
+      await adminApi.updateConfig({ ...config, confirmPassword: pw });
       toast.success('配置已保存');
-    } catch {
-      // interceptor
     } finally {
       setSaving(false);
     }
@@ -421,6 +435,21 @@ export default function AdminConfig() {
           保存所有配置
         </button>
       </div>
+
+      {confirmOpen && (
+        <ConfirmPasswordDialog
+          title="确认系统配置变更"
+          confirmLabel="确认保存"
+          destructive
+          description={
+            <>
+              您正在修改全局系统配置（SMTP、注册策略、分享默认值等），变更将<strong>影响所有用户</strong>。请输入您的管理员密码以确认。
+            </>
+          }
+          onConfirm={submitConfig}
+          onClose={() => setConfirmOpen(false)}
+        />
+      )}
     </div>
   );
 }

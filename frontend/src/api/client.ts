@@ -51,7 +51,11 @@ api.interceptors.response.use(
       }
     }
     const msg = error.response?.data?.message || error.message || '请求失败';
-    if (error.response?.status !== 401) toast.error(msg);
+    // P1-I7: admin MFA errors are surfaced by ConfirmPasswordDialog inline
+    // (with code-specific text). Don't double up with a global toast.
+    const code = error.response?.data?.code as string | undefined;
+    const isAdminConfirm = typeof code === 'string' && code.startsWith('ADMIN_CONFIRM_');
+    if (error.response?.status !== 401 && !isAdminConfirm) toast.error(msg);
     return Promise.reject(error);
   },
 );
@@ -131,15 +135,21 @@ export const usersApi = {
 };
 
 // Admin APIs
+// P1-I7: high-risk endpoints carry the admin's own password in the body so
+// the backend can re-verify identity before deleting / force-logging-out /
+// changing roles / wiping config — see admin.service.ts#requireConfirm.
 export const adminApi = {
   users: (params: any) => api.get('/admin/users', { params }),
   createUser: (data: any) => api.post('/admin/users', data),
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
-  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
-  forceLogout: (id: string) => api.post(`/admin/users/${id}/force-logout`),
+  deleteUser: (id: string, confirmPassword: string) =>
+    api.delete(`/admin/users/${id}`, { data: { confirmPassword } }),
+  forceLogout: (id: string, confirmPassword: string) =>
+    api.post(`/admin/users/${id}/force-logout`, { confirmPassword }),
   dashboard: () => api.get('/admin/dashboard'),
   files: (params: any) => api.get('/admin/files', { params }),
-  deleteFile: (nodeId: string) => api.delete(`/admin/files/${nodeId}`),
+  deleteFile: (nodeId: string, confirmPassword: string) =>
+    api.delete(`/admin/files/${nodeId}`, { data: { confirmPassword } }),
   auditLogs: (params: any) => api.get('/admin/audit-logs', { params }),
   getConfig: () => api.get('/admin/config'),
   updateConfig: (data: any) => api.patch('/admin/config', data),
