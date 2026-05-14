@@ -7,12 +7,14 @@ import {
   Body,
   Param,
   Query,
+  Req,
   ParseUUIDPipe,
   ParseIntPipe,
   DefaultValuePipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import {
   AdminService,
@@ -65,11 +67,15 @@ export class AdminController {
   @Post('users')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '管理员直接创建用户（跳过验证码）' })
+  // P1-I8: mutating admin endpoints below now thread req.ip + UA through to
+  // adminService → audit_log. Read endpoints (dashboard / list users / etc)
+  // remain untouched — audit only fires on state changes.
   createUser(
     @CurrentUser('id') adminId: string,
     @Body() dto: CreateUserAdminDto,
+    @Req() req: Request,
   ) {
-    return this.adminService.createUser(adminId, dto);
+    return this.adminService.createUser(adminId, dto, req.ip, req.headers['user-agent']);
   }
 
   /**
@@ -81,8 +87,9 @@ export class AdminController {
     @CurrentUser('id') adminId: string,
     @Param('id', ParseUUIDPipe) userId: string,
     @Body() dto: UpdateUserAdminDto,
+    @Req() req: Request,
   ) {
-    return this.adminService.updateUser(adminId, userId, dto);
+    return this.adminService.updateUser(adminId, userId, dto, req.ip, req.headers['user-agent']);
   }
 
   /**
@@ -94,8 +101,9 @@ export class AdminController {
   deleteUser(
     @CurrentUser('id') adminId: string,
     @Param('id', ParseUUIDPipe) userId: string,
+    @Req() req: Request,
   ) {
-    return this.adminService.deleteUser(adminId, userId);
+    return this.adminService.deleteUser(adminId, userId, req.ip, req.headers['user-agent']);
   }
 
   /**
@@ -107,8 +115,9 @@ export class AdminController {
   forceLogout(
     @CurrentUser('id') adminId: string,
     @Param('id', ParseUUIDPipe) userId: string,
+    @Req() req: Request,
   ) {
-    return this.adminService.forceLogout(adminId, userId);
+    return this.adminService.forceLogout(adminId, userId, req.ip, req.headers['user-agent']);
   }
 
   // ─── Files ───────────────────────────────────────────────────────────────────
@@ -140,8 +149,9 @@ export class AdminController {
   deleteFile(
     @CurrentUser('id') adminId: string,
     @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Req() req: Request,
   ) {
-    return this.adminService.deleteFileAdmin(adminId, nodeId);
+    return this.adminService.deleteFileAdmin(adminId, nodeId, req.ip, req.headers['user-agent']);
   }
 
   // ─── Audit Logs ───────────────────────────────────────────────────────────────
@@ -183,8 +193,9 @@ export class AdminController {
   updateConfig(
     @CurrentUser('id') adminId: string,
     @Body() dto: UpdateSystemConfigDto,
+    @Req() req: Request,
   ) {
-    return this.adminService.updateSystemConfig(adminId, dto);
+    return this.adminService.updateSystemConfig(adminId, dto, req.ip, req.headers['user-agent']);
   }
 
   /**
@@ -196,7 +207,8 @@ export class AdminController {
   testEmail(
     @CurrentUser('id') adminId: string,
     @Body('to') to: string,
+    @Req() req: Request,
   ) {
-    return this.adminService.testEmail(adminId, to);
+    return this.adminService.testEmail(adminId, to, req.ip, req.headers['user-agent']);
   }
 }

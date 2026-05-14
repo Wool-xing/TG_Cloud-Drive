@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { REDIS_CLIENT } from '../common/redis/redis.module';
 
 // P1-I5: HTML escape for variables interpolated into email templates.
 // Pre-fix, sendShareNotification rendered `<strong>${filename}</strong>` —
@@ -21,7 +22,10 @@ export class MailService {
   private transporter: nodemailer.Transporter;
   private readonly logger = new Logger(MailService.name);
 
-  constructor(private cs: ConfigService) {
+  constructor(
+    private cs: ConfigService,
+    @Inject(REDIS_CLIENT) private redis: any,
+  ) {
     const host = cs.get('SMTP_HOST');
     if (host) {
       this.transporter = nodemailer.createTransport({
@@ -33,11 +37,36 @@ export class MailService {
     }
   }
 
+  /**
+   * P1-I6: global daily quota guard around send(). Pre-fix, every caller (incl.
+   * admin testEmail and the verification flow) could trigger unbounded SMTP
+   * sends — a single attacker could burn the relay quota / get the sending
+   * domain blacklisted. Bucket is global across recipients; per-IP / per-user
+   * gates live in the calling controllers (B1 throttler, A6 fail counter).
+   * Fail-CLOSED on Redis outage: refuse to send rather than risk uncapped
+   * delivery during an availability incident.
+   */
+  private async checkQuotaOrThrow() {
+    const max = this.cs.get<number>('MAIL_DAILY_QUOTA', 1000);
+    const dayKey = `mail:quota:${new Date().toISOString().slice(0, 10)}`;
+    let count: number;
+    try {
+      count = await this.redis.incr(dayKey);
+      if (count === 1) await this.redis.expire(dayKey, 86400);
+    } catch (e) {
+      throw new ServiceUnavailableException('邮件服务暂时不可用，请稍后重试');
+    }
+    if (count > max) {
+      throw new ServiceUnavailableException(`邮件日发送量已达上限 (${max})`);
+    }
+  }
+
   private async send(to: string, subject: string, html: string) {
     if (!this.transporter) {
       this.logger.warn(`[MAIL DEV] To: ${to} | Subject: ${subject}`);
       return;
     }
+    await this.checkQuotaOrThrow();
     await this.transporter.sendMail({
       from: this.cs.get('SMTP_FROM'),
       to, subject, html,

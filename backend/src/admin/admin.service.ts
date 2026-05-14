@@ -92,6 +92,8 @@ export class AdminService {
     adminId: string,
     userId: string,
     dto: UpdateUserAdminDto,
+    ip?: string,
+    ua?: string,
   ): Promise<any> {
     if (adminId === userId) {
       throw new BadRequestException('不能修改自身账户角色或状态');
@@ -118,13 +120,13 @@ export class AdminService {
     if (dto.nickname !== undefined) user.nickname = dto.nickname;
 
     await this.userRepo.save(user);
-    await this.audit(adminId, 'admin.user.update', null, null, null, { targetUserId: userId });
+    await this.audit(adminId, 'admin.user.update', null, ip ?? null, ua ?? null, { targetUserId: userId });
 
     const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
     return this.safeUserAdmin(user, masterKey);
   }
 
-  async deleteUser(adminId: string, userId: string): Promise<{ message: string }> {
+  async deleteUser(adminId: string, userId: string, ip?: string, ua?: string): Promise<{ message: string }> {
     if (adminId === userId) {
       throw new BadRequestException('不能删除自己的账户');
     }
@@ -136,11 +138,11 @@ export class AdminService {
     await this.deviceRepo.delete({ userId });
     await this.userRepo.delete(userId);
 
-    await this.audit(adminId, 'admin.user.delete', null, null, null, { targetUserId: userId, username: user.username });
+    await this.audit(adminId, 'admin.user.delete', null, ip ?? null, ua ?? null, { targetUserId: userId, username: user.username });
     return { message: '用户已删除' };
   }
 
-  async forceLogout(adminId: string, userId: string): Promise<{ message: string }> {
+  async forceLogout(adminId: string, userId: string, ip?: string, ua?: string): Promise<{ message: string }> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
 
@@ -159,7 +161,7 @@ export class AdminService {
       );
     }
 
-    await this.audit(adminId, 'admin.user.force_logout', null, null, null, {
+    await this.audit(adminId, 'admin.user.force_logout', null, ip ?? null, ua ?? null, {
       targetUserId: userId,
       devicesRevoked: deleted.affected,
     });
@@ -292,6 +294,8 @@ export class AdminService {
   async deleteFileAdmin(
     adminId: string,
     nodeId: string,
+    ip?: string,
+    ua?: string,
   ): Promise<{ message: string }> {
     const node = await this.nodeRepo.findOne({ where: { id: nodeId, deletedAt: IsNull() } });
     if (!node) throw new NotFoundException('文件不存在');
@@ -299,7 +303,7 @@ export class AdminService {
     node.deletedAt = new Date();
     await this.nodeRepo.save(node);
 
-    await this.audit(adminId, 'admin.file.delete', nodeId, null, null, {
+    await this.audit(adminId, 'admin.file.delete', nodeId, ip ?? null, ua ?? null, {
       fileName: node.name,
       ownerId: node.userId,
     });
@@ -350,6 +354,8 @@ export class AdminService {
   async updateSystemConfig(
     adminId: string,
     dto: UpdateSystemConfigDto,
+    ip?: string,
+    ua?: string,
   ): Promise<any> {
     const allowedKeys = new Set([
       'defaultQuotaGB',
@@ -387,7 +393,7 @@ export class AdminService {
     }
     await this.redis.set(SYSTEM_CONFIG_REDIS_KEY, JSON.stringify(merged));
 
-    await this.audit(adminId, 'admin.config.update', null, null, null, { updated: Object.keys(sanitized) });
+    await this.audit(adminId, 'admin.config.update', null, ip ?? null, ua ?? null, { updated: Object.keys(sanitized) });
     return merged;
   }
 
@@ -466,7 +472,7 @@ export class AdminService {
 
   // ─── Create User (admin) ──────────────────────────────────────────────────────
 
-  async createUser(adminId: string, dto: CreateUserAdminDto): Promise<any> {
+  async createUser(adminId: string, dto: CreateUserAdminDto, ip?: string, ua?: string): Promise<any> {
     const { username, password, email, phone, role, nickname, quotaGb } = dto;
     const exists = await this.userRepo.findOne({ where: { username } });
     if (exists) throw new BadRequestException('用户名已存在');
@@ -484,16 +490,16 @@ export class AdminService {
       phoneEncrypted: phone && masterKey ? encryptField(phone, masterKey) : null,
     });
     await this.userRepo.save(user);
-    await this.audit(adminId, 'admin.user.create', null, null, null, { targetUser: username });
+    await this.audit(adminId, 'admin.user.create', null, ip ?? null, ua ?? null, { targetUser: username });
     return this.safeUserAdmin(user, masterKey);
   }
 
   // ─── Test Email ───────────────────────────────────────────────────────────────
 
-  async testEmail(adminId: string, to: string): Promise<{ message: string }> {
+  async testEmail(adminId: string, to: string, ip?: string, ua?: string): Promise<{ message: string }> {
     if (!to || !to.includes('@')) throw new BadRequestException('请提供有效的邮箱地址');
     await this.mailService.sendVerificationCode(to, '123456');
-    await this.audit(adminId, 'admin.test-email', null, null, null, { to });
+    await this.audit(adminId, 'admin.test-email', null, ip ?? null, ua ?? null, { to });
     return { message: `测试邮件已发送至 ${to}，请检查收件箱` };
   }
 
