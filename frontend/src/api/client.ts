@@ -105,11 +105,16 @@ export const filesApi = {
   // P1-B14: password 走 body (POST) 避免 URL / access log / 浏览器历史泄露
   getDownloadInfo: (nodeId: string, password?: string) =>
     api.post(`/files/download/${nodeId}`, password ? { password } : {}),
-  uploadChunk: (formData: FormData, onProgress: (p: number) => void) =>
+  // P1-F9: signal lets the upload store abort an in-flight chunk on pause /
+  // cancel — pre-fix the axios request kept burning bytes after the UI
+  // showed "paused", and a real cancel just deleted the task while bytes
+  // continued uploading server-side.
+  uploadChunk: (formData: FormData, onProgress: (p: number) => void, signal?: AbortSignal) =>
     api.post('/files/upload-chunk', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: e => onProgress(e.loaded),
       timeout: 120_000,
+      signal,
     }),
 };
 

@@ -79,6 +79,12 @@ export interface UploadTask {
   uploadedBytes: number;
   error?: string;
   nodeId?: string;
+  /**
+   * P1-F9: highest chunk index the server has fully acked. Resume picks up at
+   * `lastUploadedChunkIndex + 1` instead of restarting from 0. `undefined` =
+   * nothing acked yet (fresh task).
+   */
+  lastUploadedChunkIndex?: number;
 }
 
 export interface DownloadChunk {
