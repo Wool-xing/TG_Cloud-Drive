@@ -98,7 +98,9 @@ export const filesApi = {
   star: (nodeId: string) => api.patch(`/files/${nodeId}/star`),
   starred: () => api.get('/files/starred'),
   getPath: (nodeId: string) => api.get(`/files/${nodeId}/path`),
-  getDownloadInfo: (nodeId: string, password?: string) => api.get(`/files/download/${nodeId}`, { params: { password } }),
+  // P1-B14: password 走 body (POST) 避免 URL / access log / 浏览器历史泄露
+  getDownloadInfo: (nodeId: string, password?: string) =>
+    api.post(`/files/download/${nodeId}`, password ? { password } : {}),
   uploadChunk: (formData: FormData, onProgress: (p: number) => void) =>
     api.post('/files/upload-chunk', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

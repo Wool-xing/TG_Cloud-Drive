@@ -89,11 +89,20 @@ export default function SharedAccess() {
       setState('ready');
     } catch (err: any) {
       const status = err?.response?.status;
-      if (status === 401 || err?.response?.data?.message?.includes('password')) {
+      // P1-F6: prefer server-provided `code` over message substring matching.
+      // Backend now returns SHARE_PASSWORD_REQUIRED / SHARE_PASSWORD_INVALID
+      // alongside 401. Fallback to legacy substring check for old backends.
+      const code: string | undefined = err?.response?.data?.code;
+      const legacyPwdHit =
+        status === 401 && err?.response?.data?.message?.includes('password');
+      if (code === 'SHARE_PASSWORD_REQUIRED') {
         setState('password');
-        if (pwd) {
-          toast.error('密码错误，请重试');
-        }
+      } else if (code === 'SHARE_PASSWORD_INVALID') {
+        setState('password');
+        toast.error('密码错误，请重试');
+      } else if (status === 401 || legacyPwdHit) {
+        setState('password');
+        if (pwd) toast.error('密码错误，请重试');
       } else if (status === 404) {
         setErrorMessage('分享链接不存在或已失效');
         setState('error');

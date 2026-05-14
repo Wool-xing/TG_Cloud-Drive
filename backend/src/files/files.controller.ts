@@ -67,6 +67,27 @@ export class FilesController {
     );
   }
 
+  /**
+   * P1-B14: download endpoint accepts password via body now. Pre-fix it was
+   * `?password=`, which:
+   *   1. Leaked into nginx access logs and browser history.
+   *   2. Was visible to any extension / referrer header sniffing the URL.
+   *   3. Got cached by CDN/proxies despite Cache-Control headers.
+   * Switched to POST so the password lives in the body (TLS-encrypted, not
+   * logged by default). Legacy GET is kept for one release as a deprecation
+   * bridge — it logs a warning and still works.
+   */
+  @Post('download/:nodeId')
+  @HttpCode(200)
+  getDownloadInfoByPost(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId') nodeId: string,
+    @Body('password') password: string,
+  ) {
+    return this.filesService.getDownloadInfo(userId, nodeId, password);
+  }
+
+  /** @deprecated P1-B14 — use POST /files/download/:nodeId with body instead. */
   @Get('download/:nodeId')
   getDownloadInfo(
     @CurrentUser('id') userId: string,
