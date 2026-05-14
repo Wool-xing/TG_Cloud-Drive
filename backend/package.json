@@ -28,7 +28,7 @@
     "form-data": "^4.0.0",
     "helmet": "^7.1.0",
     "ioredis": "^5.3.2",
-    "nodemailer": "^6.9.10",
+    "nodemailer": "^8.0.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.11.3",
@@ -37,8 +37,14 @@
     "typeorm": "^0.3.20",
     "uuid": "^9.0.0",
     "node-fetch": "^2.7.0",
-    "multer": "^1.4.5-lts.1",
     "mime-types": "^2.1.35"
+  },
+  "overrides": {
+    "lodash": "^4.17.21",
+    "tar": "^7.4.3",
+    "file-type": "^22.0.1",
+    "js-yaml": "^4.1.1",
+    "multer": "^2.1.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.2",
