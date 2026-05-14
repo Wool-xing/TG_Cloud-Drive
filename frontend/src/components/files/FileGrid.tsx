@@ -143,10 +143,10 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
         return (
           <div
             key={node.id}
-            className={`group relative rounded-xl border-2 overflow-hidden bg-white cursor-pointer transition-all select-none ${
+            className={`group relative rounded-xl border-2 overflow-hidden bg-white dark:bg-gray-800 cursor-pointer transition-all select-none ${
               isSelected
-                ? 'border-blue-500 ring-2 ring-blue-300 shadow-md'
-                : 'border-transparent hover:border-gray-200 hover:shadow-md'
+                ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-500/40 shadow-md'
+                : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-md'
             }`}
             onClick={(e) => handleCardClick(e, node)}
             onDoubleClick={() => handleDoubleClick(node)}
