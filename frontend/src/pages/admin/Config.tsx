@@ -6,6 +6,8 @@ import {
   Loader2,
   X,
   CheckCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -158,6 +160,7 @@ export default function AdminConfig() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailTarget, setTestEmailTarget] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
 
   useEffect(() => {
     if (remoteConfig) setConfig(remoteConfig);
@@ -383,13 +386,24 @@ export default function AdminConfig() {
           />
         </Field>
         <Field label="SMTP 密码">
-          <input
-            type="password"
-            value={config.smtp.pass}
-            onChange={e => setSmtp({ pass: e.target.value })}
-            placeholder="••••••••"
-            className={inputClass()}
-          />
+          <div className="relative">
+            <input
+              type={showSmtpPass ? 'text' : 'password'}
+              value={config.smtp.pass}
+              onChange={e => setSmtp({ pass: e.target.value })}
+              placeholder="••••••••"
+              autoComplete="new-password"
+              className={`${inputClass()} pr-10`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowSmtpPass(v => !v)}
+              title={showSmtpPass ? '隐藏密码' : '显示密码'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
+            >
+              {showSmtpPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </Field>
         <Field label="发件人地址 (From)">
           <input
