@@ -86,7 +86,7 @@ export class AdminController {
   updateUser(
     @CurrentUser('id') adminId: string,
     @Param('id', ParseUUIDPipe) userId: string,
-    @Body() dto: UpdateUserAdminDto,
+    @Body() dto: UpdateUserAdminDto & { confirmPassword?: string },
     @Req() req: Request,
   ) {
     return this.adminService.updateUser(adminId, userId, dto, req.ip, req.headers['user-agent']);
@@ -101,9 +101,10 @@ export class AdminController {
   deleteUser(
     @CurrentUser('id') adminId: string,
     @Param('id', ParseUUIDPipe) userId: string,
+    @Body('confirmPassword') confirmPassword: string,
     @Req() req: Request,
   ) {
-    return this.adminService.deleteUser(adminId, userId, req.ip, req.headers['user-agent']);
+    return this.adminService.deleteUser(adminId, userId, confirmPassword, req.ip, req.headers['user-agent']);
   }
 
   /**
@@ -115,9 +116,10 @@ export class AdminController {
   forceLogout(
     @CurrentUser('id') adminId: string,
     @Param('id', ParseUUIDPipe) userId: string,
+    @Body('confirmPassword') confirmPassword: string,
     @Req() req: Request,
   ) {
-    return this.adminService.forceLogout(adminId, userId, req.ip, req.headers['user-agent']);
+    return this.adminService.forceLogout(adminId, userId, confirmPassword, req.ip, req.headers['user-agent']);
   }
 
   // ─── Files ───────────────────────────────────────────────────────────────────
@@ -149,9 +151,10 @@ export class AdminController {
   deleteFile(
     @CurrentUser('id') adminId: string,
     @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Body('confirmPassword') confirmPassword: string,
     @Req() req: Request,
   ) {
-    return this.adminService.deleteFileAdmin(adminId, nodeId, req.ip, req.headers['user-agent']);
+    return this.adminService.deleteFileAdmin(adminId, nodeId, confirmPassword, req.ip, req.headers['user-agent']);
   }
 
   // ─── Audit Logs ───────────────────────────────────────────────────────────────
@@ -192,7 +195,7 @@ export class AdminController {
   @ApiOperation({ summary: '更新系统运行时配置（存储至Redis）' })
   updateConfig(
     @CurrentUser('id') adminId: string,
-    @Body() dto: UpdateSystemConfigDto,
+    @Body() dto: UpdateSystemConfigDto & { confirmPassword?: string },
     @Req() req: Request,
   ) {
     return this.adminService.updateSystemConfig(adminId, dto, req.ip, req.headers['user-agent']);
