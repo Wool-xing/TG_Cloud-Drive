@@ -57,6 +57,12 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
   }, [onClose]);
 
   const navigateInto = (folder: Node) => {
+    // P1-F21: don't change browse path mid-submit. The race was: user clicks
+    // submit → setSubmitting(true) → in the same React tick they double-click
+    // into a folder → currentBrowseId changes before handleSubmit reads it,
+    // so the move lands in the wrong directory. Guarding navigation is
+    // simpler than freezing the captured target.
+    if (submitting) return;
     setBrowsePath((prev) => [...prev, { id: folder.id, name: folder.name }]);
   };
 
@@ -73,20 +79,29 @@ export default function MoveDialog({ nodeIds, mode, onClose, onSuccess }: MoveDi
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const promises = nodeIds.map((nodeId) =>
-        mode === 'move'
-          ? filesApi.move(nodeId, targetId ?? '')
-          : filesApi.copy(nodeId, targetId ?? ''),
+      // P1-F20: Promise.allSettled, not all. Pre-fix, any single failure made
+      // Promise.all reject — successful moves above the failing one were still
+      // applied server-side, but the user saw a generic "失败" with no idea
+      // which items moved and which didn't. allSettled lets us count and
+      // report partial-success accurately.
+      const results = await Promise.allSettled(
+        nodeIds.map((nodeId) =>
+          mode === 'move'
+            ? filesApi.move(nodeId, targetId ?? '')
+            : filesApi.copy(nodeId, targetId ?? ''),
+        ),
       );
-      await Promise.all(promises);
-      toast.success(
-        mode === 'move'
-          ? `已移动 ${nodeIds.length} 个项目`
-          : `已复制 ${nodeIds.length} 个项目`,
-      );
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - ok;
+      const verb = mode === 'move' ? '移动' : '复制';
+      if (failed === 0) {
+        toast.success(`已${verb} ${ok} 个项目`);
+      } else if (ok === 0) {
+        toast.error(`${verb}失败（${failed} 项）`);
+      } else {
+        toast.error(`部分${verb}失败：成功 ${ok}，失败 ${failed}`);
+      }
       onSuccess();
-    } catch {
-      // handled by interceptor
     } finally {
       setSubmitting(false);
     }

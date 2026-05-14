@@ -70,7 +70,9 @@ function ForgotModal({ onClose }: ForgotModalProps) {
     if (newPassword !== confirmPassword) { toast.error('两次密码不一致'); return; }
     setSubmitting(true);
     try {
-      await authApi.login({ target, code, newPassword, type: 'reset' });
+      // P1-F2: hit the dedicated /auth/reset-password endpoint instead of
+      // the legacy login() call with a phantom `type: 'reset'` field.
+      await authApi.resetPassword({ target, code, newPassword });
       toast.success('密码已重置，请重新登录');
       onClose();
     } catch {

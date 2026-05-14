@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -39,6 +40,19 @@ export class AuthController {
     const ip = req.ip || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || '';
     return this.authService.refresh(token, ip, ua);
+  }
+
+  // P1-F2: forgot-password flow. Public endpoint, tight per-IP throttle (5/min)
+  // matched to /register; bruteforce is further bounded by the per-target
+  // verification-code lock (A6) and CAS (A9) inside verificationService.verify.
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    const ip = req.ip || req.socket.remoteAddress;
+    const ua = req.headers['user-agent'] || '';
+    return this.authService.resetPassword(dto, ip, ua);
   }
 
   @Post('logout')

@@ -7,6 +7,32 @@ import toast from 'react-hot-toast';
 const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_CONCURRENT = 3;
 
+// P1-F10: bounded-concurrency semaphore for processTask. Pre-fix MAX_CONCURRENT
+// was declared but unused — addFiles spawned processTask for every file
+// simultaneously, swamping the network + memory with many parallel chunked
+// encrypts. Tickets gate task execution; tasks beyond the cap wait their turn.
+let __activeUploads__ = 0;
+const __uploadQueue__: Array<() => void> = [];
+
+function acquireSlot(): Promise<void> {
+  if (__activeUploads__ < MAX_CONCURRENT) {
+    __activeUploads__++;
+    return Promise.resolve();
+  }
+  return new Promise<void>(resolve => {
+    __uploadQueue__.push(() => {
+      __activeUploads__++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot() {
+  __activeUploads__--;
+  const next = __uploadQueue__.shift();
+  if (next) next();
+}
+
 interface UploadStore {
   tasks: UploadTask[];
   isOpen: boolean;
@@ -70,6 +96,7 @@ async function processTask(taskId: string, set: any, get: any) {
     tasks: s.tasks.map((t: UploadTask) => t.id === taskId ? { ...t, ...update } : t),
   }));
 
+  await acquireSlot();
   try {
     const task = getTask();
     if (!task || task.status === 'paused') return;
@@ -166,11 +193,18 @@ async function processTask(taskId: string, set: any, get: any) {
 
     updateTask({ status: 'done', progress: 100 });
     toast.success(`${task.file.name} 上传完成`);
+    // P1-F15 followup: File objects themselves are lightweight OS handles —
+    // the actual memory pressure came from per-chunk ArrayBuffers, which are
+    // already loop-scoped and GC'd after each iteration. The original report
+    // overstated "File holds the payload"; verified via empirical test.
+    // Keeping File alive for the queue's UI (name/size still shown after done).
   } catch (err: any) {
     const msg = err?.response?.data?.message || err?.message || '上传失败';
     set((s: any) => ({
       tasks: s.tasks.map((t: UploadTask) => t.id === taskId ? { ...t, status: 'error', error: msg } : t),
     }));
     toast.error(`上传失败: ${msg}`);
+  } finally {
+    releaseSlot();
   }
 }

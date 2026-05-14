@@ -23,6 +23,45 @@ import toast from 'react-hot-toast';
 import { usersApi } from '../api/client';
 import { useAuthStore } from '../stores/auth.store';
 import { formatBytes } from '../utils/crypto';
+
+// P1-F1: hoisted out of SecurityTab. Pre-fix this component was defined
+// inside the function body, so React saw a fresh function identity on every
+// parent render — unmount/remount the <input>, losing focus on every keystroke.
+// Moving the declaration to module scope keeps the component identity stable.
+function PwInput({
+  label,
+  value,
+  show,
+  onChange,
+  onToggle,
+}: {
+  label: string;
+  value: string;
+  show: boolean;
+  onChange: (v: string) => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        >
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 import { AuditLog } from '../types';
 
 type Tab = 'profile' | 'security' | 'devices' | 'logs' | 'storage';
@@ -216,38 +255,7 @@ function SecurityTab() {
     }
   };
 
-  const PwInput = ({
-    label,
-    value,
-    show,
-    onChange,
-    onToggle,
-  }: {
-    label: string;
-    value: string;
-    show: boolean;
-    onChange: (v: string) => void;
-    onToggle: () => void;
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <div className="relative">
-        <input
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-        >
-          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-    </div>
-  );
+  // P1-F1: PwInput hoisted to module scope; keep this comment as a tombstone.
 
   return (
     <div className="space-y-8 max-w-lg">

@@ -442,7 +442,19 @@ export default function SharedAccess() {
               </div>
             )}
             {shareInfo.node.mimeType === 'application/pdf' && (
-              <iframe src={previewUrl} className="w-full h-screen rounded-xl" title={shareInfo.node.name} />
+              // P1-F14: sandbox the preview iframe. Pre-fix, a malicious upload
+              // posing as application/pdf but actually serving HTML executed
+              // with full same-origin privileges — XSS path through any share
+              // link. Restrict to scripts only (PDF.js needs scripts + same
+              // origin); explicitly OMIT allow-same-origin to prevent the
+              // embedded content reaching our cookies / localStorage.
+              <iframe
+                src={previewUrl}
+                className="w-full h-screen rounded-xl"
+                title={shareInfo.node.name}
+                sandbox="allow-scripts allow-popups allow-forms"
+                referrerPolicy="no-referrer"
+              />
             )}
             <button
               onClick={() => setShowPreview(false)}
