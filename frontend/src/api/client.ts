@@ -65,6 +65,11 @@ export const authApi = {
   logout: () => api.post('/auth/logout'),
   logoutAll: () => api.post('/auth/logout-all'),
   me: () => api.get('/auth/me'),
+  // P1-F2: dedicated reset-password endpoint. Pre-fix the forgot-password
+  // form called /auth/login with a `type: 'reset'` field that the backend
+  // didn't understand — every reset attempt was a no-op login failure.
+  resetPassword: (data: { target: string; code: string; newPassword: string }) =>
+    api.post('/auth/reset-password', data),
 };
 
 // Verification
@@ -85,6 +90,8 @@ export const filesApi = {
   permanentDelete: (nodeIds: string[]) => api.delete('/files/trash/permanent', { data: { nodeIds } }),
   setLock: (nodeId: string, password: string) => api.patch(`/files/${nodeId}/lock`, { password }),
   verifyLock: (nodeId: string, password: string) => api.post(`/files/${nodeId}/verify-lock`, { password }),
+  // P1-B12 (frontend half): DELETE /:nodeId/lock replaces the old empty-password setLock pattern.
+  removeLock: (nodeId: string, password: string) => api.delete(`/files/${nodeId}/lock`, { data: { password } }),
   moveToPrivate: (nodeIds: string[], priv: boolean) => api.post('/files/move-private', { nodeIds, private: priv }),
   recent: (limit?: number) => api.get('/files/recent', { params: limit ? { limit } : {} }),
   search: (params: any) => api.get('/files/search', { params }),

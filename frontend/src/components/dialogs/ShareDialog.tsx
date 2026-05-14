@@ -206,6 +206,19 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                 />
               </div>
 
+              {/* P1-F22: red warning when expiry=never AND no password — that
+                  combination produces a permanent, anonymously-accessible link.
+                  Pre-fix the dialog silently created such links; users routinely
+                  shipped "永久免密" share URLs not realizing the leakage surface. */}
+              {expiry === 'never' && !password.trim() && (
+                <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="font-semibold mb-0.5">⚠ 永久 + 无密码 = 公开访问</div>
+                  <div className="text-xs leading-relaxed">
+                    任何拿到此链接的人都可直接访问该文件，且永不过期。强烈建议设置密码或选择有效期。
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-1">
                 <button

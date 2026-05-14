@@ -337,12 +337,18 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           );
         }
         if (mimeType === 'application/pdf') {
+          // P1-F14: sandbox PDF preview iframe (see SharedAccess for rationale).
+          // blob: URLs are technically "opaque origin", but malicious PDFs that
+          // contain JS can still attempt navigation / clipboard access — keep
+          // the sandbox tight even on the authenticated preview path.
           return (
             <div className="flex-1 overflow-hidden">
               <iframe
                 src={blobUrl}
                 title={previewNode.name}
                 className="w-full h-full border-0"
+                sandbox="allow-scripts allow-popups allow-forms"
+                referrerPolicy="no-referrer"
               />
             </div>
           );

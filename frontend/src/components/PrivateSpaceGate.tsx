@@ -5,14 +5,32 @@ import { useAuthStore } from '../stores/auth.store';
 import { usersApi } from '../api/client';
 import DrivePage from '../pages/Drive';
 
-const SESSION_KEY = 'private_space_token';
-const EXPIRY_KEY = 'private_space_expiry';
+// P1-F17 + P1-F18: in-memory session token storage.
+//
+// Previously the token + expiry were written to sessionStorage:
+//   - F17: any XSS on the page could read the token and act as the user
+//     inside the private space for the rest of the 30-minute TTL.
+//   - F18: client-side Date.now() vs sessionStorage expiry was the *only*
+//     gate — anyone could forge `private_space_expiry` and bypass the lock
+//     without the password.
+//
+// Now we keep the token in module-scope memory only. A full reload drops it
+// (matches the threat model: the user re-authenticates on every fresh tab /
+// reload). The real authority on expiry is the JWT signature server-side;
+// we still record `unlockedAt` as a defense-in-depth client check but it's
+// no longer the trust boundary.
+const SESSION_TTL_MS = 30 * 60 * 1000;
+let __memToken__: string | null = null;
+let __memUnlockedAt__: number = 0;
 
 function isSessionValid(): boolean {
-  const token = sessionStorage.getItem(SESSION_KEY);
-  const expiry = sessionStorage.getItem(EXPIRY_KEY);
-  if (!token || !expiry) return false;
-  return Date.now() < parseInt(expiry, 10);
+  if (!__memToken__) return false;
+  if (Date.now() - __memUnlockedAt__ > SESSION_TTL_MS) {
+    __memToken__ = null;
+    __memUnlockedAt__ = 0;
+    return false;
+  }
+  return true;
 }
 
 export default function PrivateSpaceGate() {
@@ -63,10 +81,10 @@ export default function PrivateSpaceGate() {
     try {
       const res = await usersApi.verifyPrivateSpace(password) as any;
       const token = res?.sessionToken;
-      const expiresIn = res?.expiresIn ?? 1800;
       if (token) {
-        sessionStorage.setItem(SESSION_KEY, token);
-        sessionStorage.setItem(EXPIRY_KEY, String(Date.now() + expiresIn * 1000));
+        // F17/F18: in-memory only; no sessionStorage write.
+        __memToken__ = token;
+        __memUnlockedAt__ = Date.now();
         setUnlocked(true);
       } else {
         setError('验证失败，请重试');

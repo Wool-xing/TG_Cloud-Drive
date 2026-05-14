@@ -35,8 +35,11 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
       return false;
     }
     if (!isLocked) {
-      if (password.length < 4) {
-        setError('密码至少 4 个字符');
+      // P1-F19: floor lifted from 4 → 6 to match the backend setLock contract
+      // (B12). Pre-fix, a user could set a 4-char lock here which the backend
+      // then rejected with a different error message — confusing UX.
+      if (password.length < 6) {
+        setError('密码至少 6 个字符');
         return false;
       }
       if (password !== confirmPassword) {
@@ -54,7 +57,10 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
     setSubmitting(true);
     try {
       if (isLocked) {
-        await filesApi.verifyLock(node.id, password);
+        // P1-B12: actually clear the lock instead of merely verifying. The old
+        // verifyLock call just confirmed the password was correct without
+        // changing state — the UI showed "已解锁" but the lock was still on.
+        await filesApi.removeLock(node.id, password);
         toast.success(`${itemLabel}已解锁`);
       } else {
         await filesApi.setLock(node.id, password);
@@ -120,7 +126,7 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
                 className={`w-full border rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 transition-shadow ${
                   error ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 focus:ring-blue-500'
                 }`}
-                placeholder={isLocked ? '输入锁定密码' : '至少 4 个字符'}
+                placeholder={isLocked ? '输入锁定密码' : '至少 6 个字符'}
                 disabled={submitting}
               />
               <button

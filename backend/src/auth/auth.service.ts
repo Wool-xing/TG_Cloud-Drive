@@ -23,6 +23,7 @@ import {
 let __DUMMY_BCRYPT_HASH__: Promise<string> | null = null;
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerificationService } from '../verification/verification.service';
 
 @Injectable()
@@ -128,6 +129,57 @@ export class AuthService {
       user: this.safeUser(user),
       mekSalt: user.mekSalt,
     };
+  }
+
+  /**
+   * P1-F2: password reset by verification code (forgot-password flow).
+   *
+   * Steps:
+   * 1. Consume the RESET_PASSWORD verification code for the supplied target
+   *    (email or phone). verify() applies CAS + per-target rate-limit + lock
+   *    (A6 + A9 inherit here automatically).
+   * 2. Resolve user by the same hash-based lookup login() uses — so a
+   *    non-existent target can't be distinguished from a wrong code via
+   *    error timing/messaging (returns the same generic 400).
+   * 3. Re-hash password + delete all Devices + write force_logout marker
+   *    (same revocation pattern as D6 changePassword).
+   *
+   * Throttled by the controller (5/min/IP) and bounded by the per-target
+   * verification code lock — bruteforce surface is the same as register.
+   */
+  async resetPassword(dto: ResetPasswordDto, ip: string, ua: string) {
+    const { target, code, newPassword } = dto;
+
+    await this.verificationService.verify(target, code, 'reset_password');
+
+    // Look up user via emailHash / phoneHash — same path as login. Use a
+    // unified error message so timing/wording doesn't leak account existence.
+    const user = await this.findUserByIdentifier(target);
+    if (!user) {
+      throw new BadRequestException('验证码错误或账号不存在');
+    }
+    if (user.status === UserStatus.DISABLED) {
+      throw new ForbiddenException('账号已被禁用');
+    }
+
+    user.passwordHash = await hashPassword(newPassword);
+    await this.userRepo.save(user);
+
+    // Same forced-logout treatment as D6: delete devices + Redis force_logout
+    // so any pre-reset access/refresh token becomes unusable.
+    await this.deviceRepo.delete({ userId: user.id });
+    const forceLogoutTs = Date.now().toString();
+    const ttlSeconds = this.configService.get<number>('FORCE_LOGOUT_TTL_SECONDS', 86400 * 30);
+    try {
+      await this.redis.set(`force_logout:${user.id}`, forceLogoutTs, 'EX', ttlSeconds);
+    } catch {
+      // Devices already deleted; Redis outage shouldn't block a successful reset.
+      // Pre-reset access tokens may live until their TTL — acceptable trade-off
+      // documented in the response copy.
+    }
+
+    await this.auditLog(user.id, 'password.reset', null, ip, ua);
+    return { message: '密码已重置，请使用新密码登录' };
   }
 
   async refresh(refreshToken: string, ip: string, ua: string) {

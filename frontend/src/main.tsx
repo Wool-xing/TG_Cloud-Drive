@@ -14,7 +14,8 @@ import './index.css';
   }
 })();
 
-const queryClient = new QueryClient({
+// Exported so non-component code (e.g. auth.store.logout) can clear cache too.
+export const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 

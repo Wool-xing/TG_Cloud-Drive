@@ -1,13 +1,20 @@
 import React, { useCallback, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, FileRejection } from 'react-dropzone';
 import { UploadCloud } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../../stores/auth.store';
 import { useFileStore } from '../../stores/file.store';
 import { useUploadStore } from '../../stores/upload.store';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import UploadQueue from '../upload/UploadQueue';
+
+// P1-F27: client-side guard before chunking starts. Server-side quota / type
+// enforcement is still the authoritative check; this just stops a 50 GB drop
+// from spinning up encryption workers for files we'll reject anyway. 10 GB
+// matches the rough Telegram single-document hard ceiling.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 * 1024;
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -21,7 +28,16 @@ export default function AppLayout() {
   }, [user, navigate]);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
+    (acceptedFiles: File[], rejections: FileRejection[]) => {
+      if (rejections.length > 0) {
+        // Surface the first rejection reason — usually file-too-large.
+        const reason = rejections[0].errors[0]?.code ?? 'unknown';
+        if (reason === 'file-too-large') {
+          toast.error(`文件超过 ${(MAX_UPLOAD_BYTES / 1024 / 1024 / 1024).toFixed(0)} GB 上限`);
+        } else {
+          toast.error(`部分文件被拒绝（${rejections.length} 个）`);
+        }
+      }
       if (acceptedFiles.length === 0) return;
       addFiles(acceptedFiles, currentParentId, isPrivate);
     },
@@ -32,6 +48,9 @@ export default function AppLayout() {
     onDrop,
     noClick: true,   // Don't open picker on background click
     noKeyboard: true,
+    // P1-F27: bound per-file size so a malicious 50 GB drop can't spin up
+    // encryption workers for files we'll reject anyway.
+    maxSize: MAX_UPLOAD_BYTES,
   });
 
   if (!user) return null;
