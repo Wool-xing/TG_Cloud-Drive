@@ -96,6 +96,19 @@ export class TelegramService {
   }
 
   async getFileUrl(fileId: string): Promise<string> {
+    // P1-B20: refuse to build a direct Telegram file URL when the Worker isn't
+    // configured. The direct URL embeds the bot token and is returned to the
+    // browser by files.service.getDownloadInfo — pre-fix, downloading a single
+    // file leaked the bot token via DevTools / proxy / share-link target. env
+    // validator now blocks production startup without CF_WORKERS_URL, but
+    // double-gate here in case a dev environment ever lands behind a public
+    // origin or someone bypasses the env check.
+    if (!this.workersUrl) {
+      this.logger.error('getFileUrl called without CF_WORKERS_URL — direct mode would leak bot token, refusing');
+      throw new ServiceUnavailableException(
+        '下载服务未配置：CF_WORKERS_URL 缺失。请部署 Cloudflare Worker 后再用下载/预览功能（避免 bot token 经浏览器 URL 泄漏）',
+      );
+    }
     const res = await this.fetchWithRetry(
       `${this.apiBase}/getFile?file_id=${fileId}`,
       { headers: this.defaultHeaders() },
@@ -103,11 +116,7 @@ export class TelegramService {
     );
     const json = await res.json() as any;
     if (!json.ok) throw new InternalServerErrorException('获取文件路径失败');
-    const filePath = json.result.file_path;
-    if (this.workersUrl) {
-      return `${this.workersUrl}/file/${encodeURIComponent(fileId)}`;
-    }
-    return `https://api.telegram.org/file/bot${this.token}/${filePath}`;
+    return `${this.workersUrl}/file/${encodeURIComponent(fileId)}`;
   }
 
   async deleteMessage(messageId: number) {
