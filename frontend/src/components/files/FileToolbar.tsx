@@ -40,10 +40,11 @@ interface FileToolbarProps {
   isLoading: boolean;
 }
 
-type DialogType = 'move' | 'copy' | null;
+type DialogType = 'move' | 'copy' | 'rename' | 'share' | 'lock' | null;
 
 export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
   const queryClient = useQueryClient();
+  const { mekDerived } = useAuthStore();
   const {
     selectedIds,
     currentParentId,
@@ -108,20 +109,86 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       toast.error('请选择文件（不支持直接下载文件夹）');
       return;
     }
+    // Pre-fix: this read `res?.downloadUrl ?? res?.url` and bailed silently
+    // for every file because the backend returns `{chunks, key, node}`. Now
+    // mirror PreviewModal/handleDownload: decrypt + stream each file.
+    const mek = getSessionMEK();
     toast.success(`开始下载 ${fileNodes.length} 个文件`);
     for (const node of fileNodes) {
       try {
-        const res = await filesApi.getDownloadInfo(node.id) as any;
-        const url = res?.downloadUrl ?? res?.url;
-        if (!url) continue;
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = node.name;
-        a.click();
-        await new Promise(r => setTimeout(r, 800));
-      } catch {
-        // skip failed files
+        const info = await filesApi.getDownloadInfo(node.id) as unknown as DownloadInfo;
+        const mimeType = info.node.mimeType ?? 'application/octet-stream';
+        if (!info.key || !mek || !mekDerived) {
+          // Fallback to direct URL if backend ever returns one (legacy /
+          // unencrypted path).
+          const directUrl = (info as any).downloadUrl ?? (info as any).url;
+          if (directUrl) {
+            const a = document.createElement('a');
+            a.href = directUrl;
+            a.download = node.name;
+            a.click();
+            await new Promise(r => setTimeout(r, 800));
+          }
+          continue;
+        }
+        const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+        await streamingDownload(
+          {
+            count: info.chunks.length,
+            fetchChunk: async (i) => {
+              const chunk = info.chunks[i];
+              if (!chunk.iv) throw new Error(`分片 ${i} 缺少 IV`);
+              const r = await fetch(chunk.url);
+              if (!r.ok) throw new Error(`下载分片 ${i} 失败`);
+              const enc = await r.arrayBuffer();
+              const plain = await decryptBuffer(enc, dek, chunk.iv);
+              return new Uint8Array(plain);
+            },
+          },
+          { filename: node.name, mimeType, totalSize: info.node.size },
+        );
+        // Brief gap so showSaveFilePicker dialogs don't queue on top of each
+        // other (UX: user picks save location for each).
+        await new Promise(r => setTimeout(r, 500));
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return; // user cancelled — stop batch
+        if (err instanceof BlobFallbackTooLargeError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error(`下载 ${node.name} 失败`);
       }
+    }
+  };
+
+  // P1-UX: per-file actions reachable from toolbar without right-click
+  // (新手不一定有右键习惯, 之前 toolbar 只 4 件让用户觉得"很多功能没用")
+  const singleSelectedNode = selectedCount === 1
+    ? nodes.find(n => selectedArray[0] === n.id) ?? null
+    : null;
+
+  const handleStar = async () => {
+    if (!singleSelectedNode) return;
+    const was = singleSelectedNode.isStarred;
+    try {
+      await filesApi.star(singleSelectedNode.id);
+      invalidateFiles();
+      queryClient.invalidateQueries({ queryKey: ['starred'] });
+      toast.success(was ? '已取消收藏' : '已收藏');
+    } catch {
+      // handled
+    }
+  };
+
+  const handleMovePrivate = async () => {
+    if (!selectedArray.length) return;
+    try {
+      await filesApi.moveToPrivate(selectedArray, !isPrivate);
+      invalidateFiles();
+      clearSelection();
+      toast.success(isPrivate ? '已移出隐私空间' : '已移入隐私空间');
+    } catch {
+      // handled
     }
   };
 
@@ -163,11 +230,46 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 <X className="w-3.5 h-3.5" />
                 取消选择
               </button>
-              <div className="flex items-center gap-1.5 ml-2">
+              <div className="flex items-center gap-1.5 ml-2 flex-wrap">
                 <BtnSm icon={<Trash2 className="w-4 h-4" />} label="删除" onClick={handleBatchDelete} danger />
                 <BtnSm icon={<FolderInput className="w-4 h-4" />} label="移动" onClick={() => setDialog('move')} />
                 <BtnSm icon={<Copy className="w-4 h-4" />} label="复制" onClick={() => setDialog('copy')} />
                 <BtnSm icon={<Download className="w-4 h-4" />} label="下载" onClick={handleBatchDownload} />
+                {/* Per-file actions only when exactly 1 selected — backend
+                    contracts are single-node (rename / lock / share). */}
+                {singleSelectedNode && (
+                  <>
+                    <BtnSm
+                      icon={<Edit className="w-4 h-4" />}
+                      label="重命名"
+                      onClick={() => setDialog('rename')}
+                    />
+                    <BtnSm
+                      icon={<Star className="w-4 h-4" />}
+                      label={singleSelectedNode.isStarred ? '取消收藏' : '收藏'}
+                      onClick={handleStar}
+                    />
+                    {singleSelectedNode.type === 'file' && (
+                      <BtnSm
+                        icon={<Share2 className="w-4 h-4" />}
+                        label="分享"
+                        onClick={() => setDialog('share')}
+                      />
+                    )}
+                    <BtnSm
+                      icon={singleSelectedNode.isLocked
+                        ? <Unlock className="w-4 h-4" />
+                        : <Lock className="w-4 h-4" />}
+                      label={singleSelectedNode.isLocked ? '解锁' : '加密锁定'}
+                      onClick={() => setDialog('lock')}
+                    />
+                  </>
+                )}
+                <BtnSm
+                  icon={isPrivate ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  label={isPrivate ? '移出隐私' : '移入隐私'}
+                  onClick={handleMovePrivate}
+                />
               </div>
             </>
           ) : (
@@ -228,6 +330,26 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
           mode={dialog}
           onClose={() => setDialog(null)}
           onSuccess={() => { setDialog(null); invalidateFiles(); clearSelection(); }}
+        />
+      )}
+      {dialog === 'rename' && singleSelectedNode && (
+        <RenameDialog
+          node={singleSelectedNode}
+          onClose={() => setDialog(null)}
+          onSuccess={() => { setDialog(null); invalidateFiles(); }}
+        />
+      )}
+      {dialog === 'share' && singleSelectedNode && singleSelectedNode.type === 'file' && (
+        <ShareDialog
+          node={singleSelectedNode}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'lock' && singleSelectedNode && (
+        <LockDialog
+          node={singleSelectedNode}
+          onClose={() => setDialog(null)}
+          onSuccess={() => { setDialog(null); invalidateFiles(); }}
         />
       )}
     </>
