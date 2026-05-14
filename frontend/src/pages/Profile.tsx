@@ -32,14 +32,18 @@ function PwInput({
   label,
   value,
   show,
+  placeholder,
   onChange,
   onToggle,
+  autoComplete,
 }: {
   label: string;
   value: string;
   show: boolean;
+  placeholder?: string;
   onChange: (v: string) => void;
   onToggle: () => void;
+  autoComplete?: string;
 }) {
   return (
     <div>
@@ -49,6 +53,8 @@ function PwInput({
           type={show ? 'text' : 'password'}
           value={value}
           onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
           className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
@@ -263,17 +269,27 @@ function SecurityTab() {
       <section>
         <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">修改登录密码</h3>
         <form onSubmit={handleChangePassword} className="space-y-4">
+          {/* P1-UX: input hints live in the placeholder, label stays a short
+              noun. Pre-fix the password rule ("至少 8 位") was glued to the
+              label like 新密码（至少 8 位） and the box itself was empty —
+              inconsistent with the 隐私空间密码 input below which had a real
+              placeholder. Pattern aligned across SecurityTab: label = noun,
+              placeholder = constraint hint. */}
           <PwInput
             label="当前密码"
             value={pwForm.oldPassword}
             show={showPw.old}
+            placeholder="输入您当前的登录密码"
+            autoComplete="current-password"
             onChange={v => setPwForm(f => ({ ...f, oldPassword: v }))}
             onToggle={() => setShowPw(s => ({ ...s, old: !s.old }))}
           />
           <PwInput
-            label="新密码（至少 8 位）"
+            label="新密码"
             value={pwForm.newPassword}
             show={showPw.new}
+            placeholder="至少 8 位，建议含字母与数字"
+            autoComplete="new-password"
             onChange={v => setPwForm(f => ({ ...f, newPassword: v }))}
             onToggle={() => setShowPw(s => ({ ...s, new: !s.new }))}
           />
@@ -281,6 +297,8 @@ function SecurityTab() {
             label="确认新密码"
             value={pwForm.confirm}
             show={showPw.confirm}
+            placeholder="再次输入新密码"
+            autoComplete="new-password"
             onChange={v => setPwForm(f => ({ ...f, confirm: v }))}
             onToggle={() => setShowPw(s => ({ ...s, confirm: !s.confirm }))}
           />
@@ -306,8 +324,9 @@ function SecurityTab() {
               type="password"
               value={ppForm.newPassword}
               onChange={e => setPpForm(f => ({ ...f, newPassword: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
-              placeholder="至少 6 位"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="至少 8 位，需同时包含字母与数字"
+              autoComplete="new-password"
             />
           </div>
           <div>
@@ -316,7 +335,9 @@ function SecurityTab() {
               type="password"
               value={ppForm.confirm}
               onChange={e => setPpForm(f => ({ ...f, confirm: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="再次输入隐私空间密码"
+              autoComplete="new-password"
             />
           </div>
           <button
@@ -436,15 +457,54 @@ function DevicesTab() {
 }
 
 // ── Audit Logs Tab ─────────────────────────────────────────────
+
+// Backend audit actions are stored as English snake-style identifiers
+// (login / upload / download / share.access / private_space.access ...).
+// Show a Chinese label so the table isn't "all empty + code-looking strings"
+// — pre-fix the action column read "login" / "share.access" and users
+// reported "点击空白" because the rows looked sparse / cryptic.
+const ACTION_LABEL: Record<string, string> = {
+  login: '登录',
+  logout: '退出',
+  'login.fail': '登录失败',
+  upload: '上传',
+  download: '下载',
+  delete: '删除',
+  rename: '重命名',
+  move: '移动',
+  copy: '复制',
+  star: '收藏',
+  share: '创建分享',
+  'share.access': '访问分享',
+  'share.delete': '删除分享',
+  'device.revoke': '注销设备',
+  'private_space.password_set': '设置隐私空间密码',
+  'private_space.access': '访问隐私空间',
+  'password.change': '修改密码',
+  'profile.update': '更新资料',
+};
+
+function actionLabel(action: string): string {
+  return ACTION_LABEL[action] ?? action;
+}
+
 function AuditLogsTab() {
   const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const PAGE_SIZE = 20;
 
   const { data, isLoading } = useQuery<{ logs: AuditLog[]; total: number }>({
     queryKey: ['audit-logs', page],
     queryFn: async () => {
       const res = await usersApi.auditLogs({ page, limit: PAGE_SIZE }) as any;
-      return { logs: res?.logs ?? res ?? [], total: res?.total ?? 0 };
+      // Backend returns `{ items, total, page, limit }` (users.service.ts:
+      // getAuditLogs). Pre-fix the fallback chain `res?.logs ?? res ?? []`
+      // read `res.logs` (undefined), fell through to the whole `res` OBJECT,
+      // and `.map()` on a plain object threw silently — table rendered empty
+      // even though the backend had data. Explicit `items` first matches the
+      // actual contract.
+      const items: AuditLog[] = res?.items ?? res?.logs ?? [];
+      return { logs: Array.isArray(items) ? items : [], total: res?.total ?? 0 };
     },
     staleTime: 30_000,
   });
@@ -485,29 +545,79 @@ function AuditLogsTab() {
                 <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-500">暂无操作记录</td>
               </tr>
             ) : (
-              // P1-UX: audit log rows are read-only. Pre-fix the hover:bg-gray-50
-              // class made rows look clickable but nothing happened on click
-              // ("点击空白" — user clicked expecting detail and saw nothing).
-              // Drop the hover style + cursor-default explicitly so users don't
-              // misread the rows as interactive.
-              logs.map(log => (
-                <tr key={log.id} className="cursor-default">
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${actionBadge(log.action)}`}>
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell dark:text-gray-300">
-                    <span className="truncate max-w-[160px] block">{log.nodeName ?? '—'}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs font-mono hidden lg:table-cell dark:text-gray-400">
-                    {log.ipAddress ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs dark:text-gray-400">
-                    {formatDate(log.createdAt)}
-                  </td>
-                </tr>
-              ))
+              // P1-UX: rows expand on click to show full audit detail
+              // (userAgent / nodeId / metadata / full ISO timestamp / full IP).
+              // Pre-fix the column data was English-codey ("share.access") and
+              // many cells were "—" because the columns shown didn't cover the
+              // rich fields the backend already returns. Click → expand wires
+              // those fields without a separate modal route.
+              logs.flatMap(log => {
+                const expanded = expandedId === log.id;
+                return [
+                  <tr
+                    key={log.id}
+                    onClick={() => setExpandedId(expanded ? null : log.id)}
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors even:bg-gray-50/50 dark:even:bg-gray-900/30"
+                  >
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${actionBadge(log.action)}`}>
+                        {actionLabel(log.action)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {log.nodeName ? (
+                        <span className="truncate max-w-[160px] block text-gray-600 dark:text-gray-300">{log.nodeName}</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-mono hidden lg:table-cell">
+                      {log.ipAddress ? (
+                        <span className="text-gray-500 dark:text-gray-400">{log.ipAddress.replace(/^::ffff:/, '')}</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs dark:text-gray-400">
+                      {formatDate(log.createdAt)}
+                    </td>
+                  </tr>,
+                  expanded && (
+                    <tr key={`${log.id}-detail`} className="bg-gray-50 dark:bg-gray-900/60">
+                      <td colSpan={4} className="px-4 py-3">
+                        <dl className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-xs">
+                          <dt className="text-gray-500 dark:text-gray-400">操作代码</dt>
+                          <dd className="font-mono text-gray-700 dark:text-gray-200 break-all">{log.action}</dd>
+
+                          <dt className="text-gray-500 dark:text-gray-400">完整时间</dt>
+                          <dd className="text-gray-700 dark:text-gray-200">{new Date(log.createdAt).toLocaleString('zh-CN', { hour12: false })}</dd>
+
+                          <dt className="text-gray-500 dark:text-gray-400">完整 IP</dt>
+                          <dd className="font-mono text-gray-700 dark:text-gray-200 break-all">{log.ipAddress ?? '—'}</dd>
+
+                          <dt className="text-gray-500 dark:text-gray-400">客户端</dt>
+                          <dd className="text-gray-700 dark:text-gray-200 break-all">{log.userAgent ?? '—'}</dd>
+
+                          <dt className="text-gray-500 dark:text-gray-400">关联文件名</dt>
+                          <dd className="text-gray-700 dark:text-gray-200 break-all">{log.nodeName ?? '—'}</dd>
+
+                          <dt className="text-gray-500 dark:text-gray-400">文件 ID</dt>
+                          <dd className="font-mono text-gray-700 dark:text-gray-200 break-all">{log.nodeId ?? '—'}</dd>
+
+                          {log.metadata && Object.keys(log.metadata).length > 0 && (
+                            <>
+                              <dt className="text-gray-500 dark:text-gray-400">附加信息</dt>
+                              <dd className="font-mono text-gray-700 dark:text-gray-200 break-all whitespace-pre-wrap">
+                                {JSON.stringify(log.metadata, null, 2)}
+                              </dd>
+                            </>
+                          )}
+                        </dl>
+                      </td>
+                    </tr>
+                  ),
+                ].filter(Boolean);
+              })
             )}
           </tbody>
         </table>

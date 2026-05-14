@@ -63,8 +63,11 @@ export interface Tag {
 export interface AuditLog {
   id: string;
   action: string;
-  nodeName?: string;
-  ipAddress?: string;
+  nodeId?: string | null;
+  nodeName?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  metadata?: Record<string, any> | null;
   createdAt: string;
 }
 
