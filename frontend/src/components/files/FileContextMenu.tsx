@@ -17,8 +17,10 @@ import toast from 'react-hot-toast';
 
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
-import { Node } from '../../types';
-import { formatBytes } from '../../utils/crypto';
+import { useAuthStore } from '../../stores/auth.store';
+import { Node, DownloadInfo } from '../../types';
+import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer } from '../../utils/crypto';
+import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
 import RenameDialog from '../dialogs/RenameDialog';
 import MoveDialog from '../dialogs/MoveDialog';
 import ShareDialog from '../dialogs/ShareDialog';
@@ -28,6 +30,7 @@ type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | null;
 
 export default function FileContextMenu() {
   const queryClient = useQueryClient();
+  const { mekDerived } = useAuthStore();
   const {
     contextMenuNode: node,
     contextMenuPos: pos,
@@ -101,20 +104,65 @@ export default function FileContextMenu() {
 
   const handleDownload = async () => {
     if (!node) return;
+    const savedNode = node;
     close();
     try {
-      const res = await filesApi.getDownloadInfo(node.id) as any;
-      const url = res?.downloadUrl ?? res?.url;
-      if (!url) {
-        toast.error('获取下载链接失败');
+      // Pre-fix: this branch read `res?.downloadUrl` / `res?.url`, but the
+      // backend returns `{ chunks: [{url, iv}], key, node }` (see
+      // files.service.getDownloadInfo). Both fallbacks were undefined →
+      // toast "获取下载链接失败" every time = "下载按钮没用".
+      // Now mirror PreviewModal.handleDownload: decrypt DEK with session
+      // MEK, then stream each chunk through streamingDownload helper to
+      // showSaveFilePicker (or Blob fallback). Folder downloads still
+      // unsupported server-side; bail with a clear toast.
+      if (savedNode.type !== 'file') {
+        toast.error('文件夹下载暂不支持，请逐个下载内部文件');
         return;
       }
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = node.name;
-      a.click();
-    } catch {
-      // handled by interceptor
+      const info = await filesApi.getDownloadInfo(savedNode.id) as unknown as DownloadInfo;
+      const mimeType = info.node.mimeType ?? 'application/octet-stream';
+      const mek = getSessionMEK();
+      if (!info.key || !mek || !mekDerived) {
+        const directUrl = (info as any).downloadUrl ?? (info as any).url;
+        if (directUrl) { window.open(directUrl, '_blank'); return; }
+        toast.error('会话密钥已失效，请退出后重新登录');
+        return;
+      }
+      const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+      let warned = false;
+      await streamingDownload(
+        {
+          count: info.chunks.length,
+          fetchChunk: async (i) => {
+            const chunk = info.chunks[i];
+            if (!chunk.iv) throw new Error(`分片 ${i} 缺少 IV，可能是历史损坏文件`);
+            const r = await fetch(chunk.url);
+            if (!r.ok) throw new Error(`下载分片 ${i} 失败`);
+            const encrypted = await r.arrayBuffer();
+            const plain = await decryptBuffer(encrypted, dek, chunk.iv);
+            return new Uint8Array(plain);
+          },
+        },
+        {
+          filename: savedNode.name,
+          mimeType,
+          totalSize: info.node.size,
+          onLargeFileFallback: () => {
+            if (!warned) {
+              warned = true;
+              toast('当前浏览器将在内存中缓冲完整文件，大文件可能较慢。');
+            }
+          },
+        },
+      );
+      toast.success('下载完成');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      if (err instanceof BlobFallbackTooLargeError) {
+        toast.error(err.message);
+        return;
+      }
+      toast.error('下载失败');
     }
   };
 

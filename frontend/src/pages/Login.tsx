@@ -225,6 +225,27 @@ export default function Login() {
       const res = await authApi.login({ identifier: identifier.trim(), password }) as any;
       setAuth(res.user, res.accessToken, res.refreshToken, res.mekSalt, rememberMe);
       await deriveMEK(password);
+      // P1-UX: tell the browser explicitly to remember this credential pair.
+      // Pre-fix only autoComplete attrs were set, but Chrome / Edge often
+      // captures the username and misses the password (the user reported
+      // "下次只填用户名"). The Credential Management API removes the guess —
+      // we pass both identifiers, the password manager stores them as a
+      // matched pair, next visit autofills both fields.
+      if (rememberMe && typeof window !== 'undefined' && 'PasswordCredential' in window) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const PC = (window as any).PasswordCredential;
+          const cred = new PC({
+            id: identifier.trim(),
+            password,
+            name: res.user.nickname || res.user.username,
+          });
+          await (navigator as any).credentials.store(cred);
+        } catch {
+          // Safari / Firefox lack PasswordCredential — fall through silently,
+          // autoComplete attrs still cover those browsers' weaker autofill.
+        }
+      }
       toast.success(`欢迎回来，${res.user.nickname || res.user.username}！`);
       navigate('/');
     } catch {
