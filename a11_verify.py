@@ -56,6 +56,13 @@ def redis_del(key):
                    capture_output=True, timeout=5, check=False)
 
 
+def clear_rate(target):
+    """F1: rate key now includes purpose. Burn every purpose to be safe."""
+    for purpose in ("register", "login", "reset_password",
+                    "change_email", "change_phone", "change_password"):
+        redis_del(f"vc:rate:{purpose}:{target}")
+
+
 def post(path, body=None, token=None):
     h = {"Content-Type": "application/json"}
     if token:
@@ -108,7 +115,7 @@ def main():
 
     # 2. First-time bind — single-factor (no oldEmailCode)
     email1 = f"a11a_{secrets.token_hex(3)}@example.com"
-    redis_del(f"vc:rate:{phone}")
+    clear_rate(phone)
     sc, j = post("/users/bind-email/send-code", {"email": email1}, access)
     code1 = (j.get("data") or {}).get("code")
     check("first-bind send-code OK", bool(code1), f"resp={j}")
@@ -122,7 +129,7 @@ def main():
 
     # 3. Now changing email — must reject without oldEmailCode
     email2 = f"a11b_{secrets.token_hex(3)}@example.com"
-    redis_del(f"vc:rate:{email1}")
+    clear_rate(email1)
     sc, j = post("/users/bind-email/send-code", {"email": email2}, access)
     code2 = (j.get("data") or {}).get("code")
     check("change-email send new code OK", bool(code2), f"resp={j}")
@@ -137,8 +144,8 @@ def main():
     check("change-email rejects wrong oldEmailCode", sc == 400, f"got {sc} {j}")
 
     # 5. Get a real old code + retry. New code was used above? Need re-send.
-    redis_del(f"vc:rate:{email1}")
-    redis_del(f"vc:rate:{email2}")
+    clear_rate(email1)
+    clear_rate(email2)
     sc, j = post("/users/bind-email/send-code-old", {}, access)
     old_code = (j.get("data") or {}).get("code")
     check("send-code-old after bind OK", bool(old_code), f"resp={j}")
@@ -162,7 +169,7 @@ def main():
     # 7. ATTACKER simulation: attacker has access but cannot read old inbox.
     #    Try to swap email1→attacker_email with new-side OTP only. Should fail.
     email3 = f"attacker_{secrets.token_hex(3)}@example.com"
-    redis_del(f"vc:rate:{email2}")
+    clear_rate(email2)
     sc, j = post("/users/bind-email/send-code", {"email": email3}, access)
     code3 = (j.get("data") or {}).get("code")
     sc, j = post("/users/bind-email", {"email": email3, "code": code3}, access)

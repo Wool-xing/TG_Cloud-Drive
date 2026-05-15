@@ -98,7 +98,8 @@ def register_phone_user():
     if sc not in OK:
         raise RuntimeError(f"phone login failed: {sc} {j}")
     access = (j.get("data") or j).get("accessToken")
-    redis_del(f"vc:rate:{phone}")
+    for purpose in ("register", "login", "reset_password", "change_email", "change_phone", "change_password"):
+        redis_del(f"vc:rate:{purpose}:{phone}")
     return phone, pw, access
 
 
