@@ -17,10 +17,37 @@ api.interceptors.request.use(config => {
 });
 
 api.interceptors.response.use(
-  res => res.data?.data !== undefined ? res.data.data : res.data,
+  res => {
+    const body = res.data?.data !== undefined ? res.data.data : res.data;
+    // Dev-mode verification codes: backend returns `code` in body when
+    // NODE_ENV=development (verification.service.ts L64-67). Surface as a
+    // toast so testers don't need to dig docker logs or psql when SMTP/SMS
+    // is not configured. Prod backend never sets body.code → this is a
+    // no-op outside development.
+    if (
+      body &&
+      typeof body === 'object' &&
+      typeof (body as any).code === 'string' &&
+      /^\d{6}$/.test((body as any).code)
+    ) {
+      toast.success(`开发模式验证码: ${(body as any).code}`, { duration: 15_000 });
+    }
+    return body;
+  },
   async (error: AxiosError<any>) => {
     const original = error.config as any;
-    if (error.response?.status === 401 && !original._retry && original.url !== '/auth/refresh') {
+    // Don't run the refresh dance for unauthenticated auth-entry endpoints.
+    // A 401 there means "wrong credentials" / "invalid code", not "token
+    // expired". Pre-fix the 401 path swallowed login failures: refresh would
+    // 401 too → redirect to /login → user already on /login → no toast, the
+    // UI looked like a no-op.
+    const url = original.url as string | undefined;
+    const isAuthEntry =
+      url === '/auth/login' ||
+      url === '/auth/register' ||
+      url === '/auth/refresh' ||
+      url === '/auth/reset-password';
+    if (error.response?.status === 401 && !original._retry && !isAuthEntry) {
       if (isRefreshing) {
         return new Promise(resolve => {
           refreshQueue.push(token => {
@@ -55,7 +82,14 @@ api.interceptors.response.use(
     // (with code-specific text). Don't double up with a global toast.
     const code = error.response?.data?.code as string | undefined;
     const isAdminConfirm = typeof code === 'string' && code.startsWith('ADMIN_CONFIRM_');
-    if (error.response?.status !== 401 && !isAdminConfirm) toast.error(msg);
+    // Pre-fix the toast was also skipped for any 401 to avoid double toasts
+    // on the refresh-then-retry path. But the refresh path already returns
+    // (api(original) on success, Promise.reject + redirect on fail), so by
+    // the time we reach here a 401 is either from an auth-entry endpoint
+    // (login / register / reset — user-facing error, MUST toast) or the
+    // refresh call itself failed (still worth toasting). Drop the `!== 401`
+    // guard so login failures surface.
+    if (!isAdminConfirm) toast.error(msg);
     return Promise.reject(error);
   },
 );

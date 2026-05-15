@@ -20,6 +20,32 @@
   select {
     @apply dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:placeholder-gray-400;
   }
+
+  /* Chrome / Edge autofill overrides input background to its own light-blue
+     (rgb(232,240,254)), nuking Tailwind's dark:bg-* classes. The standard
+     workaround is a 1000px inset box-shadow that paints OVER the autofill
+     background, plus -webkit-text-fill-color for the text color (the regular
+     `color` property is ignored during autofill).
+     Light mode keeps the browser default (light-blue tint is fine on white). */
+  html.dark input:-webkit-autofill,
+  html.dark input:-webkit-autofill:hover,
+  html.dark input:-webkit-autofill:focus,
+  html.dark input:-webkit-autofill:active,
+  html.dark textarea:-webkit-autofill,
+  html.dark select:-webkit-autofill {
+    -webkit-text-fill-color: rgb(243 244 246) !important;
+    -webkit-box-shadow: 0 0 0 1000px rgb(31 41 55) inset !important;
+    caret-color: rgb(243 244 246);
+    border-color: rgb(75 85 99) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+  /* Smooth the autofill paint flicker in light mode too */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill {
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 @layer utilities {
