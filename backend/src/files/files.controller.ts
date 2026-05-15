@@ -222,4 +222,9 @@ export class FilesController {
   getPath(@CurrentUser('id') userId: string, @Param('nodeId') nodeId: string) {
     return this.filesService.getPath(userId, nodeId);
   }
+
+  @Get('folder/:nodeId/download-list')
+  getFolderDownloadList(@CurrentUser('id') userId: string, @Param('nodeId') nodeId: string) {
+    return this.filesService.getFolderDownloadList(userId, nodeId);
+  }
 }

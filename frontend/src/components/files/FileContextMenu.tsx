@@ -11,9 +11,12 @@ import {
   Share2,
   EyeOff,
   Trash2,
+  FolderDown,
+  Loader2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import JSZip from 'jszip';
 
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
@@ -47,6 +50,7 @@ export default function FileContextMenu() {
   // updates in a single render, so dialogs must use these saved values.
   const [dialogNode, setDialogNode] = useState<Node | null>(null);
   const [dialogIds, setDialogIds] = useState<string[]>([]);
+  const [downloadingFolder, setDownloadingFolder] = useState(false);
 
   const effectiveIds = node
     ? selectedIds.has(node.id)
@@ -163,6 +167,66 @@ export default function FileContextMenu() {
         return;
       }
       toast.error('下载失败');
+    }
+  };
+
+  const handleDownloadFolder = async () => {
+    if (!node || node.type !== 'folder') return;
+    const savedNode = node;
+    close();
+    setDownloadingFolder(true);
+    try {
+      const mek = getSessionMEK();
+      if (!mek || !mekDerived) {
+        toast.error('会话密钥已失效，请退出后重新登录');
+        return;
+      }
+      const downloadList = await filesApi.getFolderDownloadList(savedNode.id) as any;
+      if (!downloadList?.files?.length) {
+        toast.error('文件夹为空，无文件可下载');
+        return;
+      }
+      const zip = new JSZip();
+      let completed = 0;
+      const total = downloadList.files.length;
+
+      for (const file of downloadList.files) {
+        if (!file.key) continue; // skip unencrypted
+        const fileDek = await decryptDEK(file.key.encryptedDek, file.key.iv, mek);
+        const chunks: ArrayBuffer[] = [];
+        for (let i = 0; i < file.chunks.length; i++) {
+          const chunk = file.chunks[i];
+          if (!chunk.iv) continue;
+          const res = await fetch(chunk.url);
+          if (!res.ok) throw new Error(`下载分片失败: ${file.name}`);
+          const encrypted = await res.arrayBuffer();
+          const plain = await decryptBuffer(encrypted, fileDek, chunk.iv);
+          chunks.push(plain);
+        }
+        const totalLen = chunks.reduce((s, c) => s + c.byteLength, 0);
+        const merged = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const c of chunks) { merged.set(new Uint8Array(c), offset); offset += c.byteLength; }
+        // Zip path: root folder name stripped from relPath (relPath starts with "folderName/")
+        const zipPath = file.relPath.startsWith(savedNode.name + '/')
+          ? file.relPath.slice(savedNode.name.length + 1)
+          : file.relPath;
+        zip.file(zipPath, merged);
+        completed++;
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${savedNode.name}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      toast.success(`已打包下载 ${completed} 个文件`);
+    } catch (err: any) {
+      toast.error(err?.message ?? '文件夹下载失败');
+    } finally {
+      setDownloadingFolder(false);
     }
   };
 
@@ -284,8 +348,16 @@ export default function FileContextMenu() {
           {isSingle && isFile && (
             <Item icon={<Download className="w-4 h-4" />} label="下载" onClick={handleDownload} />
           )}
+          {isSingle && !isFile && (
+            <Item
+              icon={downloadingFolder ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderDown className="w-4 h-4" />}
+              label={downloadingFolder ? '打包中…' : '下载文件夹'}
+              onClick={handleDownloadFolder}
+              disabled={downloadingFolder}
+            />
+          )}
 
-          {(isSingle && isFile) && <Divider />}
+          {(isSingle && isFile || isSingle && !isFile) && <Divider />}
 
           {/* Rename */}
           {isSingle && (

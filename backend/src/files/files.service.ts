@@ -574,6 +574,39 @@ export class FilesService {
     return path;
   }
 
+  /** Return flat list of all files under a folder with relative paths for zip download. */
+  async getFolderDownloadList(userId: string, folderId: string) {
+    const root = await this.getNodeOwned(userId, folderId);
+    if (root.type !== NodeType.FOLDER) throw new BadRequestException('仅支持文件夹下载');
+
+    const stack = [{ node: root, relPath: root.name }];
+    const files: { node: Node; relPath: string }[] = [];
+
+    while (stack.length) {
+      const { node, relPath } = stack.pop()!;
+      const children = await this.nodeRepo.find({
+        where: { parentId: node.id, userId, deletedAt: IsNull() },
+      });
+      for (const child of children) {
+        const childPath = `${relPath}/${child.name}`;
+        if (child.type === NodeType.FOLDER) {
+          stack.push({ node: child, relPath: childPath });
+        } else {
+          files.push({ node: child, relPath: childPath });
+        }
+      }
+    }
+
+    const results = await Promise.all(
+      files.map(async ({ node, relPath }) => {
+        const info = await this.getDownloadInfo(userId, node.id);
+        return { nodeId: node.id, name: node.name, relPath, size: node.size, mimeType: node.mimeType, ...info };
+      }),
+    );
+
+    return { folderName: root.name, files: results, totalFiles: results.length };
+  }
+
   private async getNodeOwned(userId: string, nodeId: string): Promise<Node> {
     const node = await this.nodeRepo.findOne({ where: { id: nodeId, userId, deletedAt: IsNull() } });
     if (!node) throw new NotFoundException('文件不存在');
