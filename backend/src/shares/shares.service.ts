@@ -45,6 +45,23 @@ export class SharesService {
   async createShare(userId: string, dto: CreateShareDto): Promise<Share> {
     const { nodeId, password, expireAt, maxDownloads, shareKeyFragment } = dto;
 
+    // Validate maxDownloads — must fit in PG int4 (column type is integer).
+    // Pre-fix the frontend could feed a number > 2^31-1 (e.g. user pasted a
+    // long digit string into the custom-downloads input → parseInt returns
+    // a JS Number that serializes to "1e+27" → PG: invalid input syntax for
+    // type integer: "1e+27" → 500. node-pg uses Number.toString() for ints,
+    // which switches to scientific notation past ~1e21 and PG rejects.
+    if (maxDownloads !== undefined && maxDownloads !== null) {
+      if (
+        !Number.isFinite(maxDownloads) ||
+        !Number.isInteger(maxDownloads) ||
+        maxDownloads < 1 ||
+        maxDownloads > 2_147_483_647
+      ) {
+        throw new BadRequestException('最大下载次数必须是 1 到 2147483647 之间的整数');
+      }
+    }
+
     // Verify the node exists and belongs to this user
     const node = await this.nodeRepo.findOne({
       where: { id: nodeId, userId, deletedAt: IsNull() },
