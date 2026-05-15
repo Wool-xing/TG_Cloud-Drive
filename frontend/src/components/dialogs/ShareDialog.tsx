@@ -63,9 +63,18 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
       if (maxDownloadsType === '1') maxDownloads = 1;
       else if (maxDownloadsType === '5') maxDownloads = 5;
       else if (maxDownloadsType === 'custom') {
+        // parseInt happily eats a 30-digit string and returns a JS Number that
+        // switches to scientific notation (1e+27 etc) when serialized — PG
+        // int4 rejects that, surfaces as 500. Cap to 10_000 which is more
+        // than any real-world share needs (1 link per recipient if you have
+        // 10k recipients you should use an unlisted bucket, not a share).
         const n = parseInt(customDownloads, 10);
-        if (isNaN(n) || n < 1) {
-          toast.error('请输入有效的下载次数');
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+          toast.error('请输入 1 到 10000 之间的整数');
+          return;
+        }
+        if (n > 10_000) {
+          toast.error('单个分享的最大下载次数不能超过 10000，请选择"无限制"');
           return;
         }
         maxDownloads = n;
@@ -183,10 +192,12 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                   <input
                     type="number"
                     min={1}
+                    max={10000}
+                    step={1}
                     value={customDownloads}
-                    onChange={(e) => setCustomDownloads(e.target.value)}
+                    onChange={(e) => setCustomDownloads(e.target.value.replace(/[^\d]/g, ''))}
                     className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
-                    placeholder="输入次数"
+                    placeholder="1 - 10000 次"
                   />
                 )}
               </div>
