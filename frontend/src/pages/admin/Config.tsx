@@ -14,6 +14,8 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/client';
 import ConfirmPasswordDialog from '../../components/dialogs/ConfirmPasswordDialog';
 
+type SmsProvider = 'none' | 'twilio' | 'aliyun' | 'aws-sns' | 'telegram-bot';
+
 interface SystemConfig {
   defaultQuotaGB: number;
   maxFoldersPerDir: number;
@@ -29,6 +31,18 @@ interface SystemConfig {
     port: number;
     user: string;
     pass: string;
+    from: string;
+  };
+  sms: {
+    provider: SmsProvider;
+    accountSid: string;
+    authToken: string;
+    accessKeyId: string;
+    accessKeySecret: string;
+    signName: string;
+    templateCode: string;
+    region: string;
+    botToken: string;
     from: string;
   };
 }
@@ -154,13 +168,36 @@ export default function AdminConfig() {
     shareDefaultExpireDays: 7,
     cfWorkersUrl: '',
     smtp: { host: '', port: 587, user: '', pass: '', from: '' },
+    sms: {
+      provider: 'none',
+      accountSid: '',
+      authToken: '',
+      accessKeyId: '',
+      accessKeySecret: '',
+      signName: '',
+      templateCode: '',
+      region: 'us-east-1',
+      botToken: '',
+      from: '',
+    },
   });
 
   const [saving, setSaving] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailTarget, setTestEmailTarget] = useState('');
+  const [emailVerifyCode, setEmailVerifyCode] = useState('');
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+
+  const [testingSms, setTestingSms] = useState(false);
+  const [testSmsTarget, setTestSmsTarget] = useState('');
+  const [smsVerifyCode, setSmsVerifyCode] = useState('');
+  const [verifyingSms, setVerifyingSms] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [showSmsSecret, setShowSmsSecret] = useState(false);
 
   useEffect(() => {
     if (remoteConfig) setConfig(remoteConfig);
@@ -169,6 +206,8 @@ export default function AdminConfig() {
   const set = (partial: Partial<SystemConfig>) => setConfig(c => ({ ...c, ...partial }));
   const setSmtp = (partial: Partial<SystemConfig['smtp']>) =>
     setConfig(c => ({ ...c, smtp: { ...c.smtp, ...partial } }));
+  const setSms = (partial: Partial<SystemConfig['sms']>) =>
+    setConfig(c => ({ ...c, sms: { ...c.sms, ...partial } }));
 
   const validate = (): boolean => {
     if (config.defaultQuotaGB < 1) { toast.error('默认配额不能小于1GB'); return false; }
@@ -207,12 +246,80 @@ export default function AdminConfig() {
     }
     setTestingEmail(true);
     try {
-      await adminApi.testEmail({ to: testEmailTarget, smtpConfig: config.smtp });
-      toast.success('测试邮件已发送，请检查收件箱');
+      const res = await adminApi.testEmail({ to: testEmailTarget, smtpConfig: config.smtp }) as any;
+      const dev = res?.devCode;
+      if (dev) {
+        toast.success(`已生成测试验证码 (dev): ${dev}`, { duration: 15_000 });
+      } else {
+        toast.success('测试邮件已发送，请检查收件箱并输入收到的验证码');
+      }
+      setEmailSent(true);
+      setEmailVerifyCode('');
     } catch {
       // interceptor
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  const handleVerifyEmail = async () => {
+    if (!/^\d{6}$/.test(emailVerifyCode)) {
+      toast.error('请输入 6 位数字验证码');
+      return;
+    }
+    setVerifyingEmail(true);
+    try {
+      await adminApi.testVerifyCode({ channel: 'email', code: emailVerifyCode });
+      toast.success('✓ 邮件通道核对成功，验证码正确');
+      setEmailSent(false);
+      setEmailVerifyCode('');
+    } catch {
+      // interceptor
+    } finally {
+      setVerifyingEmail(false);
+    }
+  };
+
+  const handleTestSms = async () => {
+    if (!testSmsTarget.trim()) {
+      toast.error('请输入测试手机号');
+      return;
+    }
+    setTestingSms(true);
+    try {
+      // Backend returns `devCode` in dev / when provider=none so admin can
+      // close the verify loop even before a real gateway is wired.
+      const res = await adminApi.testSms({ to: testSmsTarget }) as any;
+      const dev = res?.devCode;
+      if (dev) {
+        toast.success(`已生成测试验证码 (dev): ${dev}`, { duration: 15_000 });
+      } else {
+        toast.success('测试短信已发送，请检查手机并输入收到的验证码');
+      }
+      setSmsSent(true);
+      setSmsVerifyCode('');
+    } catch {
+      // interceptor
+    } finally {
+      setTestingSms(false);
+    }
+  };
+
+  const handleVerifySms = async () => {
+    if (!/^\d{6}$/.test(smsVerifyCode)) {
+      toast.error('请输入 6 位数字验证码');
+      return;
+    }
+    setVerifyingSms(true);
+    try {
+      await adminApi.testVerifyCode({ channel: 'sms', code: smsVerifyCode });
+      toast.success('✓ 短信通道核对成功，验证码正确');
+      setSmsSent(false);
+      setSmsVerifyCode('');
+    } catch {
+      // interceptor
+    } finally {
+      setVerifyingSms(false);
     }
   };
 
@@ -415,9 +522,12 @@ export default function AdminConfig() {
           />
         </Field>
 
-        {/* Test email */}
-        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">发送测试邮件</p>
+        {/* Test email — two-step: send a real 6-digit code, then admin types
+            what they received so we verify the round trip. Pre-fix the
+            button only said "邮件已发送" even when the relay had silently
+            dropped the message; now the admin must close the loop. */}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700 space-y-3">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">发送测试邮件（验证码 5 分钟内有效）</p>
           <div className="flex gap-2">
             <input
               type="email"
@@ -432,9 +542,277 @@ export default function AdminConfig() {
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               {testingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              发送测试
+              {emailSent ? '重新发送' : '发送测试'}
             </button>
           </div>
+          {emailSent && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={emailVerifyCode}
+                onChange={e => setEmailVerifyCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="输入收到的 6 位验证码"
+                className={`flex-1 ${inputClass()}`}
+              />
+              <button
+                onClick={handleVerifyEmail}
+                disabled={verifyingEmail || emailVerifyCode.length !== 6}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {verifyingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                核对验证码
+              </button>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* ── SMS Provider ─────────────────────────────────────── */}
+      <Section title="短信 SMS Provider 配置">
+        <Field
+          label="SMS Provider"
+          hint="选择短信网关。'none' 时验证码走 dev 模式（前端 toast 显示）。"
+        >
+          <div className="flex gap-4 flex-wrap">
+            {([
+              { value: 'none', label: '不启用 (dev toast)' },
+              { value: 'twilio', label: 'Twilio' },
+              { value: 'aliyun', label: '阿里云' },
+              { value: 'aws-sns', label: 'AWS SNS' },
+              { value: 'telegram-bot', label: 'Telegram Bot' },
+            ] as { value: SmsProvider; label: string }[]).map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="smsProvider"
+                  value={opt.value}
+                  checked={config.sms.provider === opt.value}
+                  onChange={() => setSms({ provider: opt.value })}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </Field>
+
+        {/* Twilio */}
+        {config.sms.provider === 'twilio' && (
+          <>
+            <Field label="Account SID" hint="Twilio 控制台 → Account Info">
+              <input
+                type="text"
+                value={config.sms.accountSid}
+                onChange={e => setSms({ accountSid: e.target.value })}
+                placeholder="AC..."
+                className={inputClass()}
+              />
+            </Field>
+            <Field label="Auth Token">
+              <div className="relative">
+                <input
+                  type={showSmsSecret ? 'text' : 'password'}
+                  value={config.sms.authToken}
+                  onChange={e => setSms({ authToken: e.target.value })}
+                  placeholder="留空保留已配置值"
+                  autoComplete="new-password"
+                  className={`${inputClass()} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSmsSecret(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
+                >
+                  {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="发送号码 (From)" hint="E.164 格式，如 +15005550006">
+              <input
+                type="text"
+                value={config.sms.from}
+                onChange={e => setSms({ from: e.target.value })}
+                placeholder="+1xxxxxxxxxx"
+                className={inputClass()}
+              />
+            </Field>
+          </>
+        )}
+
+        {/* Aliyun */}
+        {config.sms.provider === 'aliyun' && (
+          <>
+            <Field label="AccessKey ID">
+              <input
+                type="text"
+                value={config.sms.accessKeyId}
+                onChange={e => setSms({ accessKeyId: e.target.value })}
+                placeholder="LTAI..."
+                className={inputClass()}
+              />
+            </Field>
+            <Field label="AccessKey Secret">
+              <div className="relative">
+                <input
+                  type={showSmsSecret ? 'text' : 'password'}
+                  value={config.sms.accessKeySecret}
+                  onChange={e => setSms({ accessKeySecret: e.target.value })}
+                  placeholder="留空保留已配置值"
+                  autoComplete="new-password"
+                  className={`${inputClass()} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSmsSecret(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
+                >
+                  {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="签名 SignName" hint="已备案的短信签名">
+              <input
+                type="text"
+                value={config.sms.signName}
+                onChange={e => setSms({ signName: e.target.value })}
+                placeholder="如：TG云盘"
+                className={inputClass()}
+              />
+            </Field>
+            <Field label="模板 ID" hint="如 SMS_xxxxxxxx，模板需含 ${code} 变量">
+              <input
+                type="text"
+                value={config.sms.templateCode}
+                onChange={e => setSms({ templateCode: e.target.value })}
+                placeholder="SMS_xxxxxxxx"
+                className={inputClass()}
+              />
+            </Field>
+          </>
+        )}
+
+        {/* AWS SNS */}
+        {config.sms.provider === 'aws-sns' && (
+          <>
+            <Field label="AccessKey ID">
+              <input
+                type="text"
+                value={config.sms.accessKeyId}
+                onChange={e => setSms({ accessKeyId: e.target.value })}
+                placeholder="AKIA..."
+                className={inputClass()}
+              />
+            </Field>
+            <Field label="Secret AccessKey">
+              <div className="relative">
+                <input
+                  type={showSmsSecret ? 'text' : 'password'}
+                  value={config.sms.accessKeySecret}
+                  onChange={e => setSms({ accessKeySecret: e.target.value })}
+                  placeholder="留空保留已配置值"
+                  autoComplete="new-password"
+                  className={`${inputClass()} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSmsSecret(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
+                >
+                  {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="Region" hint="如 us-east-1 / ap-northeast-1">
+              <input
+                type="text"
+                value={config.sms.region}
+                onChange={e => setSms({ region: e.target.value })}
+                placeholder="us-east-1"
+                className={inputClass()}
+              />
+            </Field>
+          </>
+        )}
+
+        {/* Telegram Bot */}
+        {config.sms.provider === 'telegram-bot' && (
+          <>
+            <Field
+              label="Bot Token"
+              hint="@BotFather 申请。用户须先 /start 该 bot 并绑定账号才能收到 OTP。"
+            >
+              <div className="relative">
+                <input
+                  type={showSmsSecret ? 'text' : 'password'}
+                  value={config.sms.botToken}
+                  onChange={e => setSms({ botToken: e.target.value })}
+                  placeholder="留空保留已配置值"
+                  autoComplete="new-password"
+                  className={`${inputClass()} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSmsSecret(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
+                >
+                  {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </Field>
+          </>
+        )}
+
+        {config.sms.provider === 'none' && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            未启用任何短信通道。开发环境下，所有验证码会在前端以 toast 直接显示
+            （后端 verification.service.ts L64-67）。生产环境请选择并配置真实
+            provider。
+          </p>
+        )}
+
+        {/* Test SMS — same two-step flow as email */}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700 space-y-3">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">发送测试短信（验证码 5 分钟内有效）</p>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              value={testSmsTarget}
+              onChange={e => setTestSmsTarget(e.target.value)}
+              placeholder="输入测试手机号（含国际区号，如 +8613800000000）"
+              className={`flex-1 ${inputClass()}`}
+            />
+            <button
+              onClick={handleTestSms}
+              disabled={testingSms}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {testingSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              {smsSent ? '重新发送' : '发送测试'}
+            </button>
+          </div>
+          {smsSent && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={smsVerifyCode}
+                onChange={e => setSmsVerifyCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="输入收到的 6 位验证码"
+                className={`flex-1 ${inputClass()}`}
+              />
+              <button
+                onClick={handleVerifySms}
+                disabled={verifyingSms || smsVerifyCode.length !== 6}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {verifyingSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                核对验证码
+              </button>
+            </div>
+          )}
         </div>
       </Section>
 

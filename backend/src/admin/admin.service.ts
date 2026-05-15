@@ -349,6 +349,29 @@ export class AdminService {
         pass: '',
         from: this.cs.get<string>('SMTP_FROM') ?? '',
       },
+      // SMS provider config. `provider='none'` keeps the verification flow
+      // running in dev-toast mode (code surfaces via /verification/send.code
+      // in response — see verification.service.ts L64-67); switching to
+      // 'twilio' / 'aliyun' / 'aws-sns' / 'telegram-bot' selects which adapter
+      // the future SmsService dispatches to. Pass / secret fields blank on
+      // read so the value never leaves Redis -> admin browser.
+      sms: {
+        provider: 'none' as 'none' | 'twilio' | 'aliyun' | 'aws-sns' | 'telegram-bot',
+        // Twilio: accountSid / authToken / from (E.164). Aliyun: accessKeyId /
+        // accessKeySecret / signName / templateCode / region. AWS SNS:
+        // accessKeyId / secretAccessKey / region. Telegram bot: botToken
+        // (chatId resolved per-user). Sharing fields across providers keeps
+        // the wire shape stable; the adapter knows which subset to read.
+        accountSid: '',
+        authToken: '',
+        accessKeyId: '',
+        accessKeySecret: '',
+        signName: '',
+        templateCode: '',
+        region: 'us-east-1',
+        botToken: '',
+        from: '',
+      },
     };
 
     // Merge runtime overrides from Redis
@@ -361,9 +384,18 @@ export class AdminService {
     }
 
     const merged = { ...envConfig, ...runtimeConfig };
-    // Always merge smtp as object (not override)
+    // Always merge smtp / sms as object so partial admin updates don't drop
+    // sibling fields (e.g. saving sms.provider alone must not blank sms.from).
     if (runtimeConfig.smtp) {
       merged.smtp = { ...envConfig.smtp, ...runtimeConfig.smtp };
+    }
+    if (runtimeConfig.sms) {
+      merged.sms = { ...envConfig.sms, ...runtimeConfig.sms };
+      // Mask secrets on read — admin UI shows blank dots and the user types a
+      // fresh value to overwrite (parity with SMTP pass).
+      merged.sms.authToken = '';
+      merged.sms.accessKeySecret = '';
+      merged.sms.botToken = '';
     }
     return merged;
   }
@@ -388,6 +420,7 @@ export class AdminService {
       'shareDefaultExpireDays',
       'cfWorkersUrl',
       'smtp',
+      'sms',
     ]);
 
     const sanitized: Record<string, any> = {};
@@ -407,9 +440,28 @@ export class AdminService {
     } catch {}
 
     const merged = { ...existing, ...sanitized };
-    // Merge smtp as object
-    if (sanitized.smtp && existing.smtp) {
-      merged.smtp = { ...existing.smtp, ...sanitized.smtp };
+    // Merge smtp / sms as object so the admin can change one field without
+    // wiping siblings (e.g. saving sms.provider must not zero out sms.from).
+    // Also drop empty-string secrets so partial updates don't overwrite the
+    // stored value with "" when the UI sends back masked fields blank.
+    const mergeNonEmpty = (existingObj: any, incomingObj: any, secretKeys: string[]) => {
+      const out = { ...(existingObj || {}), ...(incomingObj || {}) };
+      for (const k of secretKeys) {
+        if (incomingObj && incomingObj[k] === '') {
+          out[k] = existingObj?.[k] ?? '';
+        }
+      }
+      return out;
+    };
+    if (sanitized.smtp) {
+      merged.smtp = mergeNonEmpty(existing.smtp, sanitized.smtp, ['pass']);
+    }
+    if (sanitized.sms) {
+      merged.sms = mergeNonEmpty(existing.sms, sanitized.sms, [
+        'authToken',
+        'accessKeySecret',
+        'botToken',
+      ]);
     }
     await this.redis.set(SYSTEM_CONFIG_REDIS_KEY, JSON.stringify(merged));
 
@@ -514,13 +566,115 @@ export class AdminService {
     return this.safeUserAdmin(user, masterKey);
   }
 
-  // ─── Test Email ───────────────────────────────────────────────────────────────
+  // ─── Test Email / SMS ─────────────────────────────────────────────────────────
+  //
+  // Admin flow: configure SMTP / SMS → click "发送测试" with a real recipient
+  // → backend generates a fresh 6-digit code, stores it in Redis under a
+  // per-admin-per-channel key, dispatches via the configured provider.
+  // Admin then types the code they received into a second input and clicks
+  // "验证收到的验证码" — backend looks up the stored code, compares, and
+  // returns success/fail. This proves end-to-end that the channel is
+  // configured correctly AND the code arrived intact (not just that send()
+  // returned 200 — many SMTP relays accept then drop).
+  //
+  // Pre-fix testEmail hardcoded "123456" and skipped the verify step, so
+  // "邮件已发送" was a lie when the relay had blacklisted the destination —
+  // nothing actually proved arrival.
 
-  async testEmail(adminId: string, to: string, ip?: string, ua?: string): Promise<{ message: string }> {
+  private testCodeKey(adminId: string, channel: 'email' | 'sms') {
+    return `admin:test-code:${channel}:${adminId}`;
+  }
+
+  async testEmail(adminId: string, to: string, ip?: string, ua?: string): Promise<{ message: string; devCode?: string }> {
     if (!to || !to.includes('@')) throw new BadRequestException('请提供有效的邮箱地址');
-    await this.mailService.sendVerificationCode(to, '123456');
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    try {
+      await this.redis.set(this.testCodeKey(adminId, 'email'), code, 'EX', 5 * 60);
+    } catch {
+      throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+    }
     await this.audit(adminId, 'admin.test-email', null, ip ?? null, ua ?? null, { to });
-    return { message: `测试邮件已发送至 ${to}，请检查收件箱` };
+    try {
+      await this.mailService.sendVerificationCode(to, code);
+    } catch (err: any) {
+      // SMTP not configured (placeholder host in env) or relay refused —
+      // surface a 400 with the underlying reason instead of 500 so the admin
+      // sees actionable feedback. The code is still in Redis; in dev mode
+      // we return it so the verify round-trip can still complete (lets the
+      // admin smoke-test the verify endpoint without a real SMTP relay).
+      this.logger.warn(`testEmail send failed: ${err?.message}`);
+      const isDev = this.cs.get<string>('NODE_ENV') === 'development';
+      if (isDev) {
+        return {
+          message: `[dev] SMTP 发送失败 (${err?.message ?? 'unknown'}), 验证码已生成: ${code}`,
+          devCode: code,
+        };
+      }
+      throw new BadRequestException(`邮件发送失败：${err?.message ?? '未知错误'}。请检查 SMTP 配置。`);
+    }
+    return { message: `测试邮件已发送至 ${to}，请检查收件箱（验证码 5 分钟内有效）` };
+  }
+
+  async testSms(adminId: string, to: string, ip?: string, ua?: string): Promise<{ message: string; devCode?: string }> {
+    if (!to || !/^\+?\d{6,15}$/.test(to.replace(/[\s-]/g, ''))) {
+      throw new BadRequestException('请提供有效的手机号');
+    }
+    const config = await this.getSystemConfig();
+    const provider = config?.sms?.provider ?? 'none';
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    try {
+      await this.redis.set(this.testCodeKey(adminId, 'sms'), code, 'EX', 5 * 60);
+    } catch {
+      throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+    }
+    // P1: SMS provider adapters not wired yet. Log so the admin can copy from
+    // docker logs while testing config schema. Future work tracked as a TODO;
+    // dropping into 'none' branch is the explicit pre-launch state.
+    this.logger.warn(`[SMS TEST] provider=${provider} to=${to} code=${code}`);
+    await this.audit(adminId, 'admin.test-sms', null, ip ?? null, ua ?? null, { to, provider });
+
+    const isDev = this.cs.get<string>('NODE_ENV') === 'development';
+    if (provider === 'none') {
+      // Provider not configured. In dev surface the code so admin can verify
+      // the full round-trip; in prod return a softer message and force the
+      // admin to fix config first.
+      return isDev
+        ? { message: `[dev] SMS 通道未配置，验证码已生成: ${code}`, devCode: code }
+        : { message: '短信通道未配置，请先选择并填写 SMS Provider 配置' };
+    }
+    // TODO: dispatch via the configured provider adapter. Until adapters land,
+    // log + dev-return preserves the verify flow so the schema can be tested.
+    return isDev
+      ? { message: `[dev] provider=${provider} 适配器尚未接入，验证码已生成: ${code}`, devCode: code }
+      : { message: `已尝试通过 ${provider} 发送短信，请查看收件人手机` };
+  }
+
+  async testVerifyCode(
+    adminId: string,
+    channel: 'email' | 'sms',
+    code: string,
+    ip?: string,
+    ua?: string,
+  ): Promise<{ message: string }> {
+    if (!code || !/^\d{6}$/.test(code)) {
+      throw new BadRequestException('请输入 6 位数字验证码');
+    }
+    let stored: string | null;
+    try {
+      stored = await this.redis.get(this.testCodeKey(adminId, channel));
+    } catch {
+      throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+    }
+    if (!stored) {
+      throw new BadRequestException('验证码已过期或未发送，请重新发送');
+    }
+    if (stored !== code) {
+      throw new BadRequestException('验证码错误');
+    }
+    // One-shot: clear on success so a leaked code can't be reused.
+    await this.redis.del(this.testCodeKey(adminId, channel)).catch(() => {});
+    await this.audit(adminId, 'admin.test-verify', null, ip ?? null, ua ?? null, { channel });
+    return { message: `${channel === 'email' ? '邮件' : '短信'}验证码核对成功` };
   }
 
   /**

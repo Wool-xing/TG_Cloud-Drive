@@ -202,4 +202,7 @@ export const adminApi = {
   getConfig: () => api.get('/admin/config'),
   updateConfig: (data: any) => api.patch('/admin/config', data),
   testEmail: (data: any) => api.post('/admin/test-email', data),
+  testSms: (data: { to: string }) => api.post('/admin/test-sms', data),
+  testVerifyCode: (data: { channel: 'email' | 'sms'; code: string }) =>
+    api.post('/admin/test-verify', data),
 };
