@@ -31,7 +31,8 @@ def main():
     r = requests.post(f"{API}/auth/register",
                       json={"username": username, "phone": phone, "code": code, "password": pw},
                       verify=False)
-    assert r.status_code in (200, 201), r.text
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"register failed: {r.status_code} {r.text}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
