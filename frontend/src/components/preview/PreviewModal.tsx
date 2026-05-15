@@ -434,6 +434,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
   const { mekDerived } = useAuthStore();
 
   const [previewState, setPreviewState] = useState<PreviewState>({ status: 'loading' });
+  const [downloadProgress, setDownloadProgress] = useState(-1);
   const [lockPassword, setLockPassword] = useState('');
   const [needsLockPassword, setNeedsLockPassword] = useState(false);
   const [downloadInfo, setDownloadInfo] = useState<DownloadInfo | null>(null);
@@ -576,6 +577,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
 
+      setDownloadProgress(0);
       let warnedFallback = false;
       await streamingDownload(
         {
@@ -594,6 +596,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           filename: previewNode.name,
           mimeType,
           totalSize: info.node.size,
+          onProgress: (f) => setDownloadProgress(Math.round(f * 100)),
           onLargeFileFallback: () => {
             if (!warnedFallback) {
               warnedFallback = true;
@@ -602,6 +605,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           },
         },
       );
+      setDownloadProgress(-1);
       toast.success('下载完成');
     } catch (err: any) {
       if (err?.name === 'AbortError') return; // user cancelled save dialog
@@ -763,12 +767,20 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           <span className="text-xs text-white/50 flex-shrink-0">
             {formatBytes(previewNode.size)}
           </span>
+          {downloadProgress >= 0 && (
+            <span className="text-xs text-blue-400 flex-shrink-0 font-mono">{downloadProgress}%</span>
+          )}
           {currentIndex >= 0 && (
             <span className="text-xs text-white/40 flex-shrink-0">
               {currentIndex + 1} / {nodes.length}
             </span>
           )}
         </div>
+        {downloadProgress >= 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10">
+            <div className="h-full bg-blue-500 transition-all duration-150" style={{ width: `${downloadProgress}%` }} />
+          </div>
+        )}
 
         <div className="flex items-center gap-2 ml-4 flex-shrink-0">
           {previewState.status === 'ready' ||
