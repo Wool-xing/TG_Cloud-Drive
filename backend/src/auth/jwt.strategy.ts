@@ -49,7 +49,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         // incorrectly invalidated. Compare in seconds with a 1s grace so a
         // legitimate re-login immediately after change-password is accepted,
         // while any token issued *before* the force-logout still fails.
-        if (payload.iat < Math.floor(parseInt(forceAt) / 1000)) {
+        const forceAtMs = parseInt(forceAt);
+        if (Number.isNaN(forceAtMs)) {
+          // Redis returned a non-numeric string. Could be key corruption or a
+          // future feature that overloaded this key with a different shape.
+          // Fail CLOSED: refuse the token rather than silently letting it
+          // through (the previous `iat < NaN` evaluation was always false,
+          // which is fail-OPEN against revocation).
+          throw new ServiceUnavailableException('鉴权服务暂时不可用，请稍后重试');
+        }
+        if (payload.iat < Math.floor(forceAtMs / 1000)) {
           throw new UnauthorizedException('已被强制下线');
         }
       }
