@@ -214,4 +214,44 @@ export class AdminController {
   ) {
     return this.adminService.testEmail(adminId, to, req.ip, req.headers['user-agent']);
   }
+
+  /**
+   * POST /admin/test-sms — send a test SMS to verify SMS provider config.
+   * Returns `devCode` in dev mode (or when no provider is configured) so the
+   * admin can complete the verify round-trip even before a real gateway is
+   * wired up.
+   */
+  @Post('test-sms')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '发送测试短信验证 SMS Provider 配置' })
+  testSms(
+    @CurrentUser('id') adminId: string,
+    @Body('to') to: string,
+    @Req() req: Request,
+  ) {
+    return this.adminService.testSms(adminId, to, req.ip, req.headers['user-agent']);
+  }
+
+  /**
+   * POST /admin/test-verify — admin types the code they received via the
+   * test channel and we confirm it matches what we stored. Proves the entire
+   * pipeline (provider → recipient → admin) is intact, not just that send()
+   * returned 200.
+   */
+  @Post('test-verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '核对测试通道收到的验证码' })
+  testVerifyCode(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { channel: 'email' | 'sms'; code: string },
+    @Req() req: Request,
+  ) {
+    return this.adminService.testVerifyCode(
+      adminId,
+      body.channel,
+      body.code,
+      req.ip,
+      req.headers['user-agent'],
+    );
+  }
 }
