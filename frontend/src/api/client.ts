@@ -136,6 +136,10 @@ export const usersApi = {
   sendBindEmailOldCode: () => api.post('/users/bind-email/send-code-old', {}),
   bindEmail: (data: { email: string; code: string; oldEmailCode?: string }) =>
     api.post('/users/bind-email', data),
+  sendBindPhoneCode: (phone: string) => api.post('/users/bind-phone/send-code', { phone }),
+  sendBindPhoneOldCode: () => api.post('/users/bind-phone/send-code-old', {}),
+  bindPhone: (data: { phone: string; code: string; oldPhoneCode?: string }) =>
+    api.post('/users/bind-phone', data),
   devices: () => api.get('/users/devices'),
   revokeDevice: (deviceId: string) => api.delete(`/users/devices/${deviceId}`),
   setupPrivateSpace: (data: any) => api.post('/users/private-space/setup', data),

@@ -127,20 +127,26 @@ function ProfileTab() {
   // uses this to decide single- vs dual-factor — never `email != null`
   // since decrypt can silently null the field while the email is bound.
   const [hasEmail, setHasEmail] = useState<boolean | null>(null);
+  const [boundPhone, setBoundPhone] = useState<string | null>(null);
+  const [hasPhone, setHasPhone] = useState<boolean | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
+
+  const refreshProfile = async () => {
+    try {
+      const res = (await usersApi.profile()) as any;
+      setBoundEmail(res?.email ?? null);
+      setHasEmail(typeof res?.hasEmail === 'boolean' ? res.hasEmail : !!res?.email);
+      setBoundPhone(res?.phone ?? null);
+      setHasPhone(typeof res?.hasPhone === 'boolean' ? res.hasPhone : !!res?.phone);
+    } catch {
+      // interceptor — leave flags null so dialogs show explicit
+      // "profile load failed" hint rather than silently downgrading.
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = (await usersApi.profile()) as any;
-        setBoundEmail(res?.email ?? null);
-        setHasEmail(typeof res?.hasEmail === 'boolean' ? res.hasEmail : !!res?.email);
-      } catch {
-        // interceptor — leave hasEmail null so the dialog can show an
-        // explicit "profile load failed" hint rather than silently
-        // downgrading the security UX.
-      }
-    })();
+    refreshProfile();
   }, []);
 
   const handleSave = async () => {
@@ -158,7 +164,18 @@ function ProfileTab() {
 
   const handleEmailBound = (newEmail: string) => {
     setBoundEmail(newEmail);
+    setHasEmail(true);
     setEmailDialogOpen(false);
+    // Re-pull server-side to pick up any normalization the backend applied
+    // (e.g. lowercased domain) so the displayed string matches the stored one.
+    refreshProfile();
+  };
+
+  const handlePhoneBound = (newPhone: string) => {
+    setBoundPhone(newPhone);
+    setHasPhone(true);
+    setPhoneDialogOpen(false);
+    refreshProfile();
   };
 
   if (!user) return null;
@@ -214,6 +231,28 @@ function ProfileTab() {
           </p>
         </div>
         <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">手机号</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="tel"
+              value={boundPhone ?? ''}
+              readOnly
+              placeholder="未绑定手机号"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300"
+            />
+            <button
+              type="button"
+              onClick={() => setPhoneDialogOpen(true)}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
+            >
+              {hasPhone ? '更换手机号' : '绑定手机号'}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            {hasPhone ? '当前已绑定手机号' : '可作为登录与找回密码的备用方式'}
+          </p>
+        </div>
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">存储使用</label>
           <div className="flex items-center gap-3">
             <div className="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
@@ -246,6 +285,212 @@ function ProfileTab() {
           onBound={handleEmailBound}
         />
       )}
+      {phoneDialogOpen && (
+        <BindPhoneDialog
+          currentPhone={boundPhone}
+          hasPhone={hasPhone}
+          onCancel={() => setPhoneDialogOpen(false)}
+          onBound={handlePhoneBound}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Bind Phone Dialog ─────────────────────────────────────────
+// Parallel to BindEmailDialog. Lives here (not extracted) because the two
+// dialogs share zero state and the duplication is small enough that an
+// abstraction would hide more than it helps.
+function BindPhoneDialog(props: {
+  currentPhone: string | null;
+  hasPhone: boolean | null;
+  onCancel: () => void;
+  onBound: (newPhone: string) => void;
+}) {
+  const { currentPhone, hasPhone, onCancel, onBound } = props;
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [oldCode, setOldCode] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendingOld, setSendingOld] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [oldCountdown, setOldCountdown] = useState(0);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = window.setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [countdown]);
+
+  useEffect(() => {
+    if (oldCountdown <= 0) return;
+    const t = window.setTimeout(() => setOldCountdown(c => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [oldCountdown]);
+
+  // Mainland CN mobile only — class-validator IsMobilePhone('zh-CN').
+  const validPhone = /^1[3-9]\d{9}$/.test(phone);
+  const needOldCode = hasPhone === true;
+  const probeFailed = hasPhone === null && !currentPhone;
+
+  const handleSend = async () => {
+    if (!validPhone) {
+      toast.error('手机号格式不正确');
+      return;
+    }
+    if (currentPhone && currentPhone === phone) {
+      toast.error('与当前手机号相同');
+      return;
+    }
+    setSending(true);
+    try {
+      await usersApi.sendBindPhoneCode(phone);
+      toast.success('验证码已发送');
+      setCountdown(60);
+    } catch {
+      // interceptor
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendOld = async () => {
+    setSendingOld(true);
+    try {
+      await usersApi.sendBindPhoneOldCode();
+      toast.success('已发送到当前手机号');
+      setOldCountdown(60);
+    } catch {
+      // interceptor
+    } finally {
+      setSendingOld(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validPhone || code.length !== 6) return;
+    if (needOldCode && oldCode.length !== 6) {
+      toast.error('请填写旧手机号验证码');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await usersApi.bindPhone({
+        phone,
+        code,
+        ...(needOldCode ? { oldPhoneCode: oldCode } : {}),
+      });
+      toast.success(currentPhone ? '手机号更换成功' : '手机号绑定成功');
+      onBound(phone);
+    } catch {
+      // interceptor
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md mx-4 rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <h3 className="text-base font-semibold text-gray-900 mb-4 dark:text-gray-100">
+          {currentPhone ? '更换手机号' : '绑定手机号'}
+        </h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">新手机号</label>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+              autoComplete="tel"
+              placeholder="11 位中国大陆手机号"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">短信验证码</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="6 位数字验证码"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending || countdown > 0 || !validPhone}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
+              >
+                {sending && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
+                {countdown > 0 ? `${countdown}s 后重发` : '发送验证码'}
+              </button>
+            </div>
+          </div>
+          {probeFailed && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              账号资料加载失败，无法确定是否需要旧手机号验证。请关闭重试。
+            </p>
+          )}
+          {needOldCode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">旧手机号验证码</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={oldCode}
+                  onChange={e => setOldCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="6 位数字验证码"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendOld}
+                  disabled={sendingOld || oldCountdown > 0}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
+                >
+                  {sendingOld && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
+                  {oldCountdown > 0 ? `${oldCountdown}s 后重发` : '发送到当前手机号'}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {currentPhone}（双重验证防接管）</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={
+                submitting ||
+                probeFailed ||
+                !validPhone ||
+                code.length !== 6 ||
+                (needOldCode && oldCode.length !== 6)
+              }
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
+            >
+              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              确认{currentPhone ? '更换' : '绑定'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

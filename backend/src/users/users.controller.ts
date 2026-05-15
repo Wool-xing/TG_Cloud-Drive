@@ -17,11 +17,9 @@ import {
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsMobilePhone, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import {
   UsersService,
-  UpdateProfileDto,
-  ChangePasswordDto,
   SetPrivateSpaceDto,
 } from './users.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -56,6 +54,65 @@ class SendBindEmailCodeDto {
   @IsEmail({}, { message: '邮箱格式不正确' })
   @MaxLength(200)
   email!: string;
+}
+
+// Promoted from `interface` in users.service.ts. Interfaces are erased at
+// runtime so ValidationPipe couldn't run class-validator on them — any
+// payload (null username, oversized fields, wrong types) reached the
+// service unchecked. Class form makes validation actually fire.
+class UpdateProfileDto {
+  @IsOptional() @IsString() @MaxLength(50)
+  username?: string;
+
+  @IsOptional() @IsString() @MaxLength(255)
+  nickname?: string;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  avatar?: string;
+
+  // notifications kept as `any`-shaped object because the service writes it
+  // through to a JSON column without per-field business logic; validating
+  // its shape belongs to the notifications feature, not this controller.
+  @IsOptional()
+  notifications?: any;
+}
+
+class ChangePasswordDto {
+  @IsString() @MinLength(1) @MaxLength(128)
+  oldPassword!: string;
+
+  // Same regex as RegisterDto/ResetPasswordDto for consistency. Without it,
+  // a 1-character "new" password would pass class-validator and only hit
+  // the length check in service — easy to forget when the API evolves.
+  @IsString()
+  @MinLength(8) @MaxLength(64)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d])/, {
+    message: '密码必须包含大小写字母、数字和特殊字符',
+  })
+  newPassword!: string;
+
+  // A8: required by service when an email is bound. Optional at DTO level
+  // because email-less accounts use the legacy single-factor path.
+  @IsOptional() @IsString() @MinLength(6) @MaxLength(6)
+  emailCode?: string;
+}
+
+class SendBindPhoneCodeDto {
+  @IsMobilePhone('zh-CN', {}, { message: '手机号格式不正确' })
+  @MaxLength(20)
+  phone!: string;
+}
+
+class BindPhoneDto {
+  @IsMobilePhone('zh-CN', {}, { message: '手机号格式不正确' })
+  @MaxLength(20)
+  phone!: string;
+
+  @IsString() @MinLength(6) @MaxLength(6)
+  code!: string;
+
+  @IsOptional() @IsString() @MinLength(6) @MaxLength(6)
+  oldPhoneCode?: string;
 }
 
 class BindEmailDto {
@@ -182,6 +239,45 @@ export class UsersController {
   ) {
     return this.usersService.bindEmail(
       userId, dto.email, dto.code, dto.oldEmailCode, req.ip, req.headers['user-agent'],
+    );
+  }
+
+  // ─── Bind / Change Phone ──────────────────────────────────────────────
+  // Same shape as bind-email above. See users.service.ts for the dual-
+  // confirm rationale (first-time bind single-factor, change-phone needs
+  // OTP to both old and new numbers). Dev mode returns the code in the
+  // response; prod needs an SMS gateway wired into VerificationService.
+
+  @Post('bind-phone/send-code')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: '获取绑定/更换手机号验证码' })
+  sendBindPhoneCode(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SendBindPhoneCodeDto,
+  ) {
+    return this.usersService.sendBindPhoneCode(userId, dto.phone);
+  }
+
+  @Post('bind-phone/send-code-old')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: '获取换手机号旧号验证码' })
+  sendBindPhoneOldCode(@CurrentUser('id') userId: string) {
+    return this.usersService.sendBindPhoneOldCode(userId);
+  }
+
+  @Post('bind-phone')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: '绑定/更换手机号' })
+  bindPhone(
+    @CurrentUser('id') userId: string,
+    @Body() dto: BindPhoneDto,
+    @Req() req: Request,
+  ) {
+    return this.usersService.bindPhone(
+      userId, dto.phone, dto.code, dto.oldPhoneCode, req.ip, req.headers['user-agent'],
     );
   }
 

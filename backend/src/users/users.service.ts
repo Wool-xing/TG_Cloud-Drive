@@ -25,28 +25,26 @@ import {
   comparePassword,
   hashIdentifier,
   normalizeEmail,
+  normalizePhone,
 } from '../common/encryption';
 import { VerificationService } from '../verification/verification.service';
 import { VerificationPurpose } from '../verification/verification.entity';
 
-export interface UpdateProfileDto {
+// UpdateProfileDto / ChangePasswordDto were promoted to class-validator
+// decorated classes in users.controller.ts so ValidationPipe actually runs
+// against them. Service-layer signatures use inline types below.
+export type UpdateProfileDto = {
   username?: string;
   nickname?: string;
   avatar?: string;
   notifications?: any;
-}
+};
 
-export interface ChangePasswordDto {
+export type ChangePasswordDto = {
   oldPassword: string;
   newPassword: string;
-  /**
-   * A8: optional email OTP. Required when the user has a bound email
-   * (server enforces; client just forwards what it collected). Users
-   * without a bound email fall back to the legacy oldPassword-only path
-   * — backward compatible until a profile-bind-email flow exists.
-   */
   emailCode?: string;
-}
+};
 
 export interface SetPrivateSpaceDto {
   password: string;
@@ -221,6 +219,123 @@ export class UsersService {
     }
     await this.audit(userId, 'email.bind', null, ip, ua);
     return { message: '邮箱绑定成功' };
+  }
+
+  // ─── Bind / Change Phone (parallel to bind-email) ────────────────────────
+  //
+  // Same dual-confirm shape as bind-email: first-time bind takes the new
+  // phone's OTP only; subsequent change-phone requires both an OTP to the
+  // OLD phone (proof of inbox-equivalent for the previous identity) and an
+  // OTP to the NEW phone. Reuses VerificationPurpose.CHANGE_PHONE which
+  // existed pre-A8 but had no controller wiring.
+  //
+  // Note on transport: dev mode returns the code in the API response (same
+  // as email). Prod requires an SMS gateway integration in mail.service.ts
+  // or a dedicated sms.service; today the code is only persisted to DB.
+  // Operators deploying without SMS plumbed should keep their users on
+  // email-bound for now.
+
+  async sendBindPhoneCode(
+    userId: string,
+    rawPhone: string,
+  ): Promise<{ message: string; code?: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    const phone = normalizePhone(rawPhone);
+    if (!phone) {
+      throw new BadRequestException('手机号格式不正确');
+    }
+    const newHash = hashIdentifier(phone, masterKey);
+
+    if (user.phoneHash && user.phoneHash === newHash) {
+      throw new BadRequestException('该手机号已绑定，无需重复操作');
+    }
+    const dup = await this.userRepo.findOne({ where: { phoneHash: newHash } });
+    if (dup && dup.id !== userId) {
+      throw new ConflictException('该手机号已被其他账号占用');
+    }
+
+    return this.verificationService.sendCode(phone, VerificationPurpose.CHANGE_PHONE);
+  }
+
+  async sendBindPhoneOldCode(userId: string): Promise<{ message: string; code?: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    if (!user.phoneEncrypted) {
+      throw new BadRequestException('当前账号未绑定手机号，首次绑定无需旧手机号验证');
+    }
+    let oldPhone: string;
+    try {
+      oldPhone = decryptField(user.phoneEncrypted, masterKey);
+    } catch {
+      throw new ServiceUnavailableException('手机号解密失败，请联系管理员');
+    }
+    return this.verificationService.sendCode(oldPhone, VerificationPurpose.CHANGE_PHONE);
+  }
+
+  async bindPhone(
+    userId: string,
+    rawPhone: string,
+    code: string,
+    oldPhoneCode?: string,
+    ip?: string,
+    ua?: string,
+  ): Promise<{ message: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    const phone = normalizePhone(rawPhone);
+    if (!phone) {
+      throw new BadRequestException('手机号格式不正确');
+    }
+    const newHash = hashIdentifier(phone, masterKey);
+
+    if (user.phoneHash && user.phoneHash === newHash) {
+      throw new BadRequestException('该手机号已绑定，无需重复操作');
+    }
+    const dup = await this.userRepo.findOne({ where: { phoneHash: newHash } });
+    if (dup && dup.id !== userId) {
+      throw new ConflictException('该手机号已被其他账号占用');
+    }
+
+    // Dual-confirm when changing an already-bound phone, same as A11 email.
+    if (user.phoneEncrypted) {
+      if (!oldPhoneCode) {
+        throw new BadRequestException('更换手机号需要旧手机号验证码');
+      }
+      let oldPhone: string;
+      try {
+        oldPhone = decryptField(user.phoneEncrypted, masterKey);
+      } catch {
+        throw new ServiceUnavailableException('手机号解密失败，请联系管理员');
+      }
+      await this.verificationService.verify(
+        oldPhone, oldPhoneCode, VerificationPurpose.CHANGE_PHONE,
+      );
+    }
+
+    await this.verificationService.verify(phone, code, VerificationPurpose.CHANGE_PHONE);
+
+    user.phoneEncrypted = encryptField(phone, masterKey);
+    user.phoneHash = newHash;
+    try {
+      await this.userRepo.save(user);
+    } catch (err: any) {
+      if (err?.code === '23505' || /duplicate key/i.test(err?.message ?? '')) {
+        throw new ConflictException('该手机号已被其他账号占用');
+      }
+      throw err;
+    }
+    await this.audit(userId, 'phone.bind', null, ip, ua);
+    return { message: '手机号绑定成功' };
   }
 
   /**

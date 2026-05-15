@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ServiceUnavailableException, Inject } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException, Inject, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
 import * as crypto from 'crypto';
@@ -8,6 +8,8 @@ import { REDIS_CLIENT } from '../common/redis/redis.module';
 
 @Injectable()
 export class VerificationService {
+  private readonly logger = new Logger(VerificationService.name);
+
   constructor(
     @InjectRepository(VerificationCode) private repo: Repository<VerificationCode>,
     @Inject(REDIS_CLIENT) private redis: any,
@@ -110,8 +112,24 @@ export class VerificationService {
         throw new ServiceUnavailableException('验证码服务暂时不可用，请稍后重试');
       }
       if (fails >= maxAttempts) {
-        await this.redis.set(lockKey, '1', 'EX', lockSeconds).catch(() => {});
-        await this.redis.del(failKey).catch(() => {});
+        // Surface lock-write failures. Silent `.catch(() => {})` previously
+        // hid the case where an attacker who can induce Redis errors at the
+        // 5th-failed-attempt moment never gets locked out — visibility in
+        // ops logs lets us catch that pattern even if the lock didn't write.
+        await this.redis
+          .set(lockKey, '1', 'EX', lockSeconds)
+          .catch((err: unknown) =>
+            this.logger.warn(
+              `lock write failed for ${lockKey}: ${(err as Error).message}`,
+            ),
+          );
+        await this.redis
+          .del(failKey)
+          .catch((err: unknown) =>
+            this.logger.warn(
+              `fail-counter clear failed for ${failKey}: ${(err as Error).message}`,
+            ),
+          );
         throw new BadRequestException('验证码连续错误次数过多，请 15 分钟后再试');
       }
       throw new BadRequestException('验证码错误或已过期');
@@ -134,7 +152,13 @@ export class VerificationService {
     }
     // Clear failure counter on success so a legit user isn't punished for
     // typos earlier in the same code's TTL.
-    await this.redis.del(failKey).catch(() => {});
+    await this.redis
+      .del(failKey)
+      .catch((err: unknown) =>
+        this.logger.warn(
+          `fail-counter clear failed for ${failKey} on success: ${(err as Error).message}`,
+        ),
+      );
     return true;
   }
 }
