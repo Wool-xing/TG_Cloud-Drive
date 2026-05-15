@@ -19,7 +19,7 @@ from playwright.sync_api import sync_playwright
 
 BASE = "https://localhost"
 API = f"{BASE}/api"
-REDIS_PASS = "ek8fRnrqV6xDzEbrwsChqp9SMmNRRcELZ7oHXtBG"
+REDIS_PASS = os.environ["REDIS_PASS"]
 
 
 def redis_del(key):

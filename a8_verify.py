@@ -21,7 +21,7 @@ import requests
 import urllib3
 
 
-REDIS_PASS = os.environ.get("REDIS_PASS", "ek8fRnrqV6xDzEbrwsChqp9SMmNRRcELZ7oHXtBG")
+REDIS_PASS = os.environ["REDIS_PASS"]
 
 
 def redis_del(key):
