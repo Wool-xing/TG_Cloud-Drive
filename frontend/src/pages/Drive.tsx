@@ -1,10 +1,11 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, FolderUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { filesApi } from '../api/client';
 import { useFileStore } from '../stores/file.store';
+import { useUploadStore } from '../stores/upload.store';
 import { Node } from '../types';
 
 import FileToolbar from '../components/files/FileToolbar';
@@ -36,6 +37,96 @@ export default function Drive({ isPrivate = false }: DriveProps) {
     selectAll,
     setContextMenu,
   } = useFileStore();
+
+  // Drag-and-drop upload
+  const { addFiles } = useUploadStore();
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+
+  // Recursively collect files from dropped items (handles folders)
+  const collectFiles = useCallback(async (items: DataTransferItemList): Promise<File[]> => {
+    const result: File[] = [];
+    const readEntry = async (entry: FileSystemEntry): Promise<void> => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve, reject) => {
+          (entry as FileSystemFileEntry).file(resolve, reject);
+        });
+        result.push(file);
+      } else if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        const readAll = (): Promise<FileSystemEntry[]> => {
+          return new Promise((resolve) => {
+            const all: FileSystemEntry[] = [];
+            const readBatch = () => {
+              reader.readEntries((entries) => {
+                if (entries.length === 0) { resolve(all); return; }
+                all.push(...entries);
+                readBatch();
+              });
+            };
+            readBatch();
+          });
+        };
+        const children = await readAll();
+        for (const child of children) await readEntry(child);
+      }
+    };
+    const entries: FileSystemEntry[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry?.();
+      if (entry) entries.push(entry);
+    }
+    // Fallback: if no webkitGetAsEntry, use getAsFile
+    if (entries.length === 0) {
+      for (let i = 0; i < items.length; i++) {
+        const file = items[i].getAsFile();
+        if (file) result.push(file);
+      }
+      return result;
+    }
+    for (const entry of entries) await readEntry(entry);
+    return result;
+  }, []);
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.types.includes('Files')) setIsDragging(true);
+  };
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDragging(false);
+    }
+  };
+
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
+    const items = e.dataTransfer.items;
+    if (!items.length) return;
+    try {
+      const files = await collectFiles(items);
+      if (files.length) {
+        addFiles(files, currentParentId, isPrivate);
+        toast.success(`已添加 ${files.length} 个文件到上传队列`);
+      }
+    } catch (err: any) {
+      toast.error('读取拖拽文件失败');
+    }
+  };
 
   // Sync isPrivate prop to store on mount / when prop changes
   useEffect(() => {
@@ -130,7 +221,13 @@ export default function Drive({ isPrivate = false }: DriveProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div
+      className="flex flex-col h-full overflow-hidden relative"
+      onDragOver={onDragOver}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <FileToolbar nodes={nodes} isLoading={isLoading} />
 
       <div className="flex-1 overflow-y-auto">
@@ -141,7 +238,7 @@ export default function Drive({ isPrivate = false }: DriveProps) {
               {searchQuery ? '没有找到匹配的文件' : '此文件夹为空'}
             </p>
             <p className="text-sm">
-              {searchQuery ? '请尝试其他关键词' : '点击上方按钮上传文件或创建文件夹'}
+              {searchQuery ? '请尝试其他关键词' : '拖拽文件到此处，或点击上方按钮上传'}
             </p>
           </div>
         ) : viewMode === 'list' ? (
@@ -150,6 +247,17 @@ export default function Drive({ isPrivate = false }: DriveProps) {
           <FileGrid nodes={nodes} isLoading={isLoading} />
         )}
       </div>
+
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-500/10 backdrop-blur-sm border-2 border-dashed border-blue-400 rounded-xl pointer-events-none">
+          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-2xl bg-white/90 dark:bg-gray-900/90 shadow-xl">
+            <FolderUp className="w-12 h-12 text-blue-500" />
+            <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">释放以上传</p>
+            <p className="text-sm text-gray-500">支持文件和文件夹</p>
+          </div>
+        </div>
+      )}
 
       {/* Always mounted. FileContextMenu owns the rename/move/copy/share/lock
           dialog state in LOCAL React state — gating the component on
