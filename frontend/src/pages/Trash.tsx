@@ -187,8 +187,8 @@ export default function Trash() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Retention banner */}
-      <div className="mx-4 mt-4 mb-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-        <Info className="w-4 h-4 flex-shrink-0 text-amber-600" />
+      <div className="mx-4 mt-4 mb-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200">
+        <Info className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
         <span>回收站中的文件将在 <strong>30天</strong> 后自动永久删除，请及时处理重要文件。</span>
       </div>
 

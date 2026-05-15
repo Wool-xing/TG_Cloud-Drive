@@ -130,7 +130,7 @@ export default function Register() {
     `w-full px-4 py-2.5 rounded-xl border ${errors[field] ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'} bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition text-sm`;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
       <div className="h-1.5 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
@@ -231,7 +231,7 @@ export default function Register() {
                   type={contactType === 'email' ? 'email' : 'tel'}
                   value={contact}
                   onChange={e => { setContact(e.target.value); setErrors(v => { const n={...v}; delete n.contact; return n; }); }}
-                  placeholder={contactType === 'email' ? 'example@mail.com' : '+86 138 0000 0000'}
+                  placeholder={contactType === 'email' ? 'example@mail.com' : '13800000000'}
                   className={inputCls('contact')}
                 />
                 {errors.contact && <p className="mt-1 text-xs text-red-500">{errors.contact}</p>}

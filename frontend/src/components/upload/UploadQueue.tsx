@@ -194,7 +194,7 @@ export default function UploadQueue() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white dark:text-gray-100">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {activeCount > 0 ? `上传中 (${activeCount})` : `已完成 ${doneCount} 个`}
           </p>
           {totalProgress !== null && (

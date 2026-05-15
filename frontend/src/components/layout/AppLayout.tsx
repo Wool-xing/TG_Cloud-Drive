@@ -56,7 +56,7 @@ export default function AppLayout() {
   if (!user) return null;
 
   return (
-    <div {...getRootProps()} className="relative flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950 dark:bg-gray-900">
+    <div {...getRootProps()} className="relative flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
       {/* Hidden dropzone input */}
       <input {...getInputProps()} />
 
@@ -68,7 +68,7 @@ export default function AppLayout() {
               <UploadCloud className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="text-center">
-              <p className="text-xl font-bold text-gray-900 dark:text-white dark:text-gray-100">松开以上传文件</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">松开以上传文件</p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {isPrivate ? '将上传到隐私空间' : '将上传到当前文件夹'}
               </p>
