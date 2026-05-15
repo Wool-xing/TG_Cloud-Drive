@@ -10,6 +10,7 @@ Coverage mirrors a11_verify.py:
   6. Attacker-only-new-OTP path blocked.
 """
 import io
+import os
 import sys
 import secrets
 import subprocess
@@ -22,7 +23,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE = "https://localhost"
 API = f"{BASE}/api"
-REDIS_PASS = "ek8fRnrqV6xDzEbrwsChqp9SMmNRRcELZ7oHXtBG"
+REDIS_PASS = os.environ["REDIS_PASS"]
 OK = (200, 201)
 PURPOSES = ("register", "login", "reset_password",
             "change_email", "change_phone", "change_password")

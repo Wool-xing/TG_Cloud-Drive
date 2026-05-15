@@ -1,5 +1,6 @@
 """Verify admin test-email / test-sms / test-verify round-trip."""
 import io
+import os
 import sys
 import requests
 import urllib3
@@ -10,8 +11,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE = "https://localhost/api"
 ADMIN_USER = "admin"
-ADMIN_PW = "1HeIDXEOCCrxsETa9M4yVk7g"
-REDIS_PASS = "ek8fRnrqV6xDzEbrwsChqp9SMmNRRcELZ7oHXtBG"
+ADMIN_PW = os.environ["ADMIN_PW"]
+REDIS_PASS = os.environ["REDIS_PASS"]
 
 PASS = 0
 FAIL = 0

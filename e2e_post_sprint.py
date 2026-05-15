@@ -143,7 +143,7 @@ def i7_test(page):
         subprocess.run(
             ["docker", "compose", "-f", "D:/项目文件/TG云盘/docker-compose.yml",
              "exec", "-T", "redis", "redis-cli", "-a",
-             "ek8fRnrqV6xDzEbrwsChqp9SMmNRRcELZ7oHXtBG", "--no-auth-warning",
+             os.environ["REDIS_PASS"], "--no-auth-warning",
              "eval", "local k=redis.call('keys','admin:confirm:*'); "
              "if #k>0 then redis.call('del',unpack(k)) end; return #k", "0"],
             capture_output=True, timeout=10

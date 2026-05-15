@@ -21,6 +21,7 @@ Coverage:
   5. send-code-old refuses when user has no bound email.
 """
 import io
+import os
 import sys
 import secrets
 import subprocess
@@ -34,7 +35,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE = "https://localhost"
 API = f"{BASE}/api"
-REDIS_PASS = "ek8fRnrqV6xDzEbrwsChqp9SMmNRRcELZ7oHXtBG"
+REDIS_PASS = os.environ["REDIS_PASS"]
 OK = (200, 201)
 
 PASS = 0
