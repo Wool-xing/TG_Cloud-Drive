@@ -9,13 +9,14 @@ import * as crypto from 'crypto';
 import { Node, NodeType } from './entities/node.entity';
 import { FileChunk } from './entities/file-chunk.entity';
 import { NodeVersion } from './entities/node-version.entity';
+import { FileRequest } from './entities/file-request.entity';
 import { NodeKey } from './entities/node-key.entity';
 import { Tag } from './entities/tag.entity';
 import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { TelegramService } from '../telegram/telegram.service';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
-import { comparePassword, hashPassword } from '../common/encryption';
+import { comparePassword, hashPassword, generateSecureToken } from '../common/encryption';
 
 @Injectable()
 export class FilesService {
@@ -28,6 +29,7 @@ export class FilesService {
     @InjectRepository(Tag) private tagRepo: Repository<Tag>,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(NodeVersion) private versionRepo: Repository<NodeVersion>,
+    @InjectRepository(FileRequest) private fileRequestRepo: Repository<FileRequest>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @Inject(REDIS_CLIENT) private redis: any,
     private telegramService: TelegramService,
@@ -710,6 +712,50 @@ export class FilesService {
   safeNode(node: Node) {
     const { lockHash, ...rest } = node as any;
     return { ...rest, size: Number(rest.size || 0) };
+  }
+
+  // ─── File Request (upload links for non-users) ───────────────────────────────
+
+  async createFileRequest(userId: string, folderId: string, maxFiles = 100, ttlHours = 72) {
+    const folder = await this.getNodeOwned(userId, folderId);
+    if (folder.type !== NodeType.FOLDER) throw new BadRequestException('仅文件夹支持文件请求');
+    const token = generateSecureToken(16);
+    const expiresAt = new Date(Date.now() + ttlHours * 3600_000);
+    const req = this.fileRequestRepo.create({ userId, folderId, token, maxFiles, expiresAt });
+    await this.fileRequestRepo.save(req);
+    return { token, expiresAt, url: `/r/${token}` };
+  }
+
+  async getFileRequest(token: string) {
+    const req = await this.fileRequestRepo.findOne({ where: { token, isActive: true } });
+    if (!req || req.expiresAt < new Date()) throw new NotFoundException('链接无效或已过期');
+    return { maxFiles: req.maxFiles, uploadCount: req.uploadCount, expiresAt: req.expiresAt };
+  }
+
+  async uploadToFileRequest(token: string, fileBuffer: Buffer, filename: string) {
+    const req = await this.fileRequestRepo.findOne({ where: { token, isActive: true } });
+    if (!req || req.expiresAt < new Date()) throw new NotFoundException('链接无效或已过期');
+    if (req.uploadCount >= req.maxFiles) throw new BadRequestException('已达到上传数量上限');
+
+    req.uploadCount++;
+    await this.fileRequestRepo.save(req);
+
+    // Upload as a simple file node (no encryption for external uploads)
+    const node = this.nodeRepo.create({
+      userId: req.userId, parentId: req.folderId, name: filename,
+      type: NodeType.FILE, size: fileBuffer.length, isPrivate: false,
+    });
+    await this.nodeRepo.save(node);
+
+    const tgResult = await this.telegramService.sendDocument(fileBuffer, filename, 'application/octet-stream');
+    const chunk = this.chunkRepo.create({
+      nodeId: node.id, chunkIndex: 0, tgFileId: tgResult.fileId,
+      tgMessageId: tgResult.messageId, size: fileBuffer.length, iv: '000000000000000000000000',
+    });
+    await this.chunkRepo.save(chunk);
+    await this.userRepo.increment({ id: req.userId }, 'usedBytes', fileBuffer.length);
+
+    return { filename, size: fileBuffer.length };
   }
 
   // ─── Version History ────────────────────────────────────────────────────────

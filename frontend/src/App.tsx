@@ -16,6 +16,7 @@ import AdminUsers from './pages/admin/Users';
 import AdminFiles from './pages/admin/Files';
 import AdminConfig from './pages/admin/Config';
 import PrivateSpaceGate from './components/PrivateSpaceGate';
+import FileRequestPage from './pages/FileRequestPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user);
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/s/:token" element={<SharedAccessPage />} />
+        <Route path="/r/:token" element={<FileRequestPage />} />
 
         <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
           <Route index element={<DrivePage />} />

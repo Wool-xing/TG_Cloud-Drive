@@ -14,6 +14,7 @@ import {
   FolderDown,
   Loader2,
   Clock,
+  Upload,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -30,8 +31,9 @@ import MoveDialog from '../dialogs/MoveDialog';
 import ShareDialog from '../dialogs/ShareDialog';
 import LockDialog from '../dialogs/LockDialog';
 import VersionDialog from '../dialogs/VersionDialog';
+import FileRequestDialog from '../dialogs/FileRequestDialog';
 
-type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | 'version' | null;
+type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | 'version' | 'file-request' | null;
 
 export default function FileContextMenu() {
   const queryClient = useQueryClient();
@@ -422,6 +424,15 @@ export default function FileContextMenu() {
             />
           )}
 
+          {/* File Request — folders only */}
+          {isSingle && !isFile && (
+            <Item
+              icon={<Upload className="w-4 h-4" />}
+              label="文件请求"
+              onClick={() => openDialog('file-request')}
+            />
+          )}
+
           <Divider />
 
           {/* Move to/from private */}
@@ -474,6 +485,12 @@ export default function FileContextMenu() {
       )}
       {dialog === 'version' && dialogNode && dialogIsSingle && (
         <VersionDialog
+          node={dialogNode}
+          onClose={closeDialog}
+        />
+      )}
+      {dialog === 'file-request' && dialogNode && dialogIsSingle && (
+        <FileRequestDialog
           node={dialogNode}
           onClose={closeDialog}
         />
