@@ -233,7 +233,15 @@ export class UsersService {
   async sendChangePasswordCode(userId: string): Promise<{ message: string; code?: string }> {
     const user = await this.findUserOrFail(userId);
     const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
-    if (!user.emailEncrypted || !masterKey) {
+    // Disambiguate two error modes that previously collapsed into one 400:
+    //   - No bound email   → user-fixable, 400 with action message.
+    //   - No master key    → server misconfiguration, 503; otherwise an
+    //     operator with a broken env sees "no email bound" on every call
+    //     and never realizes the config is wrong.
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    if (!user.emailEncrypted) {
       throw new BadRequestException('当前账号未绑定邮箱，无法启用邮箱验证');
     }
     let email: string;
@@ -305,13 +313,30 @@ export class UsersService {
     const forceLogoutTs = Date.now().toString();
     // Cover the longest token lifetime (refresh = 30d by default) with headroom.
     const ttlSeconds = this.cs.get<number>('FORCE_LOGOUT_TTL_SECONDS', 86400 * 30);
+    let redisOk = true;
     try {
       await this.redis.set(`force_logout:${userId}`, forceLogoutTs, 'EX', ttlSeconds);
     } catch (err) {
+      redisOk = false;
       this.logger.error(
         `Failed to set force_logout for user ${userId} after password change`,
         (err as Error).stack,
       );
+    }
+
+    // Audit unconditionally — the password change is the security-relevant
+    // event and must always be recorded, even when downstream revocation
+    // partially fails. Previously the audit happened after the redis throw,
+    // so a 503 path produced an unaudited password change.
+    await this.audit(
+      userId,
+      redisOk ? 'password.change' : 'password.change.partial_revocation',
+      null,
+      ip,
+      ua,
+    );
+
+    if (!redisOk) {
       // Devices are already deleted (refresh tokens dead). But existing access
       // tokens may still be valid for up to access-token TTL (~2h). Surface this
       // to caller as 503 — the password was changed, but the global revocation
@@ -320,8 +345,6 @@ export class UsersService {
         '密码已修改，但会话失效信号下发失败。请立即清理浏览器缓存并重新登录，并稍后联系管理员。',
       );
     }
-
-    await this.audit(userId, 'password.change', null, ip, ua);
     return { message: '密码修改成功，所有设备已被强制登出，请重新登录' };
   }
 
@@ -562,6 +585,12 @@ export class UsersService {
       usedBytes: Number(user.usedBytes),
       mekSalt: user.mekSalt,
       hasPrivateSpace: !!user.privateSpaceHash,
+      // Authoritative server-side flags for A8/A11 UX gating. Clients MUST
+      // use these (not `email != null`) because decrypt can silently fail and
+      // null out the email field, which would otherwise downgrade the A11
+      // dual-confirm UI to single-factor without anyone noticing.
+      hasEmail: !!user.emailEncrypted,
+      hasPhone: !!user.phoneEncrypted,
       notifyShareAccess: user.notifyShareAccess,
       notifyForeignLogin: user.notifyForeignLogin,
       email,

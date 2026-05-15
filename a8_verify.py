@@ -136,7 +136,8 @@ def main():
     # 6. send change-password OTP — clear per-target rate-limit first since
     # this test already burned it on register. In real usage 60s cooldown is
     # fine; tests need to bypass it deterministically.
-    redis_del(f"vc:rate:{email}")
+    for purpose in ("register", "login", "reset_password", "change_email", "change_phone", "change_password"):
+        redis_del(f"vc:rate:{purpose}:{email}")
     sc, j = post("/users/change-password/send-code", {}, access)
     check("send change-password OTP 200", sc in (200, 201), f"got {sc} {j}")
     cp_code = (j.get("data", {}) if isinstance(j, dict) else {}).get("code") or j.get("code")

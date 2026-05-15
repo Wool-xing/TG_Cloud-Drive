@@ -123,6 +123,10 @@ function ProfileTab() {
   const [username, setUsername] = useState(user?.username ?? '');
   const [saving, setSaving] = useState(false);
   const [boundEmail, setBoundEmail] = useState<string | null>(null);
+  // Server-authoritative flag (decrypted-email fallback proof). A11 dialog
+  // uses this to decide single- vs dual-factor — never `email != null`
+  // since decrypt can silently null the field while the email is bound.
+  const [hasEmail, setHasEmail] = useState<boolean | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -130,8 +134,11 @@ function ProfileTab() {
       try {
         const res = (await usersApi.profile()) as any;
         setBoundEmail(res?.email ?? null);
+        setHasEmail(typeof res?.hasEmail === 'boolean' ? res.hasEmail : !!res?.email);
       } catch {
-        // interceptor
+        // interceptor — leave hasEmail null so the dialog can show an
+        // explicit "profile load failed" hint rather than silently
+        // downgrading the security UX.
       }
     })();
   }, []);
@@ -234,6 +241,7 @@ function ProfileTab() {
       {emailDialogOpen && (
         <BindEmailDialog
           currentEmail={boundEmail}
+          hasEmail={hasEmail}
           onCancel={() => setEmailDialogOpen(false)}
           onBound={handleEmailBound}
         />
@@ -245,10 +253,11 @@ function ProfileTab() {
 // ── Bind Email Dialog ─────────────────────────────────────────
 function BindEmailDialog(props: {
   currentEmail: string | null;
+  hasEmail: boolean | null;
   onCancel: () => void;
   onBound: (newEmail: string) => void;
 }) {
-  const { currentEmail, onCancel, onBound } = props;
+  const { currentEmail, hasEmail, onCancel, onBound } = props;
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [oldCode, setOldCode] = useState('');
@@ -271,8 +280,14 @@ function BindEmailDialog(props: {
   }, [oldCountdown]);
 
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  // A11: when there's a currently-bound email, require the old-side OTP too.
-  const needOldCode = !!currentEmail;
+  // A11: dual-confirm trigger uses the SERVER's hasEmail flag, not the
+  // decrypted email string. If decrypt silently failed, currentEmail
+  // is null but hasEmail is true — we still must show the old-OTP
+  // field so the request matches what the server enforces.
+  const needOldCode = hasEmail === true;
+  // If the profile probe failed entirely (hasEmail === null), the dialog
+  // cannot safely decide. Block submission until we know.
+  const probeFailed = hasEmail === null && !currentEmail;
 
   const handleSend = async () => {
     if (!validEmail) {
@@ -373,6 +388,11 @@ function BindEmailDialog(props: {
               </button>
             </div>
           </div>
+          {probeFailed && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              账号资料加载失败，无法确定是否需要旧邮箱验证。请关闭重试。
+            </p>
+          )}
           {needOldCode && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">旧邮箱验证码</label>
@@ -412,6 +432,7 @@ function BindEmailDialog(props: {
               type="submit"
               disabled={
                 submitting ||
+                probeFailed ||
                 !validEmail ||
                 code.length !== 6 ||
                 (needOldCode && oldCode.length !== 6)
@@ -446,7 +467,10 @@ function SecurityTab() {
   // truth — it requires/skips the OTP based on the stored email — so this
   // is purely a UX flag (hide the field for accounts without an email).
   const [boundEmail, setBoundEmail] = useState<string | null>(null);
-  const [emailProbeDone, setEmailProbeDone] = useState(false);
+  // Server-authoritative — see ProfileTab for the same flag and why we
+  // don't infer from `email != null`.
+  const [hasEmail, setHasEmail] = useState<boolean | null>(null);
+  const [emailProbeStatus, setEmailProbeStatus] = useState<'idle' | 'ok' | 'error'>('idle');
   const [otpSending, setOtpSending] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0);
 
@@ -455,11 +479,13 @@ function SecurityTab() {
       try {
         const res = (await usersApi.profile()) as any;
         setBoundEmail(res?.email ?? null);
+        setHasEmail(typeof res?.hasEmail === 'boolean' ? res.hasEmail : !!res?.email);
+        setEmailProbeStatus('ok');
       } catch {
-        // interceptor handles error toast — leave boundEmail null so the OTP
-        // field stays hidden; backend will still enforce if email exists.
-      } finally {
-        setEmailProbeDone(true);
+        // Surface the failure rather than silently leaving boundEmail=null,
+        // which would let the user submit change-password without an OTP
+        // and get a confusing server-side rejection.
+        setEmailProbeStatus('error');
       }
     })();
   }, []);
@@ -493,7 +519,11 @@ function SecurityTab() {
       toast.error('新密码至少 8 位');
       return;
     }
-    if (boundEmail && !pwForm.emailCode) {
+    if (emailProbeStatus === 'error') {
+      toast.error('账号资料加载失败，请刷新页面后重试');
+      return;
+    }
+    if (hasEmail && !pwForm.emailCode) {
       toast.error('请填写邮箱验证码');
       return;
     }
@@ -502,7 +532,7 @@ function SecurityTab() {
       await usersApi.changePassword({
         oldPassword: pwForm.oldPassword,
         newPassword: pwForm.newPassword,
-        ...(boundEmail ? { emailCode: pwForm.emailCode } : {}),
+        ...(hasEmail ? { emailCode: pwForm.emailCode } : {}),
       });
       toast.success('密码修改成功，请重新登录');
       setPwForm({ oldPassword: '', newPassword: '', confirm: '', emailCode: '' });
@@ -587,7 +617,7 @@ function SecurityTab() {
           {/* A8: email OTP — visible only when the account has an email bound.
               Backend (users.service.ts) enforces this server-side; the field
               is hidden for email-less accounts purely for UX. */}
-          {emailProbeDone && boundEmail && (
+          {emailProbeStatus === 'ok' && hasEmail && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">邮箱验证码</label>
               <div className="flex gap-2">
@@ -611,19 +641,25 @@ function SecurityTab() {
                   {otpCountdown > 0 ? `${otpCountdown}s 后重发` : '发送验证码'}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {boundEmail}</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                {boundEmail ? `将发送到 ${boundEmail}` : '将发送到已绑定邮箱'}
+              </p>
             </div>
           )}
-          {emailProbeDone && !boundEmail && (
+          {emailProbeStatus === 'ok' && !hasEmail && (
             <p className="text-xs text-amber-600 dark:text-amber-400">提示：账号未绑定邮箱，本次修改不要求邮箱验证码。建议尽快绑定邮箱以提升账号安全。</p>
+          )}
+          {emailProbeStatus === 'error' && (
+            <p className="text-xs text-red-600 dark:text-red-400">账号资料加载失败，无法判断是否需要邮箱验证码。请刷新页面后重试。</p>
           )}
           <button
             type="submit"
             disabled={
               pwSaving ||
+              emailProbeStatus !== 'ok' ||
               !pwForm.oldPassword ||
               !pwForm.newPassword ||
-              (!!boundEmail && !pwForm.emailCode)
+              (hasEmail === true && !pwForm.emailCode)
             }
             className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
           >

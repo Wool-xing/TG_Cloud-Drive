@@ -15,7 +15,14 @@ export class VerificationService {
   ) {}
 
   async sendCode(target: string, purpose: VerificationPurpose) {
-    const rateLimitKey = `vc:rate:${target}`;
+    // F1: key MUST include purpose. Without it, an unauthenticated
+    // /auth/register sendCode to victim@example.com burns the victim's
+    // CHANGE_PASSWORD rate budget — attacker re-issues every 55s to
+    // permanently block legitimate password recovery. fail counter and
+    // lock keys already include purpose (`vc:fail:${purpose}:${target}`,
+    // `vc:lock:${purpose}:${target}`); aligning the rate key closes the
+    // last cross-purpose channel.
+    const rateLimitKey = `vc:rate:${purpose}:${target}`;
 
     // Fail-CLOSED: rate-limit check + reservation must succeed BEFORE any side
     // effects (DB write, email send). Order: get → set → DB save → mail.
