@@ -41,8 +41,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // distinguish "service degraded — retry" from 401 "token expired — re-login".
     try {
       const forceAt = await this.redis.get(`force_logout:${payload.sub}`);
-      if (forceAt && payload.iat && payload.iat * 1000 < parseInt(forceAt)) {
-        throw new UnauthorizedException('已被强制下线');
+      if (forceAt && payload.iat) {
+        // JWT iat is second-precision; force_logout is millisecond-precision.
+        // Comparing iat*1000 < forceAt rejects any token whose iat second
+        // floor-truncates the force-logout millisecond — i.e. a re-login that
+        // happens in the same wall-clock second as the force-logout write is
+        // incorrectly invalidated. Compare in seconds with a 1s grace so a
+        // legitimate re-login immediately after change-password is accepted,
+        // while any token issued *before* the force-logout still fails.
+        if (payload.iat < Math.floor(parseInt(forceAt) / 1000)) {
+          throw new UnauthorizedException('已被强制下线');
+        }
       }
     } catch (e) {
       if (e instanceof UnauthorizedException) throw e;

@@ -23,6 +23,8 @@ import {
   encryptField,
   hashPassword,
   comparePassword,
+  hashIdentifier,
+  normalizeEmail,
 } from '../common/encryption';
 import { VerificationService } from '../verification/verification.service';
 import { VerificationPurpose } from '../verification/verification.entity';
@@ -94,6 +96,83 @@ export class UsersService {
   }
 
   // ─── Password ─────────────────────────────────────────────────────────────────
+
+  // ─── Bind / Change Email (A8 follow-up) ──────────────────────────────────
+  //
+  // Completes the A8 feature: lets users without a bound email opt into the
+  // change-password OTP defense, and lets existing users rotate their email.
+  // Uses VerificationPurpose.CHANGE_EMAIL (purpose existed pre-A8, just no
+  // endpoint wired it). The new email is the OTP target so that an attacker
+  // cannot bind their own inbox using only the victim's session — they would
+  // still need to receive the code at the destination address.
+
+  async sendBindEmailCode(
+    userId: string,
+    rawEmail: string,
+  ): Promise<{ message: string; code?: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    const email = normalizeEmail(rawEmail);
+    const newHash = hashIdentifier(email, masterKey);
+
+    // Same email — refuse to spam OTP.
+    if (user.emailHash && user.emailHash === newHash) {
+      throw new BadRequestException('该邮箱已绑定，无需重复操作');
+    }
+    // Race-tolerant dedup: another user holds this email. We rely on the
+    // unique index for the final atomic write, but a pre-check produces a
+    // friendly error early.
+    const dup = await this.userRepo.findOne({ where: { emailHash: newHash } });
+    if (dup && dup.id !== userId) {
+      throw new ConflictException('该邮箱已被其他账号占用');
+    }
+
+    return this.verificationService.sendCode(email, VerificationPurpose.CHANGE_EMAIL);
+  }
+
+  async bindEmail(
+    userId: string,
+    rawEmail: string,
+    code: string,
+    ip?: string,
+    ua?: string,
+  ): Promise<{ message: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    const email = normalizeEmail(rawEmail);
+    const newHash = hashIdentifier(email, masterKey);
+
+    if (user.emailHash && user.emailHash === newHash) {
+      throw new BadRequestException('该邮箱已绑定，无需重复操作');
+    }
+    const dup = await this.userRepo.findOne({ where: { emailHash: newHash } });
+    if (dup && dup.id !== userId) {
+      throw new ConflictException('该邮箱已被其他账号占用');
+    }
+
+    // verify() throws on bad/expired/locked code and atomically marks used.
+    await this.verificationService.verify(email, code, VerificationPurpose.CHANGE_EMAIL);
+
+    user.emailEncrypted = encryptField(email, masterKey);
+    user.emailHash = newHash;
+    try {
+      await this.userRepo.save(user);
+    } catch (err: any) {
+      // Race winner already took the email between dedup check + save.
+      if (err?.code === '23505' || /duplicate key/i.test(err?.message ?? '')) {
+        throw new ConflictException('该邮箱已被其他账号占用');
+      }
+      throw err;
+    }
+    await this.audit(userId, 'email.bind', null, ip, ua);
+    return { message: '邮箱绑定成功' };
+  }
 
   /**
    * A8: send an email OTP for the in-session change-password flow.

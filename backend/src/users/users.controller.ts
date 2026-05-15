@@ -17,7 +17,7 @@ import {
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import {
   UsersService,
   UpdateProfileDto,
@@ -50,6 +50,23 @@ class VerifyPrivateSpacePasswordDto {
   @MinLength(1, { message: '请输入密码' })
   @MaxLength(128)
   password!: string;
+}
+
+class SendBindEmailCodeDto {
+  @IsEmail({}, { message: '邮箱格式不正确' })
+  @MaxLength(200)
+  email!: string;
+}
+
+class BindEmailDto {
+  @IsEmail({}, { message: '邮箱格式不正确' })
+  @MaxLength(200)
+  email!: string;
+
+  @IsString()
+  @MinLength(6)
+  @MaxLength(6)
+  code!: string;
 }
 
 @ApiTags('用户')
@@ -109,6 +126,39 @@ export class UsersController {
   @ApiOperation({ summary: '获取改密码邮箱验证码' })
   sendChangePasswordCode(@CurrentUser('id') userId: string) {
     return this.usersService.sendChangePasswordCode(userId);
+  }
+
+  /**
+   * A8 follow-up POST /users/bind-email/send-code
+   * Sends an OTP to the *new* email address. Auth-required so the session
+   * proves account control, and the OTP proves inbox control — both needed
+   * to bind. Same throttle profile as change-password OTP.
+   */
+  @Post('bind-email/send-code')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: '获取绑定/更换邮箱验证码' })
+  sendBindEmailCode(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SendBindEmailCodeDto,
+  ) {
+    return this.usersService.sendBindEmailCode(userId, dto.email);
+  }
+
+  /**
+   * A8 follow-up POST /users/bind-email
+   * Atomically updates emailEncrypted + emailHash after OTP verification.
+   */
+  @Post('bind-email')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: '绑定/更换邮箱' })
+  bindEmail(
+    @CurrentUser('id') userId: string,
+    @Body() dto: BindEmailDto,
+    @Req() req: Request,
+  ) {
+    return this.usersService.bindEmail(userId, dto.email, dto.code, req.ip, req.headers['user-agent']);
   }
 
   /**
