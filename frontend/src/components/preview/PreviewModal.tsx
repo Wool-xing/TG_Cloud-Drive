@@ -7,6 +7,15 @@ import {
   Loader2,
   AlertTriangle,
   File,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
@@ -57,6 +66,302 @@ function isTextMime(mimeType?: string): boolean {
     mimeType.includes('xml') ||
     mimeType.includes('yaml') ||
     mimeType.includes('csv')
+  );
+}
+
+function languageFromMime(mimeType: string): string {
+  if (mimeType.includes('javascript') || mimeType.includes('ecmascript')) return 'javascript';
+  if (mimeType.includes('typescript')) return 'typescript';
+  if (mimeType.includes('json')) return 'json';
+  if (mimeType.includes('xml') || mimeType.includes('svg')) return 'xml';
+  if (mimeType.includes('yaml')) return 'yaml';
+  if (mimeType.includes('css')) return 'css';
+  if (mimeType.includes('shell') || mimeType.includes('sh')) return 'bash';
+  if (mimeType.includes('python')) return 'python';
+  return '';
+}
+
+// Image zoom / pan state
+interface ImageTransform {
+  scale: number;
+  x: number;
+  y: number;
+}
+
+function ImageViewer({ blobUrl, name }: { blobUrl: string; name: string }) {
+  const [transform, setTransform] = useState<ImageTransform>({ scale: 1, x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const clampScale = (s: number) => Math.max(0.25, Math.min(10, s));
+
+  const zoomTo = (newScale: number, cx?: number, cy?: number) => {
+    setTransform((prev) => {
+      const s = clampScale(newScale);
+      if (cx !== undefined && cy !== undefined) {
+        const ratio = s / prev.scale;
+        return { scale: s, x: cx - ratio * (cx - prev.x), y: cy - ratio * (cy - prev.y) };
+      }
+      return { ...prev, scale: s };
+    });
+  };
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const delta = e.deltaY > 0 ? 0.85 : 1.15;
+    zoomTo(transform.scale * delta, cx, cy);
+  };
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setDragging(true);
+    setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragging) return;
+    setTransform((prev) => ({
+      ...prev,
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    }));
+  };
+
+  const onMouseUp = () => setDragging(false);
+  const onDoubleClick = () => {
+    setTransform(transform.scale > 1.1 ? { scale: 1, x: 0, y: 0 } : { scale: 2.5, x: 0, y: 0 });
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex-1 flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
+      onWheel={onWheel}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseUp}
+      onDoubleClick={onDoubleClick}
+    >
+      <img
+        ref={imgRef}
+        src={blobUrl}
+        alt={name}
+        draggable={false}
+        className="select-none"
+        style={{
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+          transition: dragging ? 'none' : 'transform 0.15s ease-out',
+          maxWidth: transform.scale <= 1 ? '90%' : 'none',
+          maxHeight: transform.scale <= 1 ? '90%' : 'none',
+        }}
+      />
+      {/* Zoom controls */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur rounded-full px-3 py-1.5">
+        <button onClick={() => zoomTo(transform.scale * 0.7)} className="p-1 text-white/80 hover:text-white" title="缩小">
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <span className="text-xs text-white/70 min-w-[3rem] text-center">
+          {Math.round(transform.scale * 100)}%
+        </span>
+        <button onClick={() => zoomTo(transform.scale * 1.4)} className="p-1 text-white/80 hover:text-white" title="放大">
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <button onClick={() => setTransform({ scale: 1, x: 0, y: 0 })} className="p-1 text-white/80 hover:text-white" title="重置">
+          <RotateCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VideoPlayer({ blobUrl, name }: { blobUrl: string; name: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) { v.play(); setPlaying(true); }
+    else { v.pause(); setPlaying(false); }
+  };
+
+  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const v = videoRef.current;
+    if (!v || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    v.currentTime = pct * duration;
+  };
+
+  const toggleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+  };
+
+  const toggleFullscreen = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      v.requestFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const v = videoRef.current;
+      if (!v) return;
+      if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+      else if (e.key === 'ArrowLeft') { v.currentTime = Math.max(0, v.currentTime - 5); }
+      else if (e.key === 'ArrowRight') { v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); }
+      else if (e.key === 'f') { toggleFullscreen(); }
+      else if (e.key === 'm') { toggleMute(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center bg-black">
+      <video
+        ref={videoRef}
+        src={blobUrl}
+        className="max-w-full max-h-[calc(100%-64px)] object-contain"
+        onTimeUpdate={() => {
+          const v = videoRef.current;
+          if (!v) return;
+          setCurrentTime(v.currentTime);
+          setProgress(v.duration ? (v.currentTime / v.duration) * 100 : 0);
+        }}
+        onLoadedMetadata={() => {
+          const v = videoRef.current;
+          if (!v) return;
+          setDuration(v.duration);
+        }}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onClick={togglePlay}
+      />
+      {/* Custom controls bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8">
+        {/* Progress bar */}
+        <div className="w-full h-1 bg-white/20 rounded-full mb-3 cursor-pointer" onClick={seek}>
+          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={togglePlay} className="text-white/90 hover:text-white">
+            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+          </button>
+          <span className="text-xs text-white/70 font-mono w-[4.5rem]">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+          <div className="flex-1" />
+          <button onClick={toggleMute} className="text-white/70 hover:text-white">
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+          <button onClick={toggleFullscreen} className="text-white/70 hover:text-white">
+            <Maximize className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AudioPlayer({ blobUrl, name }: { blobUrl: string; name: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) { a.play(); setPlaying(true); }
+    else { a.pause(); setPlaying(false); }
+  };
+
+  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const a = audioRef.current;
+    if (!a || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    a.currentTime = pct * duration;
+  };
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="w-full max-w-lg bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-8 flex flex-col items-center gap-6">
+        <audio
+          ref={audioRef}
+          src={blobUrl}
+          onTimeUpdate={() => {
+            const a = audioRef.current;
+            if (!a) return;
+            setCurrentTime(a.currentTime);
+            setProgress(a.duration ? (a.currentTime / a.duration) * 100 : 0);
+          }}
+          onLoadedMetadata={() => {
+            const a = audioRef.current;
+            if (!a) return;
+            setDuration(a.duration);
+          }}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+        />
+        {/* Visualizer disk */}
+        <div className={`w-28 h-28 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-2xl transition-transform ${playing ? 'animate-pulse' : ''}`}>
+          <span className="text-5xl select-none">♪</span>
+        </div>
+        <p className="text-sm text-white/80 font-medium truncate max-w-full">{name}</p>
+        {/* Progress */}
+        <div className="w-full">
+          <div className="w-full h-1.5 bg-white/10 rounded-full cursor-pointer" onClick={seek}>
+            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="flex justify-between mt-1.5">
+            <span className="text-xs text-white/50 font-mono">{formatTime(currentTime)}</span>
+            <span className="text-xs text-white/50 font-mono">{formatTime(duration)}</span>
+          </div>
+        </div>
+        {/* Controls */}
+        <button
+          onClick={togglePlay}
+          className="w-14 h-14 rounded-full bg-white text-gray-900 flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
+        >
+          {playing ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -384,55 +689,34 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           </div>
         );
 
-      case 'text':
+      case 'text': {
+        const lang = languageFromMime(previewState.mimeType);
         return (
-          <div className="flex-1 overflow-auto p-6">
-            <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap break-words bg-gray-900 text-green-400 rounded-xl p-6 h-full overflow-auto dark:text-gray-300">
-              {previewState.content}
-            </pre>
+          <div className="flex-1 overflow-auto p-4">
+            <div className="rounded-xl overflow-hidden border border-white/10 h-full">
+              <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10">
+                <span className="text-xs text-white/50 font-mono">{lang || 'text'}</span>
+              </div>
+              <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 h-[calc(100%-2.5rem)] overflow-auto">
+                {previewState.content}
+              </pre>
+            </div>
           </div>
         );
+      }
 
       case 'ready': {
         const { blobUrl, mimeType } = previewState;
         if (mimeType.startsWith('image/')) {
-          return (
-            <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-              <img
-                src={blobUrl}
-                alt={previewNode.name}
-                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-              />
-            </div>
-          );
+          return <ImageViewer blobUrl={blobUrl} name={previewNode.name} />;
         }
         if (mimeType.startsWith('video/')) {
-          return (
-            <div className="flex-1 flex items-center justify-center p-4">
-              <video
-                src={blobUrl}
-                controls
-                autoPlay
-                className="max-w-full max-h-full rounded-lg shadow-lg"
-              />
-            </div>
-          );
+          return <VideoPlayer blobUrl={blobUrl} name={previewNode.name} />;
         }
         if (mimeType.startsWith('audio/')) {
-          return (
-            <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-xl">
-                <span className="text-4xl">♪</span>
-              </div>
-              <audio src={blobUrl} controls autoPlay className="w-full max-w-md" />
-            </div>
-          );
+          return <AudioPlayer blobUrl={blobUrl} name={previewNode.name} />;
         }
         if (mimeType === 'application/pdf') {
-          // P1-F14: sandbox PDF preview iframe (see SharedAccess for rationale).
-          // blob: URLs are technically "opaque origin", but malicious PDFs that
-          // contain JS can still attempt navigation / clipboard access — keep
-          // the sandbox tight even on the authenticated preview path.
           return (
             <div className="flex-1 overflow-hidden">
               <iframe
