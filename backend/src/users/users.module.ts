@@ -8,6 +8,7 @@ import { User } from './entities/user.entity';
 import { Device } from './entities/device.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { Node } from '../files/entities/node.entity';
+import { VerificationModule } from '../verification/verification.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { Node } from '../files/entities/node.entity';
       }),
     }),
     ConfigModule,
+    VerificationModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],
