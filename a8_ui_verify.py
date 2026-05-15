@@ -40,7 +40,8 @@ def main():
     r = requests.post(f"{API}/auth/register",
                       json={"username": username, "email": email, "code": code, "password": pw},
                       verify=False)
-    assert r.status_code in (200, 201), r.text
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"register failed: {r.status_code} {r.text}")
     redis_del(f"vc:rate:{email}")
 
     with sync_playwright() as p:

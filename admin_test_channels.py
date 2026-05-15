@@ -1,6 +1,7 @@
 """Verify admin test-email / test-sms / test-verify round-trip."""
 import io
 import os
+import subprocess
 import sys
 import requests
 import urllib3
@@ -82,7 +83,6 @@ def main():
     # Read code directly from Redis to drive the verify step (since SMTP not
     # configured, no real email leaves the box — admin would normally read
     # the code from inbox, here we read from redis as proxy).
-    import subprocess
     # Need the admin user's id. Look it up from the login response.
     admin_id = data.get("user", {}).get("id")
     r = subprocess.run(
