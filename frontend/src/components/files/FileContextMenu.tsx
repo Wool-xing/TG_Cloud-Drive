@@ -13,6 +13,7 @@ import {
   Trash2,
   FolderDown,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -28,8 +29,9 @@ import RenameDialog from '../dialogs/RenameDialog';
 import MoveDialog from '../dialogs/MoveDialog';
 import ShareDialog from '../dialogs/ShareDialog';
 import LockDialog from '../dialogs/LockDialog';
+import VersionDialog from '../dialogs/VersionDialog';
 
-type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | null;
+type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | 'version' | null;
 
 export default function FileContextMenu() {
   const queryClient = useQueryClient();
@@ -402,6 +404,15 @@ export default function FileContextMenu() {
             />
           )}
 
+          {/* Version History */}
+          {isSingle && isFile && (
+            <Item
+              icon={<Clock className="w-4 h-4" />}
+              label="版本历史"
+              onClick={() => openDialog('version')}
+            />
+          )}
+
           {/* Share */}
           {isSingle && (
             <Item
@@ -459,6 +470,12 @@ export default function FileContextMenu() {
           node={dialogNode}
           onClose={closeDialog}
           onSuccess={() => { closeDialog(); invalidateFiles(); }}
+        />
+      )}
+      {dialog === 'version' && dialogNode && dialogIsSingle && (
+        <VersionDialog
+          node={dialogNode}
+          onClose={closeDialog}
         />
       )}
     </>
