@@ -204,7 +204,11 @@ export default function Recent() {
         )}
       </div>
 
-      {contextMenuNode && contextMenuPos && <FileContextMenu />}
+      {/* Always mounted — gating on contextMenuNode unmounted FileContextMenu
+          right when close() ran inside openDialog, dropping the local dialog
+          state before the dialog could render. FileContextMenu has its own
+          internal guard for the menu chrome. */}
+      <FileContextMenu />
       {previewNode && <PreviewModal nodes={nodes} />}
     </div>
   );

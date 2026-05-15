@@ -700,9 +700,15 @@ function SecurityTab() {
   const [showPw, setShowPw] = useState({ old: false, new: false, confirm: false });
   const [pwSaving, setPwSaving] = useState(false);
 
-  const [ppForm, setPpForm] = useState({ newPassword: '', confirm: '' });
+  const [ppForm, setPpForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [ppSaving, setPpSaving] = useState(false);
-  const [ppSetup, setPpSetup] = useState(false); // toggle for change vs setup
+  // Server-authoritative: profile probe sets hasPrivateSpace.
+  // Pre-fix this was a local boolean that nothing ever flipped — the form
+  // always rendered as "first-time setup", and submitting against a backend
+  // row that already had privateSpaceHash returned the confusing
+  // "修改私密空间密码需要提供当前密码" error with no place to actually put it.
+  const [hasPrivateSpace, setHasPrivateSpace] = useState<boolean | null>(null);
+  const [showPpCurrent, setShowPpCurrent] = useState(false);
 
   const [notifs, setNotifs] = useState({ shareAccess: true, foreignLogin: true });
   const [notifSaving, setNotifSaving] = useState(false);
@@ -725,6 +731,7 @@ function SecurityTab() {
         const res = (await usersApi.profile()) as any;
         setBoundEmail(res?.email ?? null);
         setHasEmail(typeof res?.hasEmail === 'boolean' ? res.hasEmail : !!res?.email);
+        setHasPrivateSpace(typeof res?.hasPrivateSpace === 'boolean' ? res.hasPrivateSpace : false);
         setEmailProbeStatus('ok');
       } catch {
         // Surface the failure rather than silently leaving boundEmail=null,
@@ -794,11 +801,19 @@ function SecurityTab() {
       toast.error('两次密码输入不一致');
       return;
     }
+    if (hasPrivateSpace && !ppForm.currentPassword) {
+      toast.error('请输入当前隐私空间密码');
+      return;
+    }
     setPpSaving(true);
     try {
-      await usersApi.setupPrivateSpace({ password: ppForm.newPassword });
-      toast.success('隐私空间密码设置成功');
-      setPpForm({ newPassword: '', confirm: '' });
+      await usersApi.setupPrivateSpace({
+        password: ppForm.newPassword,
+        ...(hasPrivateSpace ? { currentPassword: ppForm.currentPassword } : {}),
+      });
+      toast.success(hasPrivateSpace ? '隐私空间密码已更新' : '隐私空间密码设置成功');
+      setPpForm({ currentPassword: '', newPassword: '', confirm: '' });
+      setHasPrivateSpace(true);
     } catch {
       // interceptor
     } finally {
@@ -917,10 +932,41 @@ function SecurityTab() {
       {/* Private Space Password */}
       <section id="private-space" className="scroll-mt-4">
         <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">隐私空间密码</h3>
-        <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">隐私空间密码用于加密访问私密文件夹，独立于登录密码。</p>
+        <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">
+          {hasPrivateSpace === true
+            ? '隐私空间密码用于加密访问私密文件夹。修改需要输入当前隐私空间密码。'
+            : '隐私空间密码用于加密访问私密文件夹，独立于登录密码。'}
+        </p>
         <form onSubmit={handleSetupPrivateSpace} className="space-y-4">
+          {/* Current private-space password — only when one is already set.
+              hasPrivateSpace=null while the profile probe is in flight; gate
+              on === true so we don't briefly flash the field. */}
+          {hasPrivateSpace === true && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">当前隐私空间密码</label>
+              <div className="relative">
+                <input
+                  type={showPpCurrent ? 'text' : 'password'}
+                  value={ppForm.currentPassword}
+                  onChange={e => setPpForm(f => ({ ...f, currentPassword: e.target.value }))}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="输入当前隐私空间密码"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPpCurrent(s => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 dark:text-gray-500"
+                >
+                  {showPpCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">新隐私空间密码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
+              {hasPrivateSpace === true ? '新隐私空间密码' : '隐私空间密码'}
+            </label>
             <input
               type="password"
               value={ppForm.newPassword}
@@ -943,11 +989,16 @@ function SecurityTab() {
           </div>
           <button
             type="submit"
-            disabled={ppSaving || !ppForm.newPassword}
+            disabled={
+              ppSaving ||
+              hasPrivateSpace === null ||
+              !ppForm.newPassword ||
+              (hasPrivateSpace === true && !ppForm.currentPassword)
+            }
             className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             {ppSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {ppSetup ? '修改密码' : '设置密码'}
+            {hasPrivateSpace === true ? '修改密码' : '设置密码'}
           </button>
         </form>
       </section>

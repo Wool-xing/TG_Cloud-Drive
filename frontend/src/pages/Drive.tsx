@@ -151,9 +151,14 @@ export default function Drive({ isPrivate = false }: DriveProps) {
         )}
       </div>
 
-      {contextMenuNode && contextMenuPos && (
-        <FileContextMenu />
-      )}
+      {/* Always mounted. FileContextMenu owns the rename/move/copy/share/lock
+          dialog state in LOCAL React state — gating the component on
+          contextMenuNode unmounted it the instant the menu closed, dropping
+          dialogNode/dialogIds/dialog before the dialog could render. The
+          component already has its own `{node && pos && (...)}` guard for the
+          menu chrome itself, so leaving it mounted only costs a couple of
+          null checks per render. */}
+      <FileContextMenu />
 
       {previewNode && (
         <PreviewModal nodes={nodes} />
