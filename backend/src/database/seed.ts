@@ -25,6 +25,7 @@ import { Node } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
 import { NodeKey } from '../files/entities/node-key.entity';
 import { NodeVersion } from '../files/entities/node-version.entity';
+import { FileRequest } from '../files/entities/file-request.entity';
 import { Tag } from '../files/entities/tag.entity';
 import { Share } from '../shares/entities/share.entity';
 import { VerificationCode } from '../verification/verification.entity';
@@ -41,7 +42,7 @@ async function seed() {
   const ds = new DataSource({
     type: 'postgres',
     url: process.env.DATABASE_URL,
-    entities: [User, Device, AuditLog, Node, FileChunk, NodeKey, NodeVersion, Tag, Share, VerificationCode],
+    entities: [User, Device, AuditLog, Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, Share, VerificationCode],
     synchronize: true,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
   });

@@ -246,4 +246,14 @@ export class FilesController {
   ) {
     return this.filesService.getVersionDownloadInfo(userId, nodeId, versionId);
   }
+
+  @Post(':nodeId/file-request')
+  createFileRequest(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId') nodeId: string,
+    @Body('maxFiles') maxFiles = 100,
+    @Body('ttlHours') ttlHours = 72,
+  ) {
+    return this.filesService.createFileRequest(userId, nodeId, maxFiles, ttlHours);
+  }
 }

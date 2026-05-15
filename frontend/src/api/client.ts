@@ -140,6 +140,8 @@ export const filesApi = {
   createVersion: (nodeId: string) => api.post(`/files/${nodeId}/versions`),
   getVersions: (nodeId: string) => api.get(`/files/${nodeId}/versions`),
   getVersionDownloadInfo: (nodeId: string, versionId: string) => api.get(`/files/${nodeId}/versions/${versionId}/download`),
+  createFileRequest: (nodeId: string, maxFiles: number, ttlHours: number) =>
+    api.post(`/files/${nodeId}/file-request`, { maxFiles, ttlHours }),
   // P1-B14: password 走 body (POST) 避免 URL / access log / 浏览器历史泄露
   getDownloadInfo: (nodeId: string, password?: string) =>
     api.post(`/files/download/${nodeId}`, password ? { password } : {}),
