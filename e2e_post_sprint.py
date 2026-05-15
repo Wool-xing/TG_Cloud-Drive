@@ -13,6 +13,7 @@ user-side manual checks. What this script does cover:
 """
 import os
 import sys
+import subprocess
 import time
 import tempfile
 import secrets
@@ -60,7 +61,8 @@ def ctx_request_text(page, url: str) -> str:
             }""",
             url,
         )
-    except Exception:
+    except Exception as e:
+        print(f"  -- ctx_request_text fetch failed: {e}")
         return ""
 
 
@@ -76,7 +78,8 @@ def login(page, ctx):
         ignore_https_errors=True,
     )
     body = resp.json()
-    assert resp.status == 200, f"login failed: {resp.status} {body}"
+    if resp.status != 200:
+        raise RuntimeError(f"login failed: {resp.status} {body}")
     data = body["data"]
     access = data["accessToken"]
     refresh = data["refreshToken"]
@@ -138,7 +141,6 @@ def i7_test(page):
     # Clear any leftover admin:confirm:* keys from prior test runs — otherwise
     # the lock from previous wrong-pw bursts persists for 15 min, masking the
     # ADMIN_CONFIRM_INVALID path under ADMIN_CONFIRM_LOCKED.
-    import subprocess
     try:
         subprocess.run(
             ["docker", "compose", "-f", "D:/项目文件/TG云盘/docker-compose.yml",
@@ -148,7 +150,7 @@ def i7_test(page):
              "if #k>0 then redis.call('del',unpack(k)) end; return #k", "0"],
             capture_output=True, timeout=10
         )
-    except Exception as e:
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"  -- redis cleanup skipped: {e}")
 
     page.goto(f"{BASE_URL}/admin/users", wait_until="networkidle")
