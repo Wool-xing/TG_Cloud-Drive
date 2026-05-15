@@ -227,4 +227,23 @@ export class FilesController {
   getFolderDownloadList(@CurrentUser('id') userId: string, @Param('nodeId') nodeId: string) {
     return this.filesService.getFolderDownloadList(userId, nodeId);
   }
+
+  @Post(':nodeId/versions')
+  createVersion(@CurrentUser('id') userId: string, @Param('nodeId') nodeId: string) {
+    return this.filesService.createVersion(userId, nodeId);
+  }
+
+  @Get(':nodeId/versions')
+  getVersions(@CurrentUser('id') userId: string, @Param('nodeId') nodeId: string) {
+    return this.filesService.getVersions(userId, nodeId);
+  }
+
+  @Get(':nodeId/versions/:versionId/download')
+  getVersionDownloadInfo(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId') nodeId: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.filesService.getVersionDownloadInfo(userId, nodeId, versionId);
+  }
 }

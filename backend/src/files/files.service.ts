@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { Node, NodeType } from './entities/node.entity';
 import { FileChunk } from './entities/file-chunk.entity';
+import { NodeVersion } from './entities/node-version.entity';
 import { NodeKey } from './entities/node-key.entity';
 import { Tag } from './entities/tag.entity';
 import { User } from '../users/entities/user.entity';
@@ -26,6 +27,7 @@ export class FilesService {
     @InjectRepository(NodeKey) private keyRepo: Repository<NodeKey>,
     @InjectRepository(Tag) private tagRepo: Repository<Tag>,
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(NodeVersion) private versionRepo: Repository<NodeVersion>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @Inject(REDIS_CLIENT) private redis: any,
     private telegramService: TelegramService,
@@ -708,6 +710,48 @@ export class FilesService {
   safeNode(node: Node) {
     const { lockHash, ...rest } = node as any;
     return { ...rest, size: Number(rest.size || 0) };
+  }
+
+  // ─── Version History ────────────────────────────────────────────────────────
+
+  async createVersion(userId: string, nodeId: string) {
+    const node = await this.getNodeOwned(userId, nodeId);
+    if (node.type !== NodeType.FILE) throw new BadRequestException('仅文件支持版本');
+    const chunks = await this.chunkRepo.find({ where: { nodeId }, order: { chunkIndex: 'ASC' } });
+    if (!chunks.length) throw new BadRequestException('文件无分片数据');
+    const key = await this.keyRepo.findOne({ where: { nodeId } });
+    const versionCount = await this.versionRepo.count({ where: { nodeId } });
+
+    const version = this.versionRepo.create({
+      nodeId, version: versionCount + 1, size: Number(node.size),
+      encryptedDek: key?.encryptedDek ?? null,
+      dekIv: key?.iv ?? null,
+      salt: key?.salt ?? null,
+      chunkCount: chunks.length,
+      chunkRefs: chunks.map(c => ({ index: c.chunkIndex, iv: c.iv, telegramFileId: c.tgFileId })),
+    });
+    await this.versionRepo.save(version);
+    await this.audit(userId, 'version.create', nodeId, node.name);
+    return { version: version.version, createdAt: version.createdAt };
+  }
+
+  async getVersions(userId: string, nodeId: string) {
+    await this.getNodeOwned(userId, nodeId);
+    return this.versionRepo.find({ where: { nodeId }, order: { version: 'DESC' }, select: ['id', 'version', 'size', 'createdAt'] });
+  }
+
+  async getVersionDownloadInfo(userId: string, nodeId: string, versionId: string) {
+    await this.getNodeOwned(userId, nodeId);
+    const version = await this.versionRepo.findOne({ where: { id: versionId, nodeId } });
+    if (!version) throw new NotFoundException('版本不存在');
+    return {
+      node: { id: nodeId, size: version.size },
+      key: { encryptedDek: version.encryptedDek, iv: version.dekIv, salt: version.salt },
+      chunks: version.chunkRefs.map(ref => ({
+        iv: ref.iv,
+        url: `https://api.telegram.org/file/bot_dummy/${ref.telegramFileId}`,
+      })),
+    };
   }
 
   private async audit(userId: string, action: string, nodeId: string, nodeName: string) {
