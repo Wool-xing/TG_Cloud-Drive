@@ -24,6 +24,8 @@ import {
   hashPassword,
   comparePassword,
 } from '../common/encryption';
+import { VerificationService } from '../verification/verification.service';
+import { VerificationPurpose } from '../verification/verification.entity';
 
 export interface UpdateProfileDto {
   username?: string;
@@ -35,6 +37,13 @@ export interface UpdateProfileDto {
 export interface ChangePasswordDto {
   oldPassword: string;
   newPassword: string;
+  /**
+   * A8: optional email OTP. Required when the user has a bound email
+   * (server enforces; client just forwards what it collected). Users
+   * without a bound email fall back to the legacy oldPassword-only path
+   * — backward compatible until a profile-bind-email flow exists.
+   */
+  emailCode?: string;
 }
 
 export interface SetPrivateSpaceDto {
@@ -54,6 +63,7 @@ export class UsersService {
     @Inject(REDIS_CLIENT) private redis: any,
     private cs: ConfigService,
     private jwtService: JwtService,
+    private verificationService: VerificationService,
   ) {}
 
   // ─── Profile ─────────────────────────────────────────────────────────────────
@@ -85,6 +95,28 @@ export class UsersService {
 
   // ─── Password ─────────────────────────────────────────────────────────────────
 
+  /**
+   * A8: send an email OTP for the in-session change-password flow.
+   * The target is derived server-side from the authenticated user's stored
+   * email (decrypted via masterKey). Returns 400 if the account has no email
+   * bound, so the client can prompt the user accordingly. Rate-limited by
+   * VerificationService.sendCode (per-target 60s) plus controller @Throttle.
+   */
+  async sendChangePasswordCode(userId: string): Promise<{ message: string; code?: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!user.emailEncrypted || !masterKey) {
+      throw new BadRequestException('当前账号未绑定邮箱，无法启用邮箱验证');
+    }
+    let email: string;
+    try {
+      email = decryptField(user.emailEncrypted, masterKey);
+    } catch {
+      throw new ServiceUnavailableException('邮箱解密失败，请联系管理员');
+    }
+    return this.verificationService.sendCode(email, VerificationPurpose.CHANGE_PASSWORD);
+  }
+
   async changePassword(
     userId: string,
     dto: ChangePasswordDto,
@@ -100,6 +132,31 @@ export class UsersService {
 
     if (dto.oldPassword === dto.newPassword) {
       throw new BadRequestException('新密码不能与旧密码相同');
+    }
+
+    // A8: when the user has a bound email, require an email OTP in addition
+    // to the old password. Defense against stolen-session / stolen-old-password
+    // takeovers (attacker needs inbox access too). Backward-compatible for
+    // users without an email — they keep the legacy oldPassword-only path
+    // until a profile-bind-email flow ships.
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (user.emailEncrypted && masterKey) {
+      if (!dto.emailCode) {
+        throw new BadRequestException('请填写邮箱验证码');
+      }
+      let email: string;
+      try {
+        email = decryptField(user.emailEncrypted, masterKey);
+      } catch {
+        throw new ServiceUnavailableException('邮箱解密失败，请联系管理员');
+      }
+      // verify() throws BadRequestException on bad/expired/locked code,
+      // and atomically marks the code used to prevent replay.
+      await this.verificationService.verify(
+        email,
+        dto.emailCode,
+        VerificationPurpose.CHANGE_PASSWORD,
+      );
     }
 
     user.passwordHash = await hashPassword(dto.newPassword);

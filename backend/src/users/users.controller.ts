@@ -86,6 +86,7 @@ export class UsersController {
    */
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: '修改密码' })
   changePassword(
     @CurrentUser('id') userId: string,
@@ -95,6 +96,19 @@ export class UsersController {
     const ip = req.ip;
     const ua = req.headers['user-agent'];
     return this.usersService.changePassword(userId, dto, ip, ua);
+  }
+
+  /**
+   * A8 POST /users/change-password/send-code
+   * Sends a 6-digit email OTP to the authenticated user's bound email.
+   * Rate-limited per IP (controller) + per-target (verification.service).
+   */
+  @Post('change-password/send-code')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: '获取改密码邮箱验证码' })
+  sendChangePasswordCode(@CurrentUser('id') userId: string) {
+    return this.usersService.sendChangePasswordCode(userId);
   }
 
   /**

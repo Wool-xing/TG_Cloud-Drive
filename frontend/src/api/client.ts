@@ -131,6 +131,7 @@ export const usersApi = {
   profile: () => api.get('/users/profile'),
   updateProfile: (data: any) => api.patch('/users/profile', data),
   changePassword: (data: any) => api.post('/users/change-password', data),
+  sendChangePasswordCode: () => api.post('/users/change-password/send-code', {}),
   devices: () => api.get('/users/devices'),
   revokeDevice: (deviceId: string) => api.delete(`/users/devices/${deviceId}`),
   setupPrivateSpace: (data: any) => api.post('/users/private-space/setup', data),
