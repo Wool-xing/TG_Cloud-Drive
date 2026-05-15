@@ -136,6 +136,7 @@ export const filesApi = {
   star: (nodeId: string) => api.patch(`/files/${nodeId}/star`),
   starred: () => api.get('/files/starred'),
   getPath: (nodeId: string) => api.get(`/files/${nodeId}/path`),
+  getFolderDownloadList: (nodeId: string) => api.get(`/files/folder/${nodeId}/download-list`),
   // P1-B14: password 走 body (POST) 避免 URL / access log / 浏览器历史泄露
   getDownloadInfo: (nodeId: string, password?: string) =>
     api.post(`/files/download/${nodeId}`, password ? { password } : {}),
