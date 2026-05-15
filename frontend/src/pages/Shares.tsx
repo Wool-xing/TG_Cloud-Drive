@@ -171,7 +171,7 @@ export default function Shares() {
           </div>
         ) : shares.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400 dark:text-gray-500">
-            <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
               <Share2 className="w-10 h-10 text-blue-200" />
             </div>
             <p className="text-lg font-medium text-gray-500 dark:text-gray-400">暂无分享</p>

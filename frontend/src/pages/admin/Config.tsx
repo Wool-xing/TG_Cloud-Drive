@@ -114,7 +114,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 dark:bg-gray-900">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white dark:text-gray-100">{title}</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
       </div>
       <div className="px-6 py-5 space-y-4">{children}</div>
     </div>
@@ -335,7 +335,7 @@ export default function AdminConfig() {
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white dark:text-gray-100">系统配置</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">系统配置</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">管理全局系统设置</p>
         </div>
         <button

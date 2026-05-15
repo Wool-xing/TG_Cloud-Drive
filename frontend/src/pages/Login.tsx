@@ -261,7 +261,7 @@ export default function Login() {
     <>
       {showForgot && <ForgotModal onClose={() => setShowForgot(false)} />}
 
-      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 dark:bg-gray-900">
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
         {/* Blue gradient header strip */}
         <div className="h-1.5 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
 

@@ -92,7 +92,7 @@ export default function ConfirmPasswordDialog({
             <div className={`w-9 h-9 rounded-full ${themeIconBg} flex items-center justify-center`}>
               <AlertTriangle className={`w-5 h-5 ${themeIcon}`} />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-gray-100">{title}</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           </div>
           <button
             type="button"

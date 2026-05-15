@@ -55,6 +55,15 @@ function getMimeCategory(node: Node): 'image' | 'video' | 'audio' | 'document' |
   return 'other';
 }
 
+function getTypeLabel(node: Node): string {
+  if (node.type === 'folder') return '文件夹';
+  const labels = {
+    image: '图片', video: '视频', audio: '音频',
+    document: '文档', archive: '压缩包', other: '其他',
+  };
+  return labels[getMimeCategory(node)];
+}
+
 function getMimeIcon(mimeType?: string) {
   if (!mimeType) return <File className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
   if (mimeType.startsWith('image/')) return <Image className="w-5 h-5 text-purple-500" />;
@@ -148,7 +157,7 @@ export default function Starred() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 dark:bg-gray-800 dark:border-gray-700">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 dark:border-gray-700">
         <Star className="w-5 h-5 text-yellow-400 fill-yellow-300" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
           我的收藏
@@ -211,7 +220,7 @@ export default function Starred() {
                   {/* Type */}
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                      {node.type === 'folder' ? '文件夹' : (node.mimeType?.split('/')[0] ?? '文件')}
+                      {node.type === 'folder' ? '文件夹' : getTypeLabel(node)}
                     </span>
                   </td>
 

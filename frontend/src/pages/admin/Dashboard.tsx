@@ -107,7 +107,7 @@ export default function AdminDashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white dark:text-gray-100">仪表盘</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">仪表盘</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">系统运行概览</p>
       </div>
 
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
         {/* Recent audit logs */}
         <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white dark:text-gray-100">最近操作日志</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">最近操作日志</h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">最近 20 条</span>
           </div>
           <div className="overflow-x-auto">
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
         {/* Top storage users */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white dark:text-gray-100">存储使用 Top 10</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">存储使用 Top 10</h2>
             <TrendingUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
           </div>
           <div className="p-4 space-y-3">

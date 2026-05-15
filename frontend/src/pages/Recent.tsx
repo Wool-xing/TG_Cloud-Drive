@@ -127,7 +127,7 @@ export default function Recent() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 dark:bg-gray-800 dark:border-gray-700">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 dark:border-gray-700">
         <Clock className="w-5 h-5 text-blue-500 shrink-0" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
           最近访问
