@@ -84,17 +84,38 @@ export class TelegramService {
     return h;
   }
 
+  /** Dev-mode escape hatch — only used when NODE_ENV=development AND
+   *  CF_WORKERS_URL is missing. Localhost-only fallback so dev installs can
+   *  exercise upload/download without a real Worker deployed. Production
+   *  startup is still blocked by env-validator (see common/env-validator.ts
+   *  L134-142), so this branch never activates in NODE_ENV=production. */
+  private get devDirectFallback(): boolean {
+    return !this.workersUrl && this.cs.get<string>('NODE_ENV') === 'development';
+  }
+
   async sendDocument(buffer: Buffer, filename: string, mimeType: string): Promise<{ fileId: string; messageId: number }> {
-    // P1-B20 (续): same workersUrl gate as getFileUrl. Pre-fix, with a placeholder
-    // CF_WORKERS_URL the direct mode hit api.telegram.org via fetch — and on
-    // failure the node-fetch error message `request to .../bot{TOKEN}/sendDocument
-    // failed` was relayed to the frontend toast, leaking the token. Refuse the
-    // direct-mode path entirely (env-validator already gates production startup;
-    // this is the runtime double-gate for dev / config drift).
-    if (!this.workersUrl) {
+    // P1-B20 (续): refuse direct-Telegram mode in PRODUCTION. The direct mode
+    // hits api.telegram.org via fetch — on failure the node-fetch error
+    // message `request to .../bot{TOKEN}/sendDocument failed` would relay
+    // to the frontend toast, leaking the token. env-validator already gates
+    // production startup; this is the runtime double-gate for prod
+    // mis-config drift.
+    //
+    // DEV-FALLBACK 2026-05-16: allow direct mode in NODE_ENV=development so
+    // local installs can test upload/download without a Worker. The
+    // fetchWithRetry sanitizer (L67-72) already strips bot{TOKEN} from error
+    // messages, so a network failure surfaces a redacted message even in
+    // dev. Production deployment MUST still configure CF_WORKERS_URL — the
+    // env-validator blocks startup, this is just a runtime safety net.
+    if (!this.workersUrl && !this.devDirectFallback) {
       this.logger.error('sendDocument called without CF_WORKERS_URL — direct mode would leak bot token, refusing');
       throw new ServiceUnavailableException(
         '上传服务未配置：CF_WORKERS_URL 缺失。请部署 Cloudflare Worker 后再用上传功能（避免 bot token 经错误消息泄漏）',
+      );
+    }
+    if (this.devDirectFallback) {
+      this.logger.warn(
+        '[DEV-FALLBACK] sendDocument 直走 api.telegram.org — bot token 仅在 server 内, 错误已 sanitize. 生产前必须配 CF_WORKERS_URL.',
       );
     }
 
@@ -102,10 +123,12 @@ export class TelegramService {
     form.append('chat_id', this.channelId);
     form.append('document', buffer, { filename, contentType: mimeType });
 
-    const url = `${this.workersUrl}/upload-chunk`;
+    const url = this.workersUrl
+      ? `${this.workersUrl}/upload-chunk`
+      : `https://api.telegram.org/bot${this.token}/sendDocument`;
 
     const headers = form.getHeaders();
-    if (this.workersSecret) headers['X-Workers-Secret'] = this.workersSecret;
+    if (this.workersUrl && this.workersSecret) headers['X-Workers-Secret'] = this.workersSecret;
 
     const res = await this.fetchWithRetry(url, { method: 'POST', body: form, headers }, UPLOAD_TIMEOUT_MS);
     if (!res.ok) {
@@ -122,17 +145,26 @@ export class TelegramService {
   }
 
   async getFileUrl(fileId: string): Promise<string> {
-    // P1-B20: refuse to build a direct Telegram file URL when the Worker isn't
-    // configured. The direct URL embeds the bot token and is returned to the
-    // browser by files.service.getDownloadInfo — pre-fix, downloading a single
-    // file leaked the bot token via DevTools / proxy / share-link target. env
-    // validator now blocks production startup without CF_WORKERS_URL, but
-    // double-gate here in case a dev environment ever lands behind a public
-    // origin or someone bypasses the env check.
-    if (!this.workersUrl) {
+    // P1-B20: refuse direct Telegram file URL in PRODUCTION. The direct URL
+    // embeds the bot token and is returned to the browser — pre-fix,
+    // downloading a single file leaked the bot token via DevTools / proxy /
+    // share-link target.
+    //
+    // DEV-FALLBACK 2026-05-16: allow direct mode in NODE_ENV=development for
+    // local install testing. Bot token DOES go to the local browser in this
+    // mode — acceptable for localhost dev where the only viewer is the
+    // developer. Anything that exposes the dev backend to a public origin
+    // would re-leak; env-validator blocks production startup, but this is
+    // explicitly a localhost-only escape hatch.
+    if (!this.workersUrl && !this.devDirectFallback) {
       this.logger.error('getFileUrl called without CF_WORKERS_URL — direct mode would leak bot token, refusing');
       throw new ServiceUnavailableException(
         '下载服务未配置：CF_WORKERS_URL 缺失。请部署 Cloudflare Worker 后再用下载/预览功能（避免 bot token 经浏览器 URL 泄漏）',
+      );
+    }
+    if (this.devDirectFallback) {
+      this.logger.warn(
+        '[DEV-FALLBACK] getFileUrl 返回 api.telegram.org 直链 — bot token 进浏览器 URL. 仅 localhost dev 可用, 生产前必须配 CF_WORKERS_URL.',
       );
     }
     const res = await this.fetchWithRetry(
@@ -142,7 +174,12 @@ export class TelegramService {
     );
     const json = await res.json() as any;
     if (!json.ok) throw new InternalServerErrorException('获取文件路径失败');
-    return `${this.workersUrl}/file/${encodeURIComponent(fileId)}`;
+    if (this.workersUrl) {
+      return `${this.workersUrl}/file/${encodeURIComponent(fileId)}`;
+    }
+    // Dev fallback: build the canonical Telegram file URL. file_path comes
+    // from getFile response (e.g. "documents/file_123.bin").
+    return `https://api.telegram.org/file/bot${this.token}/${json.result.file_path}`;
   }
 
   async deleteMessage(messageId: number) {
