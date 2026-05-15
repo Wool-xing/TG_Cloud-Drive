@@ -28,7 +28,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 BASE_URL = "https://localhost"
 ADMIN_USER = "admin"
-ADMIN_PW = "1HeIDXEOCCrxsETa9M4yVk7g"
+ADMIN_PW = "admin"
 
 VICTIM_ID = "a60eba0a-0f86-49fe-90e3-73702862ec49"
 VICTIM_USERNAME = "a6_real_7103"
