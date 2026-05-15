@@ -226,12 +226,14 @@ export default function Login() {
       setAuth(res.user, res.accessToken, res.refreshToken, res.mekSalt, rememberMe);
       await deriveMEK(password);
       // P1-UX: tell the browser explicitly to remember this credential pair.
-      // Pre-fix only autoComplete attrs were set, but Chrome / Edge often
-      // captures the username and misses the password (the user reported
-      // "下次只填用户名"). The Credential Management API removes the guess —
-      // we pass both identifiers, the password manager stores them as a
-      // matched pair, next visit autofills both fields.
-      if (rememberMe && typeof window !== 'undefined' && 'PasswordCredential' in window) {
+      // Pre-fix the call was gated on rememberMe — but rememberMe is about
+      // long-lived refresh-token persistence, not browser password storage.
+      // The browser's own "save password?" prompt is also gated by the user
+      // anyway. We always offer the pair to the password manager; Chrome /
+      // Edge then merges it with their own prompt so the next visit can
+      // autofill both username AND password (pre-fix Chrome sometimes stored
+      // only the username, breaking the autofill chain on the next login).
+      if (typeof window !== 'undefined' && 'PasswordCredential' in window) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const PC = (window as any).PasswordCredential;
