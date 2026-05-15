@@ -251,9 +251,12 @@ function BindEmailDialog(props: {
   const { currentEmail, onCancel, onBound } = props;
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [oldCode, setOldCode] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingOld, setSendingOld] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [oldCountdown, setOldCountdown] = useState(0);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -261,7 +264,15 @@ function BindEmailDialog(props: {
     return () => window.clearTimeout(t);
   }, [countdown]);
 
+  useEffect(() => {
+    if (oldCountdown <= 0) return;
+    const t = window.setTimeout(() => setOldCountdown(c => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [oldCountdown]);
+
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  // A11: when there's a currently-bound email, require the old-side OTP too.
+  const needOldCode = !!currentEmail;
 
   const handleSend = async () => {
     if (!validEmail) {
@@ -284,12 +295,33 @@ function BindEmailDialog(props: {
     }
   };
 
+  const handleSendOld = async () => {
+    setSendingOld(true);
+    try {
+      await usersApi.sendBindEmailOldCode();
+      toast.success('已发送到当前邮箱');
+      setOldCountdown(60);
+    } catch {
+      // interceptor
+    } finally {
+      setSendingOld(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validEmail || code.length !== 6) return;
+    if (needOldCode && oldCode.length !== 6) {
+      toast.error('请填写旧邮箱验证码');
+      return;
+    }
     setSubmitting(true);
     try {
-      await usersApi.bindEmail({ email, code });
+      await usersApi.bindEmail({
+        email,
+        code,
+        ...(needOldCode ? { oldEmailCode: oldCode } : {}),
+      });
       toast.success(currentEmail ? '邮箱更换成功' : '邮箱绑定成功');
       onBound(email);
     } catch {
@@ -341,6 +373,33 @@ function BindEmailDialog(props: {
               </button>
             </div>
           </div>
+          {needOldCode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">旧邮箱验证码</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={oldCode}
+                  onChange={e => setOldCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="6 位数字验证码"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendOld}
+                  disabled={sendingOld || oldCountdown > 0}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
+                >
+                  {sendingOld && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
+                  {oldCountdown > 0 ? `${oldCountdown}s 后重发` : '发送到当前邮箱'}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {currentEmail}（双重验证防接管）</p>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -351,7 +410,12 @@ function BindEmailDialog(props: {
             </button>
             <button
               type="submit"
-              disabled={submitting || !validEmail || code.length !== 6}
+              disabled={
+                submitting ||
+                !validEmail ||
+                code.length !== 6 ||
+                (needOldCode && oldCode.length !== 6)
+              }
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}

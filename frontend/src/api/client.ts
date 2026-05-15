@@ -133,7 +133,9 @@ export const usersApi = {
   changePassword: (data: any) => api.post('/users/change-password', data),
   sendChangePasswordCode: () => api.post('/users/change-password/send-code', {}),
   sendBindEmailCode: (email: string) => api.post('/users/bind-email/send-code', { email }),
-  bindEmail: (data: { email: string; code: string }) => api.post('/users/bind-email', data),
+  sendBindEmailOldCode: () => api.post('/users/bind-email/send-code-old', {}),
+  bindEmail: (data: { email: string; code: string; oldEmailCode?: string }) =>
+    api.post('/users/bind-email', data),
   devices: () => api.get('/users/devices'),
   revokeDevice: (deviceId: string) => api.delete(`/users/devices/${deviceId}`),
   setupPrivateSpace: (data: any) => api.post('/users/private-space/setup', data),

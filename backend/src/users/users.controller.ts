@@ -67,6 +67,14 @@ class BindEmailDto {
   @MinLength(6)
   @MaxLength(6)
   code!: string;
+
+  // A11: required server-side when changing an already-bound email.
+  // Optional in the DTO so first-time bind doesn't need it.
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(6)
+  oldEmailCode?: string;
 }
 
 @ApiTags('用户')
@@ -146,8 +154,22 @@ export class UsersController {
   }
 
   /**
+   * A11 POST /users/bind-email/send-code-old
+   * Sends an OTP to the user's currently-bound email — used as the old-side
+   * factor when changing email. First-time bind doesn't need it (no old side).
+   */
+  @Post('bind-email/send-code-old')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: '获取换邮箱旧邮箱验证码' })
+  sendBindEmailOldCode(@CurrentUser('id') userId: string) {
+    return this.usersService.sendBindEmailOldCode(userId);
+  }
+
+  /**
    * A8 follow-up POST /users/bind-email
    * Atomically updates emailEncrypted + emailHash after OTP verification.
+   * A11: when an email is already bound, an oldEmailCode is also required.
    */
   @Post('bind-email')
   @HttpCode(HttpStatus.OK)
@@ -158,7 +180,9 @@ export class UsersController {
     @Body() dto: BindEmailDto,
     @Req() req: Request,
   ) {
-    return this.usersService.bindEmail(userId, dto.email, dto.code, req.ip, req.headers['user-agent']);
+    return this.usersService.bindEmail(
+      userId, dto.email, dto.code, dto.oldEmailCode, req.ip, req.headers['user-agent'],
+    );
   }
 
   /**
