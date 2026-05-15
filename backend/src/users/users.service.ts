@@ -133,10 +133,35 @@ export class UsersService {
     return this.verificationService.sendCode(email, VerificationPurpose.CHANGE_EMAIL);
   }
 
+  /**
+   * A11: send an OTP to the user's CURRENT bound email, to use as the
+   * old-side proof in a change-email dual-confirm. Caller must be authed.
+   * Only meaningful when the account already has an email bound — first-time
+   * bind has no old side and skips this entire flow.
+   */
+  async sendBindEmailOldCode(userId: string): Promise<{ message: string; code?: string }> {
+    const user = await this.findUserOrFail(userId);
+    const masterKey = this.cs.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKey) {
+      throw new ServiceUnavailableException('服务加密配置异常，请联系管理员');
+    }
+    if (!user.emailEncrypted) {
+      throw new BadRequestException('当前账号未绑定邮箱，首次绑定无需旧邮箱验证');
+    }
+    let oldEmail: string;
+    try {
+      oldEmail = decryptField(user.emailEncrypted, masterKey);
+    } catch {
+      throw new ServiceUnavailableException('邮箱解密失败，请联系管理员');
+    }
+    return this.verificationService.sendCode(oldEmail, VerificationPurpose.CHANGE_EMAIL);
+  }
+
   async bindEmail(
     userId: string,
     rawEmail: string,
     code: string,
+    oldEmailCode?: string,
     ip?: string,
     ua?: string,
   ): Promise<{ message: string }> {
@@ -154,6 +179,30 @@ export class UsersService {
     const dup = await this.userRepo.findOne({ where: { emailHash: newHash } });
     if (dup && dup.id !== userId) {
       throw new ConflictException('该邮箱已被其他账号占用');
+    }
+
+    // A11: dual-confirm for change-email. If the user already has an email
+    // bound, require an OTP delivered to the OLD address in addition to the
+    // new-address OTP. This blocks the A8-bypass attack chain where a stolen
+    // session is used to swap the bound email to the attacker's inbox and
+    // then trigger change-password — without the old-side OTP the attacker
+    // cannot complete the swap. First-time bind (no emailEncrypted) keeps
+    // the single-factor flow since there is no old side to confirm.
+    if (user.emailEncrypted) {
+      if (!oldEmailCode) {
+        throw new BadRequestException('更换邮箱需要旧邮箱验证码');
+      }
+      let oldEmail: string;
+      try {
+        oldEmail = decryptField(user.emailEncrypted, masterKey);
+      } catch {
+        throw new ServiceUnavailableException('邮箱解密失败，请联系管理员');
+      }
+      await this.verificationService.verify(
+        oldEmail,
+        oldEmailCode,
+        VerificationPurpose.CHANGE_EMAIL,
+      );
     }
 
     // verify() throws on bad/expired/locked code and atomically marks used.
