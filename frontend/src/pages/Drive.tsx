@@ -4,6 +4,7 @@ import { UploadCloud, FolderUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { filesApi } from '../api/client';
+import { useAuthStore } from '../stores/auth.store';
 import { useFileStore } from '../stores/file.store';
 import { useUploadStore } from '../stores/upload.store';
 import { Node } from '../types';
@@ -20,6 +21,23 @@ interface DriveProps {
 
 export default function Drive({ isPrivate = false }: DriveProps) {
   const queryClient = useQueryClient();
+  const user = useAuthStore(s => s.user);
+  const warned80 = useRef(false);
+  const warned95 = useRef(false);
+
+  // Quota warning — toast once per session at 80% / 95% thresholds
+  useEffect(() => {
+    if (!user || !user.quotaBytes) return;
+    const pct = (user.usedBytes / user.quotaBytes) * 100;
+    if (pct >= 95 && !warned95.current) {
+      warned95.current = true;
+      toast.error(`存储空间已使用 ${pct.toFixed(1)}%，即将达到上限，请清理文件或联系管理员扩容`, { duration: 8000 });
+    } else if (pct >= 80 && !warned80.current) {
+      warned80.current = true;
+      toast(`存储空间已使用 ${pct.toFixed(1)}%，建议清理不需要的文件`, { icon: '⚠️', duration: 6000 });
+    }
+  }, [user?.usedBytes, user?.quotaBytes]);
+
   const {
     currentParentId,
     isPrivate: storePrivate,
