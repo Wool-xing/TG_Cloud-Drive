@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   FolderPlus,
   Trash2,
@@ -14,6 +14,9 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  FileText,
+  File,
+  ChevronDown,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -53,7 +56,20 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
   const [newFolderMode, setNewFolderMode] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [createMode, setCreateMode] = useState<'folder' | 'document'>('folder');
+  const [createMime, setCreateMime] = useState('');
+  const [createExt, setCreateExt] = useState('');
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const newMenuRef = useRef<HTMLDivElement>(null);
   const [dialog, setDialog] = useState<DialogType>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) setNewMenuOpen(false);
+    };
+    if (newMenuOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [newMenuOpen]);
 
   const selectedCount = selectedIds.size;
   const selectedArray = Array.from(selectedIds);
@@ -68,17 +84,23 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       setNewFolderName('');
       return;
     }
-    if (e.key === 'Enter') await submitNewFolder();
+    if (e.key === 'Enter') await submitNewItem();
   };
 
-  const submitNewFolder = async () => {
+  const submitNewItem = async () => {
     const name = newFolderName.trim();
-    if (!name) { toast.error('文件夹名称不能为空'); return; }
+    if (!name) { toast.error('名称不能为空'); return; }
     setCreatingFolder(true);
     try {
-      await filesApi.createFolder({ name, parentId: currentParentId, private: isPrivate });
+      if (createMode === 'folder') {
+        await filesApi.createFolder({ name, parentId: currentParentId, private: isPrivate });
+        toast.success(`文件夹 "${name}" 已创建`);
+      } else {
+        const finalName = name.endsWith(createExt) ? name : name + createExt;
+        await filesApi.createDocument({ name: finalName, parentId: currentParentId, mimeType: createMime, private: isPrivate });
+        toast.success(`文件 "${finalName}" 已创建`);
+      }
       invalidateFiles();
-      toast.success(`文件夹 "${name}" 已创建`);
       setNewFolderMode(false);
       setNewFolderName('');
     } catch {
@@ -187,6 +209,54 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
     }
   };
 
+  const NEW_ITEMS = [
+    { label: '文件夹', icon: <FolderPlus className="w-4 h-4" />, mode: 'folder' as const, ext: '', mime: '' },
+    { label: '文本文档', icon: <FileText className="w-4 h-4" />, mode: 'document' as const, ext: '.txt', mime: 'text/plain' },
+    { label: 'Markdown', icon: <FileText className="w-4 h-4" />, mode: 'document' as const, ext: '.md', mime: 'text/markdown' },
+    { label: 'Word 文档', icon: <File className="w-4 h-4 text-blue-500" />, mode: 'document' as const, ext: '.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    { label: 'Excel 表格', icon: <File className="w-4 h-4 text-green-500" />, mode: 'document' as const, ext: '.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    { label: 'PPT 演示', icon: <File className="w-4 h-4 text-orange-500" />, mode: 'document' as const, ext: '.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
+  ];
+
+  const NewDropdown = () => (
+    <div ref={newMenuRef} className="relative">
+      <button
+        onClick={() => setNewMenuOpen(v => !v)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+      >
+        <FolderPlus className="w-4 h-4" />
+        新建
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${newMenuOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {newMenuOpen && (
+        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-[150px]">
+          {NEW_ITEMS.map(item => (
+            <button
+              key={item.label}
+              onClick={() => {
+                setCreateMode(item.mode);
+                setCreateMime(item.mime);
+                setCreateExt(item.ext);
+                setNewFolderMode(true);
+                setNewMenuOpen(false);
+                // Auto-fill name for convenience
+                if (item.mode === 'folder') {
+                  setNewFolderName('新建文件夹');
+                } else {
+                  setNewFolderName(`未命名${item.ext}`);
+                }
+              }}
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const BtnSm = ({
     icon, label, onClick, danger = false,
   }: {
@@ -278,7 +348,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
           )}
         </div>
 
-        {/* Right side: new folder */}
+        {/* Right side: new dropdown */}
         <div className="flex items-center gap-2">
           {newFolderMode ? (
             <div className="flex items-center gap-1.5">
@@ -289,16 +359,16 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={handleNewFolderKeyDown}
                 onBlur={() => {
-                  if (newFolderName.trim()) submitNewFolder();
+                  if (newFolderName.trim()) submitNewItem();
                   else { setNewFolderMode(false); setNewFolderName(''); }
                 }}
-                placeholder="文件夹名称"
+                placeholder={createMode === 'folder' ? '文件夹名称' : '文件名称'}
                 maxLength={500}
                 className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 dark:text-gray-100"
                 disabled={creatingFolder}
               />
               <button
-                onClick={submitNewFolder}
+                onClick={submitNewItem}
                 disabled={creatingFolder}
                 className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
@@ -312,13 +382,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => setNewFolderMode(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700/50"
-            >
-              <FolderPlus className="w-4 h-4" />
-              新建文件夹
-            </button>
+            <NewDropdown />
           )}
         </div>
       </div>
