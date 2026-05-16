@@ -95,13 +95,13 @@ export class AdminService {
     ip?: string,
     ua?: string,
   ): Promise<any> {
-    if (adminId === userId) {
-      throw new BadRequestException('不能修改自身账户角色或状态');
-    }
-
     // P1-I7: role / status changes are high-risk (privilege escalation, account
     // lockout). Quota / nickname / username changes are cosmetic — keep them
     // free of MFA so admin UX stays usable.
+    // Self-edit only blocked for role/status changes; admin CAN adjust own quota.
+    if ((dto.role !== undefined || dto.status !== undefined) && adminId === userId) {
+      throw new BadRequestException('不能修改自身账户角色或状态');
+    }
     if (dto.role !== undefined || dto.status !== undefined) {
       await this.requireConfirm(adminId, dto.confirmPassword);
     }
@@ -252,6 +252,8 @@ export class AdminService {
     userId?: string,
     search?: string,
     type?: string,
+    sortField = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
   ): Promise<{ files: any[]; total: number; page: number; limit: number }> {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
@@ -286,12 +288,15 @@ export class AdminService {
       return qb;
     };
 
+    const sortCol = ['name', 'size', 'createdAt', 'updatedAt'].includes(sortField) ? sortField : 'createdAt';
+    const sortDir = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
     const total = await buildBase().getCount();
 
     // Step 1: get paginated IDs with no joins (safe LIMIT/OFFSET)
     const idRows = await buildBase()
       .select('n.id')
-      .orderBy('n.createdAt', 'DESC')
+      .orderBy(`n.${sortCol}`, sortDir)
       .skip((safePage - 1) * safeLimit)
       .take(safeLimit)
       .getMany();
@@ -306,7 +311,7 @@ export class AdminService {
       .createQueryBuilder('n')
       .leftJoinAndSelect('n.user', 'u')
       .where('n.id IN (:...nodeIds)', { nodeIds })
-      .orderBy('n.createdAt', 'DESC')
+      .orderBy(`n.${sortCol}`, sortDir)
       .getMany();
 
     const items = nodes.map(n => ({

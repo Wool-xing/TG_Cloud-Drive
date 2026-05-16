@@ -5,6 +5,8 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   File,
   Folder,
   Image,
@@ -70,7 +72,20 @@ function typeLabel(type: string): string {
   }
 }
 
-interface AdminNode extends Node {
+  const SortTh = ({ field, label, visible }: { field: string; label: string; visible: boolean | string }) => {
+    const isActive = sortField === field;
+    const visibility = visible === true ? '' : visible === false ? 'hidden' : `hidden ${visible}:table-cell`;
+    return (
+      <th className={`px-4 py-3 text-left text-xs font-medium uppercase select-none cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 text-gray-500 dark:text-gray-400 ${visibility}`} onClick={() => { if (visible) toggleSort(field); }}>
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {isActive && (sortOrder === 'ASC' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+        </span>
+      </th>
+    );
+  };
+
+  interface AdminNode extends Node {
   username?: string;
 }
 
@@ -79,12 +94,20 @@ export default function AdminFiles() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
+  const [sortField, setSortField] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [deleteTarget, setDeleteTarget] = useState<AdminNode | null>(null);
 
+  const toggleSort = (field: string) => {
+    if (sortField === field) setSortOrder(o => o === 'ASC' ? 'DESC' : 'ASC');
+    else { setSortField(field); setSortOrder('DESC'); }
+    setPage(1);
+  };
+
   const { data, isLoading } = useQuery<{ files: AdminNode[]; total: number }>({
-    queryKey: ['admin', 'files', search, page, typeFilter],
+    queryKey: ['admin', 'files', search, page, typeFilter, sortField, sortOrder],
     queryFn: async () => {
-      const params: Record<string, any> = { page, limit: PAGE_SIZE };
+      const params: Record<string, any> = { page, limit: PAGE_SIZE, sort: sortField, order: sortOrder };
       if (search) params.search = search;
       if (typeFilter) params.type = typeFilter;
       const res = await adminApi.files(params) as any;
@@ -150,11 +173,11 @@ export default function AdminFiles() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">文件名</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">类型</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">所有者</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">大小</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden xl:table-cell">上传时间</th>
+                <SortTh field="name" label="文件名" visible />
+                <SortTh field="type" label="类型" visible="md" />
+                <SortTh field="userId" label="所有者" visible="md" />
+                <SortTh field="size" label="大小" visible="lg" />
+                <SortTh field="createdAt" label="上传时间" visible="xl" />
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">操作</th>
               </tr>
             </thead>
