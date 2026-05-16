@@ -72,19 +72,6 @@ function typeLabel(type: string): string {
   }
 }
 
-  const SortTh = ({ field, label, visible }: { field: string; label: string; visible: boolean | string }) => {
-    const isActive = sortField === field;
-    const visibility = visible === true ? '' : visible === false ? 'hidden' : `hidden ${visible}:table-cell`;
-    return (
-      <th className={`px-4 py-3 text-left text-xs font-medium uppercase select-none cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 text-gray-500 dark:text-gray-400 ${visibility}`} onClick={() => { if (visible) toggleSort(field); }}>
-        <span className="inline-flex items-center gap-1">
-          {label}
-          {isActive && (sortOrder === 'ASC' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-        </span>
-      </th>
-    );
-  };
-
   interface AdminNode extends Node {
   username?: string;
 }
@@ -119,6 +106,19 @@ export default function AdminFiles() {
   const files = data?.files ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const SortTh = ({ field, label, visible }: { field: string; label: string; visible: boolean | string }) => {
+    const isActive = sortField === field;
+    const v = visible === true ? '' : visible === false ? 'hidden' : `hidden ${visible}:table-cell`;
+    return (
+      <th className={`px-4 py-3 text-left text-xs font-medium uppercase select-none cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 text-gray-500 dark:text-gray-400 ${v}`} onClick={() => { if (visible) toggleSort(field); }}>
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {isActive && (sortOrder === 'ASC' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+        </span>
+      </th>
+    );
+  };
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'files'] });
 
