@@ -13,6 +13,7 @@ import { MailModule } from './mail/mail.module';
 import { VerificationModule } from './verification/verification.module';
 import { WebdavModule } from './webdav/webdav.module';
 import { RedisModule } from './common/redis/redis.module';
+import { StorageModule } from './storage/storage.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -52,6 +53,7 @@ import configuration from './config/configuration';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
 
     RedisModule,
+    StorageModule,
     AuthModule,
     UsersModule,
     FilesModule,

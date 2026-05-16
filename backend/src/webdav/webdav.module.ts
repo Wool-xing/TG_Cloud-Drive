@@ -6,7 +6,6 @@ import { Node } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
 import { NodeKey } from '../files/entities/node-key.entity';
 import { User } from '../users/entities/user.entity';
-import { TelegramModule } from '../telegram/telegram.module';
 import { WebdavController } from './webdav.controller';
 import { WebdavService } from './webdav.service';
 
@@ -18,7 +17,6 @@ import { WebdavService } from './webdav.service';
       inject: [ConfigService],
       useFactory: (cs: ConfigService) => ({ secret: cs.get<string>('JWT_SECRET') }),
     }),
-    TelegramModule,
   ],
   controllers: [WebdavController],
   providers: [WebdavService],

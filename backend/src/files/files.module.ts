@@ -16,7 +16,6 @@ import { TelegramModule } from '../telegram/telegram.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, User, AuditLog]),
-    TelegramModule,
   ],
   controllers: [FilesController, FileRequestController],
   providers: [FilesService],

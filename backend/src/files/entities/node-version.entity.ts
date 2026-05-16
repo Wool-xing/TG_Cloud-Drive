@@ -33,7 +33,13 @@ export class NodeVersion {
   chunkCount: number;
 
   @Column('jsonb')
-  chunkRefs: { index: number; iv: string; telegramFileId: string }[];
+  chunkRefs: {
+    index: number;
+    iv: string;
+    telegramFileId: string;
+    storageBackend?: string;
+    r2Key?: string | null;
+  }[];
 
   @CreateDateColumn()
   createdAt: Date;

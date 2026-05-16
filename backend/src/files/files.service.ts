@@ -14,7 +14,7 @@ import { NodeKey } from './entities/node-key.entity';
 import { Tag } from './entities/tag.entity';
 import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
-import { TelegramService } from '../telegram/telegram.service';
+import { StorageService } from '../storage/storage.service';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
 import { comparePassword, hashPassword, generateSecureToken } from '../common/encryption';
 
@@ -32,7 +32,7 @@ export class FilesService {
     @InjectRepository(FileRequest) private fileRequestRepo: Repository<FileRequest>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @Inject(REDIS_CLIENT) private redis: any,
-    private telegramService: TelegramService,
+    private storage: StorageService,
     private cs: ConfigService,
   ) {}
 
@@ -102,14 +102,21 @@ export class FilesService {
     if (empty) return this.safeNode(node);
     const buffer = Buffer.from(contentBase64!, 'base64');
 
-    const tgResult = await this.telegramService.sendDocument(buffer, name, mimeType);
+    const backend = this.storage.getPrimary();
+    const r2Key = backend === 'r2' ? this.storage.buildR2Key(userId, node.id, 0) : undefined;
+    const result = await this.storage.upload(backend, buffer, r2Key || name, mimeType);
     await this.chunkRepo.save(this.chunkRepo.create({
-      nodeId: node.id, chunkIndex: 0, tgFileId: tgResult.fileId,
-      tgMessageId: tgResult.messageId, size: buffer.length, iv: '000000000000000000000000',
+      nodeId: node.id, chunkIndex: 0,
+      storageBackend: backend,
+      tgFileId: result.providerKey,
+      tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
+      r2Key: r2Key || null,
+      r2Etag: result.etag || null,
+      size: buffer.length, iv: '000000000000000000000000',
     }));
     await this.nodeRepo.update(node.id, { size: buffer.length });
-    if (tgResult.thumbnailFileId) {
-      await this.nodeRepo.update(node.id, { thumbnailFileId: tgResult.thumbnailFileId });
+    if (result.thumbnailFileId) {
+      await this.nodeRepo.update(node.id, { thumbnailFileId: result.thumbnailFileId });
     }
     await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
     return this.safeNode(node);
@@ -167,9 +174,16 @@ export class FilesService {
     if (!chunkIv) {
       throw new BadRequestException('缺少分片加密 IV (chunkIv)，无法保存');
     }
-    const tgResult = await this.telegramService.sendDocument(buffer, `chunk_${chunkIndex}`, 'application/octet-stream');
+    const backend = this.storage.getPrimary();
+    const r2Key = this.storage.buildR2Key(userId, nodeId, chunkIndex);
+    const result = await this.storage.upload(backend, buffer, r2Key, 'application/octet-stream');
     await this.chunkRepo.save(this.chunkRepo.create({
-      nodeId, chunkIndex, tgFileId: tgResult.fileId, tgMessageId: tgResult.messageId,
+      nodeId, chunkIndex,
+      storageBackend: backend,
+      tgFileId: result.providerKey,
+      tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
+      r2Key,
+      r2Etag: result.etag || null,
       size: buffer.length, checksum: crypto.createHash('md5').update(buffer).digest('hex'),
       iv: chunkIv,
     }));
@@ -216,7 +230,10 @@ export class FilesService {
     // chunk decryption. key.iv is only for unwrapping the DEK with MEK.
     const chunkInfos = await Promise.all(
       chunks.map(async c => ({
-        url: await this.telegramService.getFileUrl(c.tgFileId),
+        url: await this.storage.getUrl(
+          (c.storageBackend || 'telegram') as any,
+          c.storageBackend === 'r2' ? c.r2Key! : c.tgFileId!,
+        ),
         iv: c.iv,
       })),
     );
@@ -316,8 +333,11 @@ export class FilesService {
           await this.chunkRepo.save(this.chunkRepo.create({
             nodeId: dest.id,
             chunkIndex: c.chunkIndex,
+            storageBackend: c.storageBackend || 'telegram',
             tgFileId: c.tgFileId,
             tgMessageId: c.tgMessageId,
+            r2Key: c.r2Key,
+            r2Etag: c.r2Etag,
             size: c.size,
             checksum: c.checksum,
             iv: c.iv,
@@ -450,9 +470,18 @@ export class FilesService {
         await this.userRepo.decrement({ id: userId }, 'usedBytes', Number(node.size));
       }
       const chunks = await this.chunkRepo.find({ where: { nodeId: node.id } });
+      const r2Keys: string[] = [];
       for (const c of chunks) {
-        if (c.tgMessageId) await this.telegramService.deleteMessage(c.tgMessageId).catch(() => {});
+        if (c.storageBackend === 'r2' && c.r2Key) {
+          r2Keys.push(c.r2Key);
+        } else if (c.storageBackend === 'telegram' && c.tgMessageId) {
+          await this.storage.delete('telegram', c.tgFileId, String(c.tgMessageId)).catch(() => {});
+        } else if (c.tgMessageId) {
+          // Legacy chunks without storageBackend — assume Telegram
+          await this.storage.delete('telegram', c.tgFileId, String(c.tgMessageId)).catch(() => {});
+        }
       }
+      if (r2Keys.length > 0) await this.storage.deleteMany(r2Keys).catch(() => {});
       await this.nodeRepo.delete(node.id);
     }
     return { message: '永久删除成功' };
@@ -700,11 +729,18 @@ export class FilesService {
     const node = await this.getNodeOwned(userId, nodeId);
     if (node.type !== NodeType.FILE) throw new BadRequestException('仅文件支持');
 
-    const tgResult = await this.telegramService.sendDocument(encryptedBuffer, node.name, mimeType);
+    const backend = this.storage.getPrimary();
+    const r2Key = this.storage.buildR2Key(userId, nodeId, 0);
+    const result = await this.storage.upload(backend, encryptedBuffer, r2Key, mimeType);
     await this.chunkRepo.delete({ nodeId });
     await this.chunkRepo.save(this.chunkRepo.create({
-      nodeId, chunkIndex: 0, tgFileId: tgResult.fileId,
-      tgMessageId: tgResult.messageId, size, iv,
+      nodeId, chunkIndex: 0,
+      storageBackend: backend,
+      tgFileId: result.providerKey,
+      tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
+      r2Key,
+      r2Etag: result.etag || null,
+      size, iv,
     }));
 
     const prevSize = Number(node.size);
@@ -731,7 +767,7 @@ export class FilesService {
 
     // Prefer Telegram-generated thumbnail if available
     if (node.thumbnailFileId) {
-      return this.telegramService.getFileUrl(node.thumbnailFileId);
+      return this.storage.getUrl('telegram', node.thumbnailFileId);
     }
 
     // For unencrypted image files, return first chunk as fallback thumbnail
@@ -739,7 +775,12 @@ export class FilesService {
       const hasKey = await this.keyRepo.findOne({ where: { nodeId } });
       if (!hasKey) {
         const firstChunk = await this.chunkRepo.findOne({ where: { nodeId }, order: { chunkIndex: 'ASC' } });
-        if (firstChunk) return this.telegramService.getFileUrl(firstChunk.tgFileId);
+        if (firstChunk) {
+          return this.storage.getUrl(
+            (firstChunk.storageBackend || 'telegram') as any,
+            firstChunk.storageBackend === 'r2' ? firstChunk.r2Key! : firstChunk.tgFileId!,
+          );
+        }
       }
     }
 
@@ -888,13 +929,20 @@ export class FilesService {
     });
     await this.nodeRepo.save(node);
 
-    const tgResult = await this.telegramService.sendDocument(fileBuffer, filename, 'application/octet-stream');
-    if (tgResult.thumbnailFileId) {
-      await this.nodeRepo.update(node.id, { thumbnailFileId: tgResult.thumbnailFileId });
+    const backend = this.storage.getPrimary();
+    const r2Key = this.storage.buildR2Key(req.userId, node.id, 0);
+    const result = await this.storage.upload(backend, fileBuffer, r2Key, 'application/octet-stream');
+    if (result.thumbnailFileId) {
+      await this.nodeRepo.update(node.id, { thumbnailFileId: result.thumbnailFileId });
     }
     const chunk = this.chunkRepo.create({
-      nodeId: node.id, chunkIndex: 0, tgFileId: tgResult.fileId,
-      tgMessageId: tgResult.messageId, size: fileBuffer.length, iv: '000000000000000000000000',
+      nodeId: node.id, chunkIndex: 0,
+      storageBackend: backend,
+      tgFileId: result.providerKey,
+      tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
+      r2Key,
+      r2Etag: result.etag || null,
+      size: fileBuffer.length, iv: '000000000000000000000000',
     });
     await this.chunkRepo.save(chunk);
     await this.userRepo.increment({ id: req.userId }, 'usedBytes', fileBuffer.length);
@@ -918,7 +966,12 @@ export class FilesService {
       dekIv: key?.iv ?? null,
       salt: key?.salt ?? null,
       chunkCount: chunks.length,
-      chunkRefs: chunks.map(c => ({ index: c.chunkIndex, iv: c.iv, telegramFileId: c.tgFileId })),
+      chunkRefs: chunks.map(c => ({
+        index: c.chunkIndex, iv: c.iv,
+        storageBackend: c.storageBackend || 'telegram',
+        telegramFileId: c.tgFileId,
+        r2Key: c.r2Key,
+      })),
     });
     await this.versionRepo.save(version);
     await this.audit(userId, 'version.create', nodeId, node.name);
@@ -935,10 +988,14 @@ export class FilesService {
     const version = await this.versionRepo.findOne({ where: { id: versionId, nodeId } });
     if (!version) throw new NotFoundException('版本不存在');
     const chunks = await Promise.all(
-      version.chunkRefs.map(async ref => ({
-        iv: ref.iv,
-        url: await this.telegramService.getFileUrl(ref.telegramFileId),
-      })),
+      version.chunkRefs.map(async ref => {
+        const backend = (ref.storageBackend || 'telegram') as any;
+        const key = backend === 'r2' ? ref.r2Key! : ref.telegramFileId!;
+        return {
+          iv: ref.iv,
+          url: await this.storage.getUrl(backend, key),
+        };
+      }),
     );
     return {
       node: { id: nodeId, size: version.size },
