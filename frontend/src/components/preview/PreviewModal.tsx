@@ -26,6 +26,8 @@ import { useAuthStore } from '../../stores/auth.store';
 import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer, encryptChunk, generateDEK, encryptDEK, exportDEKAsBase64 } from '../../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
 import RichTextEditor from './RichTextEditor';
+import SpreadsheetEditor from './SpreadsheetEditor';
+import PresentationEditor from './PresentationEditor';
 import { Node, DownloadInfo } from '../../types';
 
 // P1-F24: preview path has to buffer into a Blob URL for <img>/<video>/<pdf>.
@@ -68,7 +70,13 @@ function isTextMime(mimeType?: string): boolean {
     mimeType.includes('json') ||
     mimeType.includes('xml') ||
     mimeType.includes('yaml') ||
-    mimeType.includes('csv')
+    mimeType.includes('csv') ||
+    mimeType.includes('spreadsheet') ||
+    mimeType.includes('excel') ||
+    mimeType.includes('presentation') ||
+    mimeType.includes('powerpoint') ||
+    mimeType.includes('word') ||
+    mimeType.includes('document')
   );
 }
 
@@ -512,9 +520,16 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       setPreviewState({ status: 'loading' });
       setNeedsLockPassword(false);
 
-      // New empty text document — open editor directly, no download needed
+      // New empty document — open editor directly with default content
       if (node.size === 0 && isTextMime(node.mimeType)) {
-        setPreviewState({ status: 'text', content: '', mimeType: node.mimeType || 'text/plain' });
+        const mt = node.mimeType || 'text/plain';
+        let initial = '';
+        if (mt.includes('spreadsheet') || mt.includes('excel') || mt.includes('csv')) {
+          initial = JSON.stringify(Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => ({ value: '' }))));
+        } else if (mt.includes('presentation') || mt.includes('powerpoint')) {
+          initial = JSON.stringify([{ title: '', body: '' }]);
+        }
+        setPreviewState({ status: 'text', content: initial, mimeType: mt });
         return;
       }
 
@@ -756,11 +771,15 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       case 'text': {
         const lang = languageFromMime(previewState.mimeType);
         const isCode = !!lang;
+        const isSheet = previewState.mimeType.includes('spreadsheet') || previewState.mimeType.includes('csv') || previewState.mimeType.includes('excel');
+        const isSlide = previewState.mimeType.includes('presentation') || previewState.mimeType.includes('powerpoint');
+        const label = isSheet ? 'sheet' : isSlide ? 'slide' : lang || 'richtext';
+
         return (
           <div className="flex-1 overflow-hidden p-4">
             <div className="rounded-xl overflow-hidden border border-white/10 h-full flex flex-col">
               <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10">
-                <span className="text-xs text-white/50 font-mono">{lang || 'richtext'}</span>
+                <span className="text-xs text-white/50 font-mono">{label}</span>
                 <div className="flex-1" />
                 {editing ? (
                   <>
@@ -777,29 +796,21 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
               </div>
               {editing ? (
                 isCode ? (
-                  <textarea
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
-                    className="flex-1 text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 outline-none resize-none border-0"
-                    autoFocus
-                  />
+                  <textarea value={editText} onChange={e => setEditText(e.target.value)}
+                    className="flex-1 text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 outline-none resize-none border-0" autoFocus />
+                ) : isSheet ? (
+                  <SpreadsheetEditor content={editText} onChange={setEditText} />
+                ) : isSlide ? (
+                  <PresentationEditor content={editText} onChange={setEditText} />
                 ) : (
-                  <RichTextEditor
-                    content={editText}
-                    onChange={setEditText}
-                    placeholder="开始编辑文档…"
-                  />
+                  <RichTextEditor content={editText} onChange={setEditText} placeholder="开始编辑文档…" />
                 )
               ) : (
                 isCode ? (
-                  <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 flex-1 overflow-auto m-0">
-                    {previewState.content}
-                  </pre>
+                  <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 flex-1 overflow-auto m-0">{previewState.content}</pre>
                 ) : (
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none p-6 flex-1 overflow-auto bg-gray-950 text-gray-100"
-                    dangerouslySetInnerHTML={{ __html: previewState.content }}
-                  />
+                  <div className="prose prose-sm dark:prose-invert max-w-none p-6 flex-1 overflow-auto bg-gray-950 text-gray-100"
+                    dangerouslySetInnerHTML={{ __html: previewState.content }} />
                 )
               )}
             </div>
