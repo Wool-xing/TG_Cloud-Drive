@@ -13,6 +13,8 @@ import { filesApi } from '../api/client';
 import { Node } from '../types';
 import { formatBytes } from '../utils/crypto';
 
+const TRASH_RETENTION_DAYS = 30;
+
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -21,6 +23,19 @@ function formatDate(dateStr: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function remainingDays(deletedAt?: string): number {
+  if (!deletedAt) return TRASH_RETENTION_DAYS;
+  const elapsed = Date.now() - new Date(deletedAt).getTime();
+  return Math.max(0, TRASH_RETENTION_DAYS - Math.floor(elapsed / 86400000));
+}
+
+function countdownBadge(days: number) {
+  if (days <= 2) return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+  if (days <= 5) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300';
+  if (days <= 10) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
 }
 
 function ConfirmModal({
@@ -267,6 +282,7 @@ export default function Trash() {
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">名称</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell dark:text-gray-400">原始位置</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell dark:text-gray-400">删除时间</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">剩余天数</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell dark:text-gray-400">大小</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">操作</th>
               </tr>
@@ -302,6 +318,16 @@ export default function Trash() {
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell dark:text-gray-400">
                       {node.deletedAt ? formatDate(node.deletedAt) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const days = remainingDays(node.deletedAt);
+                        return (
+                          <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${countdownBadge(days)}`}>
+                            {days === 0 ? '即将删除' : `${days} 天`}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-gray-500 hidden sm:table-cell dark:text-gray-400">
                       {node.type === 'folder' ? '—' : formatBytes(node.size)}

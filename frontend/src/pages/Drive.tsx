@@ -14,6 +14,7 @@ import FileList from '../components/files/FileList';
 import FileGrid from '../components/files/FileGrid';
 import FileContextMenu from '../components/files/FileContextMenu';
 import PreviewModal from '../components/preview/PreviewModal';
+import ShortcutsPanel from '../components/ShortcutsPanel';
 
 interface DriveProps {
   isPrivate?: boolean;
@@ -208,11 +209,20 @@ export default function Drive({ isPrivate = false }: DriveProps) {
   }, [selectedIds, queryClient, clearSelection]);
 
   // Keyboard shortcuts
+  const [showShortcuts, setShowShortcuts] = useState(false);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        if (e.key === 'Escape') (target as HTMLInputElement).blur();
+        return;
+      }
 
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(v => !v);
+        return;
+      }
       if (e.key === 'Escape') {
         clearSelection();
         setContextMenu(null, null);
@@ -289,6 +299,8 @@ export default function Drive({ isPrivate = false }: DriveProps) {
       {previewNode && (
         <PreviewModal nodes={nodes} />
       )}
+
+      <ShortcutsPanel open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }

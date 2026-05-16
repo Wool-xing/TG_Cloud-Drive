@@ -13,9 +13,11 @@ import {
   Share2,
   Eye,
   EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import JSZip from 'jszip';
 
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
@@ -26,10 +28,6 @@ import {
   decryptDEK,
   decryptBuffer,
 } from '../../utils/crypto';
-import {
-  streamingDownload,
-  BlobFallbackTooLargeError,
-} from '../../utils/streaming-download';
 import MoveDialog from '../dialogs/MoveDialog';
 import RenameDialog from '../dialogs/RenameDialog';
 import ShareDialog from '../dialogs/ShareDialog';
@@ -102,6 +100,8 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
     }
   };
 
+  const [batchDownloading, setBatchDownloading] = useState(false);
+
   const handleBatchDownload = async () => {
     if (!selectedArray.length) return;
     const fileNodes = nodes.filter(n => selectedArray.includes(n.id) && n.type === 'file');
@@ -109,55 +109,50 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       toast.error('请选择文件（不支持直接下载文件夹）');
       return;
     }
-    // Pre-fix: this read `res?.downloadUrl ?? res?.url` and bailed silently
-    // for every file because the backend returns `{chunks, key, node}`. Now
-    // mirror PreviewModal/handleDownload: decrypt + stream each file.
     const mek = getSessionMEK();
-    toast.success(`开始下载 ${fileNodes.length} 个文件`);
-    for (const node of fileNodes) {
-      try {
-        const info = await filesApi.getDownloadInfo(node.id) as unknown as DownloadInfo;
-        const mimeType = info.node.mimeType ?? 'application/octet-stream';
-        if (!info.key || !mek || !mekDerived) {
-          // Fallback to direct URL if backend ever returns one (legacy /
-          // unencrypted path).
-          const directUrl = (info as any).downloadUrl ?? (info as any).url;
-          if (directUrl) {
-            const a = document.createElement('a');
-            a.href = directUrl;
-            a.download = node.name;
-            a.click();
-            await new Promise(r => setTimeout(r, 800));
+    if (!mek || !mekDerived) {
+      toast.error('会话密钥已失效，请退出后重新登录');
+      return;
+    }
+    setBatchDownloading(true);
+    try {
+      const zip = new JSZip();
+      let completed = 0;
+      for (const node of fileNodes) {
+        try {
+          const info = await filesApi.getDownloadInfo(node.id) as unknown as DownloadInfo;
+          if (!info.key) continue;
+          const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+          const chunks: ArrayBuffer[] = [];
+          for (let i = 0; i < info.chunks.length; i++) {
+            const c = info.chunks[i];
+            if (!c.iv) continue;
+            const r = await fetch(c.url);
+            if (!r.ok) throw new Error(`下载分片失败: ${node.name}`);
+            const encrypted = await r.arrayBuffer();
+            chunks.push(await decryptBuffer(encrypted, dek, c.iv));
           }
-          continue;
+          const totalLen = chunks.reduce((s, c) => s + c.byteLength, 0);
+          const merged = new Uint8Array(totalLen);
+          let offset = 0;
+          for (const c of chunks) { merged.set(new Uint8Array(c), offset); offset += c.byteLength; }
+          zip.file(node.name, merged);
+          completed++;
+        } catch {
+          toast.error(`打包 ${node.name} 失败`);
         }
-        const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
-        await streamingDownload(
-          {
-            count: info.chunks.length,
-            fetchChunk: async (i) => {
-              const chunk = info.chunks[i];
-              if (!chunk.iv) throw new Error(`分片 ${i} 缺少 IV`);
-              const r = await fetch(chunk.url);
-              if (!r.ok) throw new Error(`下载分片 ${i} 失败`);
-              const enc = await r.arrayBuffer();
-              const plain = await decryptBuffer(enc, dek, chunk.iv);
-              return new Uint8Array(plain);
-            },
-          },
-          { filename: node.name, mimeType, totalSize: info.node.size },
-        );
-        // Brief gap so showSaveFilePicker dialogs don't queue on top of each
-        // other (UX: user picks save location for each).
-        await new Promise(r => setTimeout(r, 500));
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return; // user cancelled — stop batch
-        if (err instanceof BlobFallbackTooLargeError) {
-          toast.error(err.message);
-          return;
-        }
-        toast.error(`下载 ${node.name} 失败`);
       }
+      if (completed === 0) { toast.error('没有可下载的文件'); return; }
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `files_${completed}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      toast.success(`已打包下载 ${completed} 个文件`);
+    } finally {
+      setBatchDownloading(false);
     }
   };
 
@@ -234,7 +229,11 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 <BtnSm icon={<Trash2 className="w-4 h-4" />} label="删除" onClick={handleBatchDelete} danger />
                 <BtnSm icon={<FolderInput className="w-4 h-4" />} label="移动" onClick={() => setDialog('move')} />
                 <BtnSm icon={<Copy className="w-4 h-4" />} label="复制" onClick={() => setDialog('copy')} />
-                <BtnSm icon={<Download className="w-4 h-4" />} label="下载" onClick={handleBatchDownload} />
+                <BtnSm
+                  icon={batchDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  label={batchDownloading ? '打包中…' : '下载'}
+                  onClick={handleBatchDownload}
+                />
                 {/* Per-file actions only when exactly 1 selected — backend
                     contracts are single-node (rename / lock / share). */}
                 {singleSelectedNode && (
