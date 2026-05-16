@@ -55,9 +55,10 @@ export class WebdavService {
         case 'GET': return this.get(req, res, user.id, urlPath);
         case 'PUT': return this.put(req, res, user.id, urlPath);
         case 'DELETE': return this.del(req, res, user.id, urlPath);
+        case 'MOVE': return this.move(req, res, user.id, urlPath);
         case 'MKCOL': return this.mkcol(req, res, user.id, urlPath);
         default:
-          res.status(405).set('Allow', 'OPTIONS,PROPFIND,GET,PUT,DELETE,MKCOL').send();
+          res.status(405).set('Allow', 'OPTIONS,PROPFIND,GET,PUT,DELETE,MOVE,MKCOL').send();
       }
     } catch (err: any) {
       if (err instanceof UnauthorizedException) {
@@ -71,7 +72,7 @@ export class WebdavService {
   }
 
   private options(_req: Request, res: Response) {
-    res.set('Allow', 'OPTIONS,PROPFIND,GET,PUT,DELETE,MKCOL');
+    res.set('Allow', 'OPTIONS,PROPFIND,GET,PUT,DELETE,MOVE,MKCOL');
     res.set('DAV', '1,2');
     res.status(200).send();
   }
@@ -205,6 +206,64 @@ export class WebdavService {
     await this.nodeRepo.update(node.id, { deletedAt: new Date() });
     this.logger.log(`WebDAV DELETE: ${node.name} (node ${node.id})`);
     res.status(204).send();
+  }
+
+  private async move(req: Request, res: Response, userId: string, path: string) {
+    const dest = String(req.headers.destination || '');
+    if (!dest) return res.status(400).send();
+
+    // Parse destination URL — extract path after /api/dav/
+    let destPath: string;
+    try {
+      const url = new URL(dest);
+      destPath = decodeURIComponent(url.pathname.replace(/^\/api\/dav\/?/, '') || '');
+    } catch {
+      destPath = decodeURIComponent(dest.replace(/^\/api\/dav\/?/, '') || '');
+    }
+    if (!destPath) return res.status(400).send();
+
+    const src = await this.resolveTarget(userId, path);
+    if (!src) return res.status(404).send();
+
+    // Determine destination parent and new name
+    const destSegments = destPath.split('/').filter(Boolean);
+    if (!destSegments.length) return res.status(400).send();
+    const newName = destSegments.pop()!;
+    const destParentPath = destSegments.join('/');
+    const destParent = destParentPath ? await this.resolvePath(userId, destParentPath) : null;
+    if (destParentPath && !destParent) return res.status(409).send();
+
+    const destParentId = destParent?.id ?? null;
+
+    // Check duplicate
+    const existing = await this.nodeRepo.findOne({
+      where: { parentId: destParentId, name: newName, userId, deletedAt: IsNull() },
+    });
+    if (existing && existing.id !== src.id) {
+      // Overwrite: delete existing, move src
+      await this.nodeRepo.update(existing.id, { deletedAt: new Date() });
+    }
+
+    if (src.parentId === destParentId) {
+      // Same folder — rename
+      await this.nodeRepo.update(src.id, { name: newName });
+    } else {
+      // Different folder — move
+      if (destParentId && src.type !== NodeType.FOLDER) {
+        const target = await this.nodeRepo.findOne({ where: { id: destParentId, userId, type: NodeType.FOLDER, deletedAt: IsNull() } });
+        if (!target) return res.status(409).send();
+      }
+      await this.nodeRepo.update(src.id, { name: newName, parentId: destParentId });
+    }
+
+    this.logger.log(`WebDAV MOVE: ${src.name} → ${newName} (parent ${destParentId ?? 'root'})`);
+    res.status(destPath ? 201 : 204).send();
+  }
+
+  private async resolveTarget(userId: string, path: string): Promise<Node | null> {
+    const folder = await this.resolvePath(userId, path);
+    if (folder) return folder;
+    return this.resolveFile(userId, path);
   }
 
   private async mkcol(_req: Request, res: Response, userId: string, path: string) {
