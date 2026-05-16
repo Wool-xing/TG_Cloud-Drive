@@ -240,6 +240,39 @@ export class FilesController {
     return this.filesService.getFolderDownloadList(userId, nodeId);
   }
 
+  // ─── Tags ─────────────────────────────────────────────────────────────────────
+
+  @Get('tags')
+  listTags(@CurrentUser('id') userId: string) {
+    return this.filesService.listTags(userId);
+  }
+
+  @Post('tags')
+  @HttpCode(201)
+  createTag(@CurrentUser('id') userId: string, @Body('name') name: string, @Body('color') color?: string) {
+    return this.filesService.createTag(userId, name, color);
+  }
+
+  @Delete('tags/:tagId')
+  @HttpCode(200)
+  deleteTag(@CurrentUser('id') userId: string, @Param('tagId', ParseUUIDPipe) tagId: string) {
+    return this.filesService.deleteTag(userId, tagId);
+  }
+
+  @Post(':nodeId/tags')
+  addTagToNode(@CurrentUser('id') userId: string, @Param('nodeId', ParseUUIDPipe) nodeId: string, @Body('tagId') tagId: string) {
+    return this.filesService.addTagToNode(userId, nodeId, tagId);
+  }
+
+  @Delete(':nodeId/tags/:tagId')
+  removeTagFromNode(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ) {
+    return this.filesService.removeTagFromNode(userId, nodeId, tagId);
+  }
+
   @Post(':nodeId/versions')
   createVersion(@CurrentUser('id') userId: string, @Param('nodeId') nodeId: string) {
     return this.filesService.createVersion(userId, nodeId);

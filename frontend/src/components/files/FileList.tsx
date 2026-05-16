@@ -264,6 +264,12 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
                           )}
                         </div>
                         <span className="truncate font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
+                        {node.tags?.slice(0, 2).map((t: any) => (
+                          <span key={t.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex-shrink-0 max-w-[80px] truncate"
+                            style={t.color ? { backgroundColor: t.color + '20', color: t.color } : {}}>
+                            {t.name}
+                          </span>
+                        ))}
                         {node.isStarred && (
                           <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-300 flex-shrink-0" />
                         )}
