@@ -134,14 +134,18 @@ export class AdminController {
   @ApiQuery({ name: 'userId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'type', required: false, type: String })
+  @ApiQuery({ name: 'sort', required: false, type: String })
+  @ApiQuery({ name: 'order', required: false, type: String })
   listFiles(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('userId') userId?: string,
     @Query('search') search?: string,
     @Query('type') type?: string,
+    @Query('sort') sort?: string,
+    @Query('order') order?: 'ASC' | 'DESC',
   ) {
-    return this.adminService.listAllFiles(page, limit, userId, search, type);
+    return this.adminService.listAllFiles(page, limit, userId, search, type, sort, order);
   }
 
   /**
