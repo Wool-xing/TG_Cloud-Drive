@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import { User, UserRole, UserStatus } from '../users/entities/user.entity';
 import { Device } from '../users/entities/device.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
+import { Subscription, planQuotaBytes } from '../payment/entities/subscription.entity';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
 import {
   hashPassword, comparePassword, generateSecureToken, encryptField,
@@ -32,6 +33,7 @@ export class AuthService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Device) private deviceRepo: Repository<Device>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
+    @InjectRepository(Subscription) private subRepo: Repository<Subscription>,
     @Inject(REDIS_CLIENT) private redis: any,
     private jwtService: JwtService,
     private configService: ConfigService,
@@ -77,7 +79,7 @@ export class AuthService {
       username,
       passwordHash,
       mekSalt,
-      quotaBytes: (this.configService.get<number>('DEFAULT_USER_QUOTA_GB') || 50) * 1024 * 1024 * 1024,
+      quotaBytes: planQuotaBytes('free'),
       // Encrypted fields store the normalized form so decrypting yields a value
       // consistent with what login/dedup compare against.
       emailEncrypted: normalizedEmail ? encryptField(normalizedEmail, masterKey) : null,
@@ -87,6 +89,11 @@ export class AuthService {
     });
 
     await this.userRepo.save(user);
+
+    // Auto-provision free-tier subscription
+    const freeSub = this.subRepo.create({ userId: user.id, plan: 'free', status: 'active' });
+    await this.subRepo.save(freeSub);
+
     await this.auditLog(user.id, 'register', null, null, null);
     return { message: '注册成功' };
   }

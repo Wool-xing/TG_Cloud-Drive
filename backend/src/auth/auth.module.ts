@@ -14,12 +14,13 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { User } from '../users/entities/user.entity';
 import { Device } from '../users/entities/device.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
+import { Subscription } from '../payment/entities/subscription.entity';
 import { UsersModule } from '../users/users.module';
 import { VerificationModule } from '../verification/verification.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Device, AuditLog]),
+    TypeOrmModule.forFeature([User, Device, AuditLog, Subscription]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
