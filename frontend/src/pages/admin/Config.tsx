@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Save,
   Mail,
   Loader2,
   X,
@@ -338,14 +337,6 @@ export default function AdminConfig() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">系统配置</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">管理全局系统设置</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          保存配置
-        </button>
       </div>
 
       {/* ── Storage & Limits ─────────────────────────────── */}

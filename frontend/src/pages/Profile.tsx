@@ -696,6 +696,7 @@ function BindEmailDialog(props: {
 
 // ── Security Tab ───────────────────────────────────────────────
 function SecurityTab() {
+  const { user, setUser } = useAuthStore();
   const [pwForm, setPwForm] = useState({ oldPassword: '', newPassword: '', confirm: '', emailCode: '' });
   const [showPw, setShowPw] = useState({ old: false, new: false, confirm: false });
   const [pwSaving, setPwSaving] = useState(false);
@@ -731,7 +732,11 @@ function SecurityTab() {
         const res = (await usersApi.profile()) as any;
         setBoundEmail(res?.email ?? null);
         setHasEmail(typeof res?.hasEmail === 'boolean' ? res.hasEmail : !!res?.email);
-        setHasPrivateSpace(typeof res?.hasPrivateSpace === 'boolean' ? res.hasPrivateSpace : false);
+        const hasPS = typeof res?.hasPrivateSpace === 'boolean' ? res.hasPrivateSpace : false;
+        setHasPrivateSpace(hasPS);
+        if (hasPS && user && !user.hasPrivateSpace) {
+          setUser({ ...user, hasPrivateSpace: true });
+        }
         setEmailProbeStatus('ok');
       } catch {
         // Surface the failure rather than silently leaving boundEmail=null,
@@ -814,6 +819,7 @@ function SecurityTab() {
       toast.success(hasPrivateSpace ? '隐私空间密码已更新' : '隐私空间密码设置成功');
       setPpForm({ currentPassword: '', newPassword: '', confirm: '' });
       setHasPrivateSpace(true);
+      if (user) setUser({ ...user, hasPrivateSpace: true });
     } catch {
       // interceptor
     } finally {
