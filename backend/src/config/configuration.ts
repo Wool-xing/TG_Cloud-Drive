@@ -16,6 +16,8 @@ export default () => ({
   JWT_EXPIRES_IN: '2h',
   JWT_REFRESH_EXPIRES_IN: '30d',
 
+  SENTRY_DSN: process.env.SENTRY_DSN,
+
   ENCRYPTION_MASTER_KEY: process.env.ENCRYPTION_MASTER_KEY,
 
   TG_BOT_TOKEN: process.env.TG_BOT_TOKEN,

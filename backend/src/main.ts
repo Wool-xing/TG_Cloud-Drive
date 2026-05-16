@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import * as Sentry from '@sentry/nestjs';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -18,9 +19,20 @@ async function bootstrap() {
   });
 
   const configService = app.get(ConfigService);
+  const dsn = configService.get<string>('SENTRY_DSN');
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+  if (dsn && isProduction) {
+    Sentry.init({
+      dsn,
+      environment: configService.get<string>('NODE_ENV', 'development'),
+      tracesSampleRate: 0.1,
+      profilesSampleRate: 0.1,
+    });
+  }
+
   const port = configService.get<number>('PORT', 3000);
   const frontendUrl = configService.get<string>('APP_URL', 'http://localhost:5173');
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());

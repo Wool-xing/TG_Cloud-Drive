@@ -2,8 +2,21 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
+import * as Sentry from '@sentry/react';
 import App from './App';
 import './index.css';
+
+// Initialize Sentry for frontend error tracking
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: import.meta.env.MODE || 'development',
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
 
 // Initialize dark mode before first render to avoid FOUC
 ;(function () {
@@ -51,9 +64,11 @@ export const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
-    </QueryClientProvider>
+    <Sentry.ErrorBoundary fallback={<p>An error occurred — our team has been notified.</p>}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+        <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+      </QueryClientProvider>
+    </Sentry.ErrorBoundary>
   </React.StrictMode>,
 );

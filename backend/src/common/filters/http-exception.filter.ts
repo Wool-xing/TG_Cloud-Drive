@@ -1,5 +1,6 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -25,13 +26,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : 'Internal server error';
     const code = exRes && typeof exRes === 'object' ? exRes.code : undefined;
 
-    // Non-HttpException = unexpected error. Log full stack so operators can
-    // diagnose 500s without re-deploying with extra instrumentation.
+    // Non-HttpException = unexpected error. Log full stack + report to Sentry.
     if (!(exception instanceof HttpException)) {
       this.logger.error(
         `[${request.method} ${request.url}] ${(exception as Error)?.message ?? exception}`,
         (exception as Error)?.stack,
       );
+      Sentry.captureException(exception);
     }
 
     const body: any = {
