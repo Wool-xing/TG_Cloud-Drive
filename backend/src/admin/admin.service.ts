@@ -251,6 +251,7 @@ export class AdminService {
     limit = 20,
     userId?: string,
     search?: string,
+    type?: string,
   ): Promise<{ files: any[]; total: number; page: number; limit: number }> {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
@@ -258,11 +259,30 @@ export class AdminService {
     // Build base filters without joins to avoid TypeORM DISTINCT+ORDER BY pagination bug
     const buildBase = () => {
       const qb = this.nodeRepo.createQueryBuilder('n')
-        .where('n.deleted_at IS NULL')
-        .andWhere('n.is_private = :isPrivate', { isPrivate: false })
-        .andWhere('n.type = :nodeType', { nodeType: NodeType.FILE });
+        .where('n.deleted_at IS NULL');
       if (userId) qb.andWhere('n.user_id = :userId', { userId });
       if (search) qb.andWhere('n.name ILIKE :search', { search: `%${search}%` });
+      if (type) {
+        if (type === 'folder') {
+          qb.andWhere('n.type = :nodeType', { nodeType: NodeType.FOLDER });
+        } else {
+          qb.andWhere('n.type = :nodeType', { nodeType: NodeType.FILE });
+          const mimeMap: Record<string, string[]> = {
+            image: ['image/'],
+            video: ['video/'],
+            audio: ['audio/'],
+            document: ['application/pdf', 'text/', 'application/msword', 'application/vnd.openxmlformats', 'application/vnd.ms-'],
+            archive: ['application/zip', 'application/x-rar', 'application/x-tar', 'application/x-gzip', 'application/x-bzip', 'application/x-7z'],
+          };
+          const prefixes = mimeMap[type];
+          if (prefixes?.length) {
+            const conditions = prefixes.map(p => 'n.mime_type LIKE :' + p.replace(/\W/g, '_')).join(' OR ');
+            const params: Record<string, string> = {};
+            prefixes.forEach(p => { params[p.replace(/\W/g, '_')] = `${p}%`; });
+            qb.andWhere(`(${conditions})`, params);
+          }
+        }
+      }
       return qb;
     };
 
@@ -292,9 +312,11 @@ export class AdminService {
     const items = nodes.map(n => ({
       id: n.id,
       name: n.name,
+      type: n.type,
       size: Number(n.size),
       mimeType: n.mimeType,
       md5Plain: n.md5Plain,
+      isPrivate: n.isPrivate,
       userId: n.userId,
       username: n.user?.username ?? null,
       createdAt: n.createdAt,

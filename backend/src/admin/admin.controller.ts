@@ -125,21 +125,23 @@ export class AdminController {
   // ─── Files ───────────────────────────────────────────────────────────────────
 
   /**
-   * GET /admin/files?page=1&limit=20&userId=xxx&search=xxx
+   * GET /admin/files?page=1&limit=20&userId=xxx&search=xxx&type=folder|image|video|audio|document|archive
    */
   @Get('files')
-  @ApiOperation({ summary: '查看所有文件（不含私密文件）' })
+  @ApiOperation({ summary: '查看所有文件（含私密文件、含文件夹）' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'userId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, type: String })
   listFiles(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('userId') userId?: string,
     @Query('search') search?: string,
+    @Query('type') type?: string,
   ) {
-    return this.adminService.listAllFiles(page, limit, userId, search);
+    return this.adminService.listAllFiles(page, limit, userId, search, type);
   }
 
   /**
