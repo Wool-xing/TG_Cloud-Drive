@@ -38,6 +38,19 @@ export class FilesController {
     return this.filesService.createFolder(userId, name, parentId, !!isPrivate);
   }
 
+  @Post('document')
+  @HttpCode(201)
+  createDocument(
+    @CurrentUser('id') userId: string,
+    @Body('name') name: string,
+    @Body('parentId') parentId: string,
+    @Body('mimeType') mimeType: string,
+    @Body('content') content?: string,
+    @Body('private') isPrivate?: boolean,
+  ) {
+    return this.filesService.createDocument(userId, name, parentId, mimeType, content, !!isPrivate);
+  }
+
   @Get('recent')
   listRecent(@CurrentUser('id') userId: string) {
     return this.filesService.listRecent(userId);

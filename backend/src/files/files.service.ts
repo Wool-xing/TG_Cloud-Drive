@@ -86,6 +86,33 @@ export class FilesService {
     return this.safeNode(folder);
   }
 
+  async createDocument(userId: string, name: string, parentId: string, mimeType: string, contentBase64?: string, isPrivate = false) {
+    await this.validateParent(userId, parentId, isPrivate);
+    await this.checkDuplicate(userId, parentId, name, isPrivate);
+    const buffer = contentBase64 ? Buffer.from(contentBase64, 'base64') : Buffer.alloc(0);
+
+    const node = this.nodeRepo.create({
+      userId, parentId: parentId || null, name, type: NodeType.FILE,
+      size: buffer.length, mimeType, isPrivate,
+    });
+    await this.nodeRepo.save(node);
+
+    // Upload placeholder to Telegram so file is downloadable
+    const tgResult = await this.telegramService.sendDocument(
+      buffer.length ? buffer : Buffer.from(' '), name, mimeType,
+    );
+    await this.chunkRepo.save(this.chunkRepo.create({
+      nodeId: node.id, chunkIndex: 0, tgFileId: tgResult.fileId,
+      tgMessageId: tgResult.messageId, size: buffer.length || 1, iv: '000000000000000000000000',
+    }));
+
+    if (tgResult.thumbnailFileId) {
+      await this.nodeRepo.update(node.id, { thumbnailFileId: tgResult.thumbnailFileId });
+    }
+
+    return this.safeNode(node);
+  }
+
   async uploadChunk(userId: string, nodeIdempotencyKey: string, chunkIndex: number, totalChunks: number,
     filename: string, md5: string, mimeType: string, parentId: string, isPrivate: boolean,
     buffer: Buffer,
