@@ -1,0 +1,15 @@
+{
+  "alwaysThinkingEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(make *)",
+      "Bash(cd */Dockerfile *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(git *)",
+      "Bash(ruff *)",
+      "Bash(node *)"
+    ]
+  }
+}
