@@ -89,28 +89,29 @@ export class FilesService {
   async createDocument(userId: string, name: string, parentId: string, mimeType: string, contentBase64?: string, isPrivate = false) {
     await this.validateParent(userId, parentId, isPrivate);
     await this.checkDuplicate(userId, parentId, name, isPrivate);
-    const buffer = contentBase64 ? Buffer.from(contentBase64, 'base64') : Buffer.alloc(0);
 
+    const empty = !contentBase64;
     const node = this.nodeRepo.create({
       userId, parentId: parentId || null, name, type: NodeType.FILE,
-      size: buffer.length, mimeType, isPrivate,
+      size: 0, mimeType, isPrivate,
     });
     await this.nodeRepo.save(node);
 
-    // Upload placeholder to Telegram so file is downloadable
-    const tgResult = await this.telegramService.sendDocument(
-      buffer.length ? buffer : Buffer.from(' '), name, mimeType,
-    );
+    // If content provided, upload now. Otherwise create empty placeholder —
+    // user edits and saves later via inline editor (triggers updateFileContent).
+    if (empty) return this.safeNode(node);
+    const buffer = Buffer.from(contentBase64!, 'base64');
+
+    const tgResult = await this.telegramService.sendDocument(buffer, name, mimeType);
     await this.chunkRepo.save(this.chunkRepo.create({
       nodeId: node.id, chunkIndex: 0, tgFileId: tgResult.fileId,
-      tgMessageId: tgResult.messageId, size: buffer.length || 1, iv: '000000000000000000000000',
+      tgMessageId: tgResult.messageId, size: buffer.length, iv: '000000000000000000000000',
     }));
-
+    await this.nodeRepo.update(node.id, { size: buffer.length });
     if (tgResult.thumbnailFileId) {
       await this.nodeRepo.update(node.id, { thumbnailFileId: tgResult.thumbnailFileId });
     }
-
-    await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length || 1);
+    await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
     return this.safeNode(node);
   }
 
@@ -694,18 +695,31 @@ export class FilesService {
     return { folderName: root.name, files: results, totalFiles: results.length };
   }
 
-  async updateFileContent(userId: string, nodeId: string, encryptedBuffer: Buffer, iv: string, size: number, mimeType: string) {
+  async updateFileContent(userId: string, nodeId: string, encryptedBuffer: Buffer, iv: string, size: number, mimeType: string, encryptedDek?: string, dekIv?: string) {
     const node = await this.getNodeOwned(userId, nodeId);
     if (node.type !== NodeType.FILE) throw new BadRequestException('仅文件支持');
 
     const tgResult = await this.telegramService.sendDocument(encryptedBuffer, node.name, mimeType);
-    // Replace existing chunk(s) with single new chunk
     await this.chunkRepo.delete({ nodeId });
     await this.chunkRepo.save(this.chunkRepo.create({
       nodeId, chunkIndex: 0, tgFileId: tgResult.fileId,
       tgMessageId: tgResult.messageId, size, iv,
     }));
+
+    const prevSize = Number(node.size);
     await this.nodeRepo.update(nodeId, { size, mimeType, updatedAt: new Date() });
+    if (prevSize !== size) {
+      await this.userRepo.increment({ id: userId }, 'usedBytes', size - prevSize);
+    }
+
+    // Store NodeKey for first save
+    if (encryptedDek && dekIv) {
+      const existing = await this.keyRepo.findOne({ where: { nodeId } });
+      if (!existing) {
+        await this.keyRepo.save(this.keyRepo.create({ nodeId, encryptedDek, iv: dekIv, salt: '' }));
+      }
+    }
+
     await this.audit(userId, 'edit', nodeId, node.name);
     return { size };
   }
