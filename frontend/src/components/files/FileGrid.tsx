@@ -219,7 +219,7 @@ export default function FileGrid({ nodes, isLoading }: FileGridProps) {
                 {node.name}
               </p>
               <p className="text-xs text-gray-400 mt-0.5 dark:text-gray-500">
-                {node.type === 'folder' ? '文件夹' : formatBytes(node.size)}
+                {node.type === 'folder' ? '文件夹' : node.size === 0 ? '空白' : formatBytes(node.size)}
               </p>
             </div>
           </div>
