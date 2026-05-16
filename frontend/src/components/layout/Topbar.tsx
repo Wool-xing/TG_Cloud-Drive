@@ -13,6 +13,7 @@ import {
   SortDesc,
   ArrowLeft,
   Settings,
+  UserCircle,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useFileStore } from '../../stores/file.store';
@@ -45,13 +46,14 @@ function useDarkMode() {
 
 // ── Filter tab labels ─────────────────────────────────────────────────────────
 
-const filterTabs: { value: FileFilter; label: string }[] = [
+const filterTabs: { value: FileFilter | 'other'; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'image', label: '图片' },
   { value: 'video', label: '视频' },
   { value: 'audio', label: '音频' },
   { value: 'document', label: '文档' },
   { value: 'archive', label: '压缩包' },
+  { value: 'other', label: '其他' },
 ];
 
 const sortOptions: { value: SortField; label: string }[] = [
@@ -270,6 +272,15 @@ export default function Topbar({ onUpload }: TopbarProps) {
               <span className="hidden lg:inline">上传</span>
             </button>
           )}
+
+          {/* Profile */}
+          <button
+            onClick={() => routerNavigate('/profile')}
+            title="个人资料"
+            className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition dark:text-gray-500 dark:hover:bg-gray-700"
+          >
+            <UserCircle className="h-4.5 w-4.5" />
+          </button>
 
           {/* Dark mode toggle */}
           <button
