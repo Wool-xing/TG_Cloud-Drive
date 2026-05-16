@@ -10,7 +10,7 @@ export async function deriveMEK(password: string, saltHex: string): Promise<Cryp
   const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   const salt = hexToBuffer(saltHex);
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -35,35 +35,35 @@ export async function encryptDEK(dek: CryptoKey, mek: CryptoKey): Promise<{ encr
 export async function decryptDEK(encryptedDekHex: string, ivHex: string, mek: CryptoKey): Promise<CryptoKey> {
   const encryptedDek = hexToBuffer(encryptedDekHex);
   const iv = hexToBuffer(ivHex);
-  const rawDek = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, mek, encryptedDek);
+  const rawDek = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, mek, encryptedDek as BufferSource);
   return crypto.subtle.importKey('raw', rawDek, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 
 // Encrypt a chunk buffer with DEK
 export async function encryptChunk(chunk: ArrayBuffer, dek: CryptoKey): Promise<{ data: ArrayBuffer; iv: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, dek, chunk);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, dek, chunk);
   return { data: encrypted, iv: bufferToHex(iv) };
 }
 
 // Decrypt a chunk buffer with DEK
 export async function decryptChunk(data: ArrayBuffer, dek: CryptoKey, ivHex: string): Promise<ArrayBuffer> {
   const iv = hexToBuffer(ivHex);
-  return crypto.subtle.decrypt({ name: 'AES-GCM', iv }, dek, data);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, dek, data);
 }
 
 // Encrypt entire file (for small files only, large files use chunk streaming)
 export async function encryptFile(file: File, dek: CryptoKey): Promise<{ data: Uint8Array; iv: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const buffer = await file.arrayBuffer();
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, dek, buffer);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, dek, buffer);
   return { data: new Uint8Array(encrypted), iv: bufferToHex(iv) };
 }
 
 // Decrypt downloaded file data
 export async function decryptBuffer(data: ArrayBuffer, dek: CryptoKey, ivHex: string): Promise<ArrayBuffer> {
   const iv = hexToBuffer(ivHex);
-  return crypto.subtle.decrypt({ name: 'AES-GCM', iv }, dek, data);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, dek, data);
 }
 
 // Compute MD5 of file (using SHA-256 as MD5 is not available in Web Crypto)
