@@ -58,7 +58,13 @@ function isPreviewable(mimeType?: string): boolean {
     mimeType.startsWith('text/') ||
     mimeType.includes('javascript') ||
     mimeType.includes('json') ||
-    mimeType.includes('xml')
+    mimeType.includes('xml') ||
+    mimeType.includes('spreadsheet') ||
+    mimeType.includes('excel') ||
+    mimeType.includes('presentation') ||
+    mimeType.includes('powerpoint') ||
+    mimeType.includes('word') ||
+    mimeType.includes('document')
   );
 }
 
@@ -533,6 +539,8 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           initial = JSON.stringify([{ title: '', body: '' }]);
         }
         setPreviewState({ status: 'text', content: initial, mimeType: mt });
+        setEditText(initial);
+        setEditing(true); // Auto-enter edit mode for new files
         return;
       }
 
@@ -786,14 +794,14 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                 <div className="flex-1" />
                 {editing ? (
                   <>
-                    <button onClick={() => setEditing(false)} className="text-xs text-white/60 hover:text-white px-2 py-1 rounded transition-colors">取消</button>
-                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors">
-                      <Save className="w-3 h-3" />{saving ? '保存中…' : '保存'}
+                    <button onClick={() => setEditing(false)} className="text-xs text-white/70 hover:text-white px-3 py-1 rounded-lg hover:bg-white/10 transition-colors">取消</button>
+                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium">
+                      <Save className="w-3.5 h-3.5" />{saving ? '保存中…' : '保存'}
                     </button>
                   </>
                 ) : (
-                  <button onClick={handleEdit} className="flex items-center gap-1 text-xs text-white/60 hover:text-white px-2 py-1 rounded transition-colors">
-                    <Edit3 className="w-3 h-3" />编辑
+                  <button onClick={handleEdit} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors font-medium border border-white/10">
+                    <Edit3 className="w-3.5 h-3.5" />编辑
                   </button>
                 )}
               </div>
