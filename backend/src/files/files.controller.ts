@@ -1,7 +1,8 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
-  Req, UseInterceptors, UploadedFile, ParseUUIDPipe, HttpCode,
+  Req, Res, UseInterceptors, UploadedFile, ParseUUIDPipe, HttpCode,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Throttle } from '@nestjs/throttler';
@@ -216,6 +217,17 @@ export class FilesController {
   @Get('starred')
   listStarred(@CurrentUser('id') userId: string) {
     return this.filesService.listStarred(userId);
+  }
+
+  @Get('thumbnail/:nodeId')
+  async thumbnail(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Res() res: Response,
+  ) {
+    const url = await this.filesService.getThumbnailUrl(userId, nodeId);
+    if (!url) return res.status(404).send();
+    res.redirect(302, url);
   }
 
   @Get(':nodeId/path')

@@ -611,6 +611,27 @@ export class FilesService {
     return { folderName: root.name, files: results, totalFiles: results.length };
   }
 
+  async getThumbnailUrl(userId: string, nodeId: string): Promise<string | null> {
+    const node = await this.nodeRepo.findOne({ where: { id: nodeId, userId, deletedAt: IsNull() } });
+    if (!node || node.type === NodeType.FOLDER) return null;
+
+    // Prefer Telegram-generated thumbnail if available
+    if (node.thumbnailFileId) {
+      return this.telegramService.getFileUrl(node.thumbnailFileId);
+    }
+
+    // For unencrypted image files, return first chunk as fallback thumbnail
+    if (node.mimeType?.startsWith('image/')) {
+      const hasKey = await this.keyRepo.findOne({ where: { nodeId } });
+      if (!hasKey) {
+        const firstChunk = await this.chunkRepo.findOne({ where: { nodeId }, order: { chunkIndex: 'ASC' } });
+        if (firstChunk) return this.telegramService.getFileUrl(firstChunk.tgFileId);
+      }
+    }
+
+    return null;
+  }
+
   private async getNodeOwned(userId: string, nodeId: string): Promise<Node> {
     const node = await this.nodeRepo.findOne({ where: { id: nodeId, userId, deletedAt: IsNull() } });
     if (!node) throw new NotFoundException('文件不存在');
@@ -748,6 +769,9 @@ export class FilesService {
     await this.nodeRepo.save(node);
 
     const tgResult = await this.telegramService.sendDocument(fileBuffer, filename, 'application/octet-stream');
+    if (tgResult.thumbnailFileId) {
+      await this.nodeRepo.update(node.id, { thumbnailFileId: tgResult.thumbnailFileId });
+    }
     const chunk = this.chunkRepo.create({
       nodeId: node.id, chunkIndex: 0, tgFileId: tgResult.fileId,
       tgMessageId: tgResult.messageId, size: fileBuffer.length, iv: '000000000000000000000000',
