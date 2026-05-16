@@ -511,6 +511,12 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       setPreviewState({ status: 'loading' });
       setNeedsLockPassword(false);
 
+      // New empty text document — open editor directly, no download needed
+      if (node.size === 0 && isTextMime(node.mimeType)) {
+        setPreviewState({ status: 'text', content: '', mimeType: node.mimeType || 'text/plain' });
+        return;
+      }
+
       try {
         const result = await fetchAndDecrypt(node.id, mekDerived, password);
         setDownloadInfo(result.downloadInfo);
