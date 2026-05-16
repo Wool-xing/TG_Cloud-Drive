@@ -20,6 +20,7 @@ import {
   Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
@@ -441,6 +442,7 @@ async function fetchAndDecrypt(
 }
 
 export default function PreviewModal({ nodes }: PreviewModalProps) {
+  const queryClient = useQueryClient();
   const { previewNode, setPreview } = useFileStore();
   const { mekDerived } = useAuthStore();
 
@@ -495,6 +497,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       setPreviewState({ status: 'text', content: editText, mimeType: previewNode.mimeType || 'text/plain' });
       setEditing(false);
       toast.success('已保存');
+      queryClient.invalidateQueries({ queryKey: ['files'] });
     } catch (err: any) { toast.error(err?.message || '保存失败');
     } finally { setSaving(false); }
   };

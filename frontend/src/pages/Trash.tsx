@@ -204,7 +204,7 @@ export default function Trash() {
       {/* Retention banner */}
       <div className="mx-4 mt-4 mb-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200">
         <Info className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-        <span>回收站中的文件将在 <strong>30天</strong> 后自动永久删除，请及时处理重要文件。</span>
+        <span>回收站中的文件将在 <strong>30天</strong> 后自动永久删除{nodes.length > 0 && <>，当前占用 <strong>{formatBytes(nodes.reduce((s, n) => s + (n.type === 'file' ? n.size : 0), 0))}</strong></>}，请及时处理重要文件。</span>
       </div>
 
       {/* Toolbar */}
