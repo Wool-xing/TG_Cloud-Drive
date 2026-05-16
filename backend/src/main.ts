@@ -12,7 +12,10 @@ import { validateEnvOrExit } from './common/env-validator';
 async function bootstrap() {
   validateEnvOrExit();
 
-  const app = await NestFactory.create(AppModule, { cors: false });
+  const app = await NestFactory.create(AppModule, {
+    cors: false,
+    rawBody: true,
+  });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);

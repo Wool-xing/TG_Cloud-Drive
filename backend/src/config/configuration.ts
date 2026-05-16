@@ -39,6 +39,12 @@ export default () => ({
   // No fallback — startup validated; seed script also re-checks.
   ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD,
   ADMIN_USERNAME: process.env.ADMIN_USERNAME,
+  // Stripe
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID,
+  STRIPE_BUSINESS_PRICE_ID: process.env.STRIPE_BUSINESS_PRICE_ID,
+
   DEFAULT_USER_QUOTA_GB: parseInt(process.env.DEFAULT_USER_QUOTA_GB, 10) || 50,
 
   MAX_FOLDERS_PER_DIR: parseInt(process.env.MAX_FOLDERS_PER_DIR, 10) || 10,
