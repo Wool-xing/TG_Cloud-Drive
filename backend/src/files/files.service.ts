@@ -976,6 +976,142 @@ export class FilesService {
     return { filename, size: fileBuffer.length };
   }
 
+  // ─── Offline Download (URL → Drive) ─────────────────────────────────────────
+
+  async createOfflineDownload(userId: string, url: string, parentId: string, filename?: string) {
+    // Security: only http/https; block private/internal IPs
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new BadRequestException('无效的 URL');
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new BadRequestException('仅支持 HTTP/HTTPS 链接');
+    }
+
+    // Block obviously internal hosts
+    const hostname = parsed.hostname.toLowerCase();
+    const blocked = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '10.', '172.16.', '192.168.'];
+    if (blocked.some(b => hostname === b || hostname.startsWith(b))) {
+      throw new BadRequestException('不支持内网地址下载');
+    }
+
+    await this.validateParent(userId, parentId || null, false);
+
+    // Extract filename from URL path or Content-Disposition
+    const urlName = decodeURIComponent(parsed.pathname.split('/').pop() || 'download');
+    const name = (filename || urlName).slice(0, 500);
+    const safeName = await this.resolveNameConflict(userId, parentId, name, false);
+
+    // Quota check — we don't know file size yet, just check headroom
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB hard limit
+    if (user && Number(user.usedBytes) >= Number(user.quotaBytes)) {
+      throw new BadRequestException('存储空间不足');
+    }
+
+    // Create placeholder node
+    const node = this.nodeRepo.create({
+      userId, parentId: parentId || null, name: safeName,
+      type: NodeType.FILE, size: 0, isPrivate: false,
+    });
+    await this.nodeRepo.save(node);
+
+    // Stream-fetch the URL to a buffer (with size limit)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30 * 60_000); // 30min timeout
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal as any,
+        headers: { 'User-Agent': 'TGCloudDrive/1.0' },
+        redirect: 'follow',
+      });
+
+      if (!response.ok) {
+        throw new BadRequestException(`下载失败：服务器返回 ${response.status}`);
+      }
+
+      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+      if (contentLength > maxSize) {
+        await this.nodeRepo.delete(node.id);
+        throw new BadRequestException(`文件过大（最大 5GB）`);
+      }
+
+      // Stream the body in chunks, accumulating into a single buffer
+      // (for files < 50MB we buffer; for larger files we'd chunk)
+      const chunks: Buffer[] = [];
+      let totalBytes = 0;
+      const reader = (response as any).body;
+
+      if (reader && typeof reader.getReader === 'function') {
+        // Web Streams API (Node 18+)
+        const streamReader = reader.getReader();
+        while (true) {
+          const { done, value } = await streamReader.read();
+          if (done) break;
+          totalBytes += value.length;
+          if (totalBytes > maxSize) {
+            streamReader.cancel();
+            await this.nodeRepo.delete(node.id);
+            throw new BadRequestException(`文件过大（最大 5GB）`);
+          }
+          chunks.push(Buffer.from(value));
+        }
+      } else {
+        // Fallback: buffer the whole response (Node.js fetch body is already a readable stream)
+        const buf = Buffer.from(await response.arrayBuffer());
+        chunks.push(buf);
+        totalBytes = buf.length;
+      }
+
+      const buffer = Buffer.concat(chunks);
+
+      // Detect MIME from response or URL extension
+      const mimeFromResponse = response.headers.get('content-type')?.split(';')[0]?.trim();
+      const mimeType = mimeFromResponse || 'application/octet-stream';
+
+      // Upload to storage
+      const backend = this.storage.getPrimary();
+      const r2Key = this.storage.buildR2Key(userId, node.id, 0);
+      const result = await this.storage.upload(backend, buffer, r2Key, mimeType);
+
+      await this.nodeRepo.update(node.id, { size: buffer.length, mimeType });
+      await this.chunkRepo.save(this.chunkRepo.create({
+        nodeId: node.id, chunkIndex: 0,
+        storageBackend: backend,
+        tgFileId: result.providerKey,
+        tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
+        r2Key,
+        r2Etag: result.etag || null,
+        size: buffer.length, iv: '000000000000000000000000',
+      }));
+      await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
+
+      if (result.thumbnailFileId) {
+        await this.nodeRepo.update(node.id, { thumbnailFileId: result.thumbnailFileId });
+      }
+
+      await this.audit(userId, 'offline-download', node.id, safeName);
+      return {
+        nodeId: node.id,
+        name: safeName,
+        size: buffer.length,
+        mimeType,
+      };
+    } catch (e: any) {
+      clearTimeout(timeout);
+      // Clean up the placeholder node on failure
+      await this.nodeRepo.delete(node.id).catch(() => {});
+      if (e instanceof BadRequestException) throw e;
+      this.logger.error(`Offline download failed: ${e.message}`);
+      throw new BadRequestException(`离线下载失败：${e.message.slice(0, 200)}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   // ─── Version History ────────────────────────────────────────────────────────
 
   async createVersion(userId: string, nodeId: string) {
