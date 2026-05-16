@@ -1,0 +1,16 @@
+{
+  "name": "TG 云盘",
+  "short_name": "TG云盘",
+  "description": "自托管端到端加密云盘",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
