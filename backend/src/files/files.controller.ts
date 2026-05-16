@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param, Query,
   Req, Res, UseInterceptors, UploadedFile, ParseUUIDPipe, HttpCode,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -36,6 +36,19 @@ export class FilesController {
     @Body('private') isPrivate: boolean,
   ) {
     return this.filesService.createFolder(userId, name, parentId, !!isPrivate);
+  }
+
+  @Put(':nodeId/content')
+  updateContent(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Body('data') data: string,
+    @Body('iv') iv: string,
+    @Body('size') size: number,
+    @Body('mimeType') mimeType: string,
+  ) {
+    const buffer = Buffer.from(data, 'base64');
+    return this.filesService.updateFileContent(userId, nodeId, buffer, iv, size, mimeType);
   }
 
   @Post('document')

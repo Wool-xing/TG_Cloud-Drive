@@ -673,6 +673,22 @@ export class FilesService {
     return { folderName: root.name, files: results, totalFiles: results.length };
   }
 
+  async updateFileContent(userId: string, nodeId: string, encryptedBuffer: Buffer, iv: string, size: number, mimeType: string) {
+    const node = await this.getNodeOwned(userId, nodeId);
+    if (node.type !== NodeType.FILE) throw new BadRequestException('仅文件支持');
+
+    const tgResult = await this.telegramService.sendDocument(encryptedBuffer, node.name, mimeType);
+    // Replace existing chunk(s) with single new chunk
+    await this.chunkRepo.delete({ nodeId });
+    await this.chunkRepo.save(this.chunkRepo.create({
+      nodeId, chunkIndex: 0, tgFileId: tgResult.fileId,
+      tgMessageId: tgResult.messageId, size, iv,
+    }));
+    await this.nodeRepo.update(nodeId, { size, mimeType, updatedAt: new Date() });
+    await this.audit(userId, 'edit', nodeId, node.name);
+    return { size };
+  }
+
   async getThumbnailUrl(userId: string, nodeId: string): Promise<string | null> {
     const node = await this.nodeRepo.findOne({ where: { id: nodeId, userId, deletedAt: IsNull() } });
     if (!node || node.type === NodeType.FOLDER) return null;
