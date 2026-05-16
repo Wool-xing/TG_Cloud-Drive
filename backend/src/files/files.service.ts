@@ -110,6 +110,7 @@ export class FilesService {
       await this.nodeRepo.update(node.id, { thumbnailFileId: tgResult.thumbnailFileId });
     }
 
+    await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length || 1);
     return this.safeNode(node);
   }
 
@@ -440,14 +441,35 @@ export class FilesService {
   async permanentDelete(userId: string, nodeIds: string[]) {
     const nodes = await this.nodeRepo.find({ where: { id: In(nodeIds), userId } });
     for (const node of nodes) {
+      // Collect all descendant nodes to properly decrement quota
+      if (node.type === NodeType.FOLDER) {
+        const descendants = await this.collectDescendantNodes(userId, node.id);
+        const totalBytes = descendants.reduce((sum, d) => sum + (d.type === NodeType.FILE ? Number(d.size) : 0), 0);
+        if (totalBytes > 0) await this.userRepo.decrement({ id: userId }, 'usedBytes', totalBytes);
+      } else if (node.type === NodeType.FILE) {
+        await this.userRepo.decrement({ id: userId }, 'usedBytes', Number(node.size));
+      }
       const chunks = await this.chunkRepo.find({ where: { nodeId: node.id } });
       for (const c of chunks) {
         if (c.tgMessageId) await this.telegramService.deleteMessage(c.tgMessageId).catch(() => {});
       }
-      await this.userRepo.decrement({ id: userId }, 'usedBytes', Number(node.size));
       await this.nodeRepo.delete(node.id);
     }
     return { message: '永久删除成功' };
+  }
+
+  private async collectDescendantNodes(userId: string, folderId: string): Promise<Node[]> {
+    const result: Node[] = [];
+    const stack = [folderId];
+    while (stack.length) {
+      const parentId = stack.pop()!;
+      const children = await this.nodeRepo.find({ where: { parentId, userId, deletedAt: IsNull() } });
+      for (const child of children) {
+        result.push(child);
+        if (child.type === NodeType.FOLDER) stack.push(child.id);
+      }
+    }
+    return result;
   }
 
   /**
@@ -891,13 +913,16 @@ export class FilesService {
     await this.getNodeOwned(userId, nodeId);
     const version = await this.versionRepo.findOne({ where: { id: versionId, nodeId } });
     if (!version) throw new NotFoundException('版本不存在');
+    const chunks = await Promise.all(
+      version.chunkRefs.map(async ref => ({
+        iv: ref.iv,
+        url: await this.telegramService.getFileUrl(ref.telegramFileId),
+      })),
+    );
     return {
       node: { id: nodeId, size: version.size },
       key: { encryptedDek: version.encryptedDek, iv: version.dekIv, salt: version.salt },
-      chunks: version.chunkRefs.map(ref => ({
-        iv: ref.iv,
-        url: `https://api.telegram.org/file/bot_dummy/${ref.telegramFileId}`,
-      })),
+      chunks,
     };
   }
 

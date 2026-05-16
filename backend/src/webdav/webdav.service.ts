@@ -191,6 +191,7 @@ export class WebdavService {
         this.chunkRepo.create({ nodeId: node.id, tgFileId: fileId, tgMessageId: messageId, chunkIndex: 0, size: body.length }),
       );
 
+      await this.userRepo.increment({ id: userId }, 'usedBytes', body.length);
       this.logger.log(`WebDAV PUT: ${filename} (${body.length} bytes) → node ${node.id}`);
       res.status(201).send();
     } catch (err: any) {
@@ -203,8 +204,20 @@ export class WebdavService {
     const node = await this.resolveFile(userId, path);
     if (!node) return res.status(404).send();
 
-    await this.nodeRepo.update(node.id, { deletedAt: new Date() });
-    this.logger.log(`WebDAV DELETE: ${node.name} (node ${node.id})`);
+    const ids = [node.id];
+    if (node.type === NodeType.FOLDER) {
+      const stack = [node.id];
+      while (stack.length) {
+        const parentId = stack.pop()!;
+        const children = await this.nodeRepo.find({ where: { parentId, userId, deletedAt: IsNull() } });
+        for (const child of children) {
+          ids.push(child.id);
+          if (child.type === NodeType.FOLDER) stack.push(child.id);
+        }
+      }
+    }
+    await this.nodeRepo.createQueryBuilder().update().set({ deletedAt: new Date() }).where('id IN (:...ids)', { ids }).execute();
+    this.logger.log(`WebDAV DELETE: ${node.name} + ${ids.length - 1} children`);
     res.status(204).send();
   }
 
