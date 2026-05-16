@@ -1,24 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, ShieldAlert } from 'lucide-react';
+import { Lock, Eye, EyeOff, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { usersApi } from '../api/client';
 import DrivePage from '../pages/Drive';
 
 // P1-F17 + P1-F18: in-memory session token storage.
-//
-// Previously the token + expiry were written to sessionStorage:
-//   - F17: any XSS on the page could read the token and act as the user
-//     inside the private space for the rest of the 30-minute TTL.
-//   - F18: client-side Date.now() vs sessionStorage expiry was the *only*
-//     gate — anyone could forge `private_space_expiry` and bypass the lock
-//     without the password.
-//
-// Now we keep the token in module-scope memory only. A full reload drops it
-// (matches the threat model: the user re-authenticates on every fresh tab /
-// reload). The real authority on expiry is the JWT signature server-side;
-// we still record `unlockedAt` as a defense-in-depth client check but it's
-// no longer the trust boundary.
 const SESSION_TTL_MS = 30 * 60 * 1000;
 let __memToken__: string | null = null;
 let __memUnlockedAt__: number = 0;
@@ -35,6 +22,7 @@ function isSessionValid(): boolean {
 
 export default function PrivateSpaceGate() {
   const user = useAuthStore(s => s.user);
+  const setUser = useAuthStore(s => s.setUser);
   const navigate = useNavigate();
 
   const [unlocked, setUnlocked] = useState(isSessionValid);
@@ -43,13 +31,40 @@ export default function PrivateSpaceGate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Server-authoritative probe: hasPrivateSpace from auth store may be stale
+  // (login response doesn't include it). Probe backend on mount.
+  const [probing, setProbing] = useState(true);
+  const [hasPrivateSpace, setHasPrivateSpace] = useState<boolean | null>(null);
+
   useEffect(() => {
-    if (!user) navigate('/login', { replace: true });
-  }, [user, navigate]);
+    if (!user) { navigate('/login', { replace: true }); return; }
+    (async () => {
+      try {
+        const res = await usersApi.profile() as any;
+        const hasPS = typeof res?.hasPrivateSpace === 'boolean' ? res.hasPrivateSpace : false;
+        setHasPrivateSpace(hasPS);
+        if (hasPS && !user.hasPrivateSpace) {
+          setUser({ ...user, hasPrivateSpace: true });
+        }
+      } catch {
+        setHasPrivateSpace(false);
+      } finally {
+        setProbing(false);
+      }
+    })();
+  }, [user, navigate, setUser]);
 
   if (!user) return null;
 
-  if (!user.hasPrivateSpace) {
+  if (probing) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (hasPrivateSpace === false) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 text-gray-500 dark:text-gray-400 p-8">
         <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center dark:bg-gray-700">
