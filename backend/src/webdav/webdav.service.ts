@@ -9,7 +9,7 @@ import { Node, NodeType } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
 import { NodeKey } from '../files/entities/node-key.entity';
 import { User } from '../users/entities/user.entity';
-import { TelegramService } from '../telegram/telegram.service';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class WebdavService {
@@ -21,7 +21,7 @@ export class WebdavService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(NodeKey) private keyRepo: Repository<NodeKey>,
     private jwtService: JwtService,
-    private telegram: TelegramService,
+    private storage: StorageService,
   ) {}
 
   private async auth(req: Request): Promise<User> {
@@ -153,7 +153,9 @@ export class WebdavService {
     });
 
     for (const chunk of chunks) {
-      const url = await this.telegram.getFileUrl(chunk.tgFileId);
+      const backend = (chunk.storageBackend || 'telegram') as any;
+      const key = backend === 'r2' ? chunk.r2Key! : chunk.tgFileId!;
+      const url = await this.storage.getUrl(backend, key);
       const r = await fetch(url);
       if (r.ok) {
         const buf = Buffer.from(await r.arrayBuffer());
@@ -203,22 +205,35 @@ export class WebdavService {
         return;
       }
 
-      const { fileId, messageId } = await this.telegram.sendDocument(body, filename, cleanMime);
-
+      // Save node first to get stable ID for R2 key
       const node = await this.nodeRepo.save(
         this.nodeRepo.create({
           userId,
           parentId: parent?.id ?? null,
           name: filename,
           type: NodeType.FILE,
-          size: body.length,
+          size: 0, // temp; updated after upload
           mimeType: cleanMime,
           isPrivate: false,
         }),
       );
 
+      const backend = this.storage.getPrimary();
+      const r2Key = this.storage.buildR2Key(userId, node.id, 0);
+      const result = await this.storage.upload(backend, body, r2Key, cleanMime);
+
+      await this.nodeRepo.update(node.id, { size: body.length });
       await this.chunkRepo.save(
-        this.chunkRepo.create({ nodeId: node.id, tgFileId: fileId, tgMessageId: messageId, chunkIndex: 0, size: body.length }),
+        this.chunkRepo.create({
+          nodeId: node.id,
+          storageBackend: backend,
+          tgFileId: result.providerKey,
+          tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
+          r2Key,
+          r2Etag: result.etag || null,
+          chunkIndex: 0,
+          size: body.length,
+        }),
       );
 
       await this.userRepo.increment({ id: userId }, 'usedBytes', body.length);
@@ -302,7 +317,11 @@ export class WebdavService {
       // Clean up overwritten file's Telegram chunks and quota
       const oldChunks = await this.chunkRepo.find({ where: { nodeId: existing.id } });
       for (const c of oldChunks) {
-        if (c.tgMessageId) await this.telegram.deleteMessage(c.tgMessageId).catch(() => {});
+        if (c.storageBackend === 'r2' && c.r2Key) {
+          await this.storage.delete('r2', c.r2Key).catch(() => {});
+        } else if (c.tgMessageId) {
+          await this.storage.delete('telegram', c.tgFileId, String(c.tgMessageId)).catch(() => {});
+        }
       }
       if (existing.type === NodeType.FILE) {
         await this.userRepo.decrement({ id: userId }, 'usedBytes', Number(existing.size));

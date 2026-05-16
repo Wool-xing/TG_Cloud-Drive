@@ -13,11 +13,29 @@ export class FileChunk {
   @Column({ name: 'chunk_index' })
   chunkIndex: number;
 
-  @Column({ name: 'tg_file_id' })
+  /** Storage backend for this chunk: 'telegram' or 'r2' */
+  @Column({ name: 'storage_backend', default: 'telegram', length: 20 })
+  storageBackend: string;
+
+  // ── Telegram fields (legacy + fallback) ──────────────────────────────────
+
+  /** Telegram file_id — legacy primary key, nullable for R2-only chunks */
+  @Column({ name: 'tg_file_id', nullable: true })
   tgFileId: string;
 
+  /** Telegram message_id — used for deleteMessage */
   @Column({ name: 'tg_message_id', nullable: true })
   tgMessageId: number;
+
+  // ── R2 / S3 fields ──────────────────────────────────────────────────────
+
+  /** R2 object key: {userId}/{nodeId}/chunk_{index} */
+  @Column({ name: 'r2_key', nullable: true, length: 512 })
+  r2Key: string;
+
+  /** R2 ETag on upload — used for integrity verification */
+  @Column({ name: 'r2_etag', nullable: true, length: 64 })
+  r2Etag: string;
 
   @Column({ type: 'bigint' })
   size: number;

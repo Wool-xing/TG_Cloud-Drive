@@ -23,6 +23,13 @@ export default () => ({
   CF_WORKERS_URL: process.env.CF_WORKERS_URL,
   CF_WORKERS_SECRET: process.env.CF_WORKERS_SECRET,
 
+  // Cloudflare R2 (S3-compatible object storage)
+  R2_ENDPOINT: process.env.R2_ENDPOINT,
+  R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+  R2_BUCKET: process.env.R2_BUCKET,
+  R2_PUBLIC_URL: process.env.R2_PUBLIC_URL,
+
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
   SMTP_USER: process.env.SMTP_USER,
