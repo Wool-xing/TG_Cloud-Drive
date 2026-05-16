@@ -69,9 +69,13 @@ export default function SpreadsheetEditor({ content, onChange }: Props) {
     emit(data.filter((_, i) => i !== idx));
   };
 
-  const addCol = () => emit(data.map(row => [...row, { value: '' }]));
+  const addCol = () => {
+    setColWidths(w => [...w, 80]);
+    emit(data.map(row => [...row, { value: '' }]));
+  };
   const deleteCol = (idx: number) => {
     if (data[0].length <= 1) return;
+    setColWidths(w => w.filter((_, i) => i !== idx));
     emit(data.map(row => row.filter((_, i) => i !== idx)));
   };
 

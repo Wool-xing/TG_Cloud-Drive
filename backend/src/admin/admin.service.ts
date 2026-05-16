@@ -72,9 +72,10 @@ export class AdminService {
     const qb = this.userRepo.createQueryBuilder('u').where('u.deleted_at IS NULL');
 
     if (search) {
+      const escaped = search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
       qb.andWhere(
-        '(u.username ILIKE :search OR u.nickname ILIKE :search)',
-        { search: `%${search}%` },
+        "(u.username ILIKE :search ESCAPE '\\' OR u.nickname ILIKE :search ESCAPE '\\')",
+        { search: `%${escaped}%` },
       );
     }
 
@@ -264,7 +265,10 @@ export class AdminService {
       const qb = this.nodeRepo.createQueryBuilder('n')
         .where('n.deleted_at IS NULL');
       if (userId) qb.andWhere('n.user_id = :userId', { userId });
-      if (search) qb.andWhere('n.name ILIKE :search', { search: `%${search}%` });
+      if (search) {
+        const escaped = search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+        qb.andWhere("n.name ILIKE :search ESCAPE '\\'", { search: `%${escaped}%` });
+      }
       if (type) {
         if (type === 'folder') {
           qb.andWhere('n.type = :nodeType', { nodeType: NodeType.FOLDER });
@@ -362,7 +366,7 @@ export class AdminService {
     // Base config from environment, using frontend-compatible field names
     const envConfig: Record<string, any> = {
       defaultQuotaGB: this.cs.get<number>('DEFAULT_USER_QUOTA_GB') ?? 10,
-      maxFoldersPerDir: this.cs.get<number>('MAX_FOLDERS_PER_DIR') ?? 1000,
+      maxFoldersPerDir: this.cs.get<number>('MAX_FOLDERS_PER_DIR') ?? 10,
       registrationMode: 'open',
       fileTypeBlacklist: [],
       verificationCodeTTL: 600,

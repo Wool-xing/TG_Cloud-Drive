@@ -131,6 +131,13 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       toast.error('请选择文件（不支持直接下载文件夹）');
       return;
     }
+    // Memory safety: refuse batch downloads > 500MB to avoid OOM
+    const MAX_BATCH_BYTES = 500 * 1024 * 1024;
+    const totalSize = fileNodes.reduce((s, n) => s + Number(n.size), 0);
+    if (totalSize > MAX_BATCH_BYTES) {
+      toast.error(`所选文件总大小 ${(totalSize / 1024 / 1024).toFixed(0)}MB 超过 500MB 限制，请分批下载`);
+      return;
+    }
     const mek = getSessionMEK();
     if (!mek || !mekDerived) {
       toast.error('会话密钥已失效，请退出后重新登录');
@@ -358,10 +365,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={handleNewFolderKeyDown}
-                onBlur={() => {
-                  if (newFolderName.trim()) submitNewItem();
-                  else { setNewFolderMode(false); setNewFolderName(''); }
-                }}
+                onBlur={() => { setNewFolderMode(false); setNewFolderName(''); }}
                 placeholder={createMode === 'folder' ? '文件夹名称' : '文件名称'}
                 maxLength={500}
                 className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 dark:text-gray-100"

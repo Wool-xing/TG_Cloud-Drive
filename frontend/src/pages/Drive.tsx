@@ -38,7 +38,8 @@ export default function Drive({ isPrivate = false }: DriveProps) {
     }
   }, [uploadTasks, queryClient]);
 
-  // Quota warning — toast once per session at 80% / 95% thresholds
+  // Quota warning — toast once per session at 80% / 95% thresholds.
+  // Reset refs when usage drops below threshold so warnings re-fire on re-crossing.
   useEffect(() => {
     if (!user || !user.quotaBytes) return;
     const pct = (user.usedBytes / user.quotaBytes) * 100;
@@ -49,6 +50,8 @@ export default function Drive({ isPrivate = false }: DriveProps) {
       warned80.current = true;
       toast(`存储空间已使用 ${pct.toFixed(1)}%，建议清理不需要的文件`, { icon: '⚠️', duration: 6000 });
     }
+    if (pct < 75) warned80.current = false;
+    if (pct < 90) warned95.current = false;
   }, [user?.usedBytes, user?.quotaBytes]);
 
   const {

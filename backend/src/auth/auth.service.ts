@@ -361,7 +361,11 @@ export class AuthService {
     };
   }
 
-  private async auditLog(userId: string, action: string, nodeId: string, ip: string, ua: string) {
-    await this.auditRepo.save(this.auditRepo.create({ userId, action, nodeId, ipAddress: ip, userAgent: ua }));
+  private async auditLog(userId: string, action: string, nodeId: string | null, ip: string | null, ua: string | null) {
+    try {
+      await this.auditRepo.save(this.auditRepo.create({ userId, action, nodeId, ipAddress: ip, userAgent: ua }));
+    } catch {
+      // audit failure must not affect user-facing operations
+    }
   }
 }
