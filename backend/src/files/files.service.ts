@@ -537,12 +537,8 @@ export class FilesService {
     return { message: toPrivate ? '已移入隐私空间' : '已移出隐私空间' };
   }
 
-  async search(userId: string, keyword: string, type?: string, isPrivate = false) {
-    // P1-B15: escape ILIKE wildcards in user input. Pre-fix, a user typing
-    // "100%_off" matched anything containing "100" + any chars + "off" because
-    // % and _ were treated as wildcards. ESCAPE clause uses '\' as the literal
-    // escape char so callers can still search for percent / underscore.
-    // Length cap protects against pathological inputs hammering the DB index.
+  async search(userId: string, keyword: string, type?: string, isPrivate = false, tagId?: string) {
+    // P1-B15: escape ILIKE wildcards in user input.
     const kw = (keyword ?? '').slice(0, 100);
     const escaped = kw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const qb = this.nodeRepo.createQueryBuilder('n')
@@ -551,6 +547,9 @@ export class FilesService {
       .andWhere('n.is_private = :isPrivate', { isPrivate })
       .andWhere("n.name ILIKE :kw ESCAPE '\\'", { kw: `%${escaped}%` });
     if (type) this.applyMimeTypeFilter(qb, type);
+    if (tagId) {
+      qb.innerJoin('n.tags', 'tag', 'tag.id = :tagId', { tagId });
+    }
     const nodes = await qb.orderBy('n.updatedAt', 'DESC').limit(100).getMany();
     return nodes.map(n => this.safeNode(n));
   }

@@ -231,8 +231,9 @@ export class FilesController {
     @Query('q') keyword: string,
     @Query('type') type: string,
     @Query('private') isPrivate: string,
+    @Query('tagId') tagId?: string,
   ) {
-    return this.filesService.search(userId, keyword, type, isPrivate === 'true');
+    return this.filesService.search(userId, keyword, type, isPrivate === 'true', tagId);
   }
 
   @Patch(':nodeId/star')
