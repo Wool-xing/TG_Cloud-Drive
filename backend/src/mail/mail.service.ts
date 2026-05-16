@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
 
 // P1-I5: HTML escape for variables interpolated into email templates.
@@ -19,13 +20,25 @@ function esc(s: string): string {
 
 @Injectable()
 export class MailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
+  private resend: Resend | null = null;
+  private readonly from: string;
   private readonly logger = new Logger(MailService.name);
 
   constructor(
     private cs: ConfigService,
     @Inject(REDIS_CLIENT) private redis: any,
   ) {
+    this.from = cs.get('SMTP_FROM') || 'TG云盘 <noreply@tgpan.com>';
+
+    // Resend API (primary — higher deliverability)
+    const resendKey = cs.get('RESEND_API_KEY');
+    if (resendKey) {
+      this.resend = new Resend(resendKey);
+      this.logger.log('Mail: Resend API configured (primary)');
+    }
+
+    // nodemailer SMTP (fallback)
     const host = cs.get('SMTP_HOST');
     if (host) {
       this.transporter = nodemailer.createTransport({
@@ -34,6 +47,11 @@ export class MailService {
         secure: cs.get<number>('SMTP_PORT', 587) === 465,
         auth: { user: cs.get('SMTP_USER'), pass: cs.get('SMTP_PASS') },
       });
+      this.logger.log('Mail: SMTP configured (fallback)');
+    }
+
+    if (!this.resend && !this.transporter) {
+      this.logger.warn('Mail: Neither Resend nor SMTP configured — emails will be logged only');
     }
   }
 
@@ -62,15 +80,27 @@ export class MailService {
   }
 
   private async send(to: string, subject: string, html: string) {
-    if (!this.transporter) {
-      this.logger.warn(`[MAIL DEV] To: ${to} | Subject: ${subject}`);
+    await this.checkQuotaOrThrow();
+
+    // Try Resend API first
+    if (this.resend) {
+      try {
+        const { error } = await this.resend.emails.send({ from: this.from, to, subject, html });
+        if (error) throw error;
+        return;
+      } catch (e: any) {
+        this.logger.warn(`Resend send failed (will try SMTP): ${e.message}`);
+      }
+    }
+
+    // Fall back to SMTP
+    if (this.transporter) {
+      await this.transporter.sendMail({ from: this.from, to, subject, html });
       return;
     }
-    await this.checkQuotaOrThrow();
-    await this.transporter.sendMail({
-      from: this.cs.get('SMTP_FROM'),
-      to, subject, html,
-    });
+
+    // Neither available — log only (dev mode)
+    this.logger.warn(`[MAIL DEV] To: ${to} | Subject: ${subject}`);
   }
 
   async sendVerificationCode(to: string, code: string) {
