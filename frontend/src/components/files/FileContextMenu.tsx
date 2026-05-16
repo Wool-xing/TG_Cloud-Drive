@@ -84,7 +84,7 @@ export default function FileContextMenu() {
     if (!node) return;
 
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(e.target as HTMLElement)) {
         setContextMenu(null, null);
       }
     };

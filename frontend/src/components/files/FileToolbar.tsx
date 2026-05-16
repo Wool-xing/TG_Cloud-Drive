@@ -65,7 +65,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) setNewMenuOpen(false);
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as HTMLElement)) setNewMenuOpen(false);
     };
     if (newMenuOpen) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
