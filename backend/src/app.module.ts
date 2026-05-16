@@ -11,6 +11,7 @@ import { AdminModule } from './admin/admin.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { MailModule } from './mail/mail.module';
 import { VerificationModule } from './verification/verification.module';
+import { WebdavModule } from './webdav/webdav.module';
 import { RedisModule } from './common/redis/redis.module';
 import configuration from './config/configuration';
 
@@ -59,6 +60,7 @@ import configuration from './config/configuration';
     TelegramModule,
     MailModule,
     VerificationModule,
+    WebdavModule,
   ],
 })
 export class AppModule {}
