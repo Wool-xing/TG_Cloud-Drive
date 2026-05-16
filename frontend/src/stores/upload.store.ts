@@ -58,6 +58,7 @@ interface UploadStore {
   pauseTask: (id: string) => void;
   resumeTask: (id: string) => void;
   cancelTask: (id: string) => void;
+  swapTasks: (fromId: string, toId: string) => void;
   clearDone: () => void;
   toggleOpen: () => void;
 }
@@ -110,6 +111,17 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
     // processTask now reads lastUploadedChunkIndex from the task and seeks
     // forward to that chunk, so already-acked chunks aren't re-uploaded.
     processTask(id, set, get);
+  },
+
+  swapTasks: (fromId, toId) => {
+    set(s => {
+      const tasks = [...s.tasks];
+      const fromIdx = tasks.findIndex(t => t.id === fromId);
+      const toIdx = tasks.findIndex(t => t.id === toId);
+      if (fromIdx === -1 || toIdx === -1) return s;
+      [tasks[fromIdx], tasks[toIdx]] = [tasks[toIdx], tasks[fromIdx]];
+      return { tasks };
+    });
   },
 
   cancelTask: (id) => {

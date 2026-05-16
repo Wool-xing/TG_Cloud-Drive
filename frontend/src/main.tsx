@@ -39,6 +39,11 @@ import './index.css';
   } catch { /* private mode / disabled storage — fall through */ }
 })();
 
+// Register service worker for PWA offline shell
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
 // Exported so non-component code (e.g. auth.store.logout) can clear cache too.
 export const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },

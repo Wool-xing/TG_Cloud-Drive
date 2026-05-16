@@ -69,11 +69,13 @@ interface TaskRowProps {
 }
 
 function TaskRow({ task }: TaskRowProps) {
-  const { pauseTask, resumeTask, cancelTask } = useUploadStore();
+  const { pauseTask, resumeTask, cancelTask, swapTasks, tasks } = useUploadStore();
 
   const canPause = task.status === 'uploading';
   const canResume = task.status === 'paused' || task.status === 'error';
   const canCancel = task.status !== 'done';
+  const canMove = task.status === 'pending' || task.status === 'paused';
+  const idx = tasks.findIndex(t => t.id === task.id);
 
   return (
     <div className="flex flex-col gap-1.5 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition group">
@@ -115,6 +117,24 @@ function TaskRow({ task }: TaskRowProps) {
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {canMove && idx > 0 && (
+            <button
+              onClick={() => swapTasks(task.id, tasks[idx - 1].id)}
+              title="上移"
+              className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition dark:text-gray-500"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {canMove && idx < tasks.length - 1 && (
+            <button
+              onClick={() => swapTasks(task.id, tasks[idx + 1].id)}
+              title="下移"
+              className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition dark:text-gray-500"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          )}
           {canPause && (
             <button
               onClick={() => pauseTask(task.id)}

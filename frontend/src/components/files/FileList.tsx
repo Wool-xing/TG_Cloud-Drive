@@ -13,9 +13,12 @@ import {
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Node } from '../../types';
 import { useFileStore } from '../../stores/file.store';
 import { formatBytes } from '../../utils/crypto';
+
+const ROW_HEIGHT = 52;
 
 interface FileListProps {
   nodes: Node[];
@@ -73,31 +76,21 @@ function getTypeBadge(node: Node): string {
   return '文件';
 }
 
+const gridCols = 'grid-cols-[40px_1fr_80px_90px_130px_130px]';
+
 function SkeletonRow() {
   return (
-    <tr className="animate-pulse border-b border-gray-100 dark:border-gray-800 dark:border-gray-700">
-      <td className="w-10 px-4 py-3">
-        <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-40" />
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
-      </td>
-      <td className="px-4 py-3">
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-14" />
-      </td>
-      <td className="px-4 py-3">
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
-      </td>
-      <td className="px-4 py-3">
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
-      </td>
-    </tr>
+    <div className={`grid ${gridCols} items-center animate-pulse border-b border-gray-100 dark:border-gray-800`} style={{ height: ROW_HEIGHT }}>
+      <div className="px-4"><div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></div>
+      <div className="px-4 flex items-center gap-3">
+        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-40" />
+      </div>
+      <div className="px-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" /></div>
+      <div className="px-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-14" /></div>
+      <div className="px-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></div>
+      <div className="px-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" /></div>
+    </div>
   );
 }
 
@@ -179,129 +172,122 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
     'px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider select-none';
   const sortableTh = `${thClass} cursor-pointer hover:text-gray-800 dark:hover:text-gray-200`;
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: isLoading ? 0 : nodes.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  const Row = ({ node }: { node: Node }) => {
+    const isSelected = selectedIds.has(node.id);
+    return (
+      <div
+        className={`grid ${gridCols} items-center cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-800 ${
+          isSelected
+            ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/40'
+            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+        }`}
+        style={{ height: ROW_HEIGHT }}
+        onClick={(e) => handleRowClick(e, node)}
+        onDoubleClick={() => handleRowDoubleClick(node)}
+        onContextMenu={(e) => handleContextMenu(e, node)}
+      >
+        <div className="px-4">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => selectNode(node.id, true)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
+          />
+        </div>
+        <div className="px-4 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative flex-shrink-0">
+              {node.type === 'folder' ? (
+                <Folder className="w-5 h-5 text-yellow-400 fill-yellow-300" />
+              ) : (
+                getMimeIcon(node.mimeType)
+              )}
+              {node.isLocked && (
+                <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5 dark:text-gray-400" />
+              )}
+            </div>
+            <span className="truncate font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
+            {node.tags?.slice(0, 2).map((t: any) => (
+              <span key={t.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex-shrink-0 max-w-[80px] truncate"
+                style={t.color ? { backgroundColor: t.color + '20', color: t.color } : {}}>
+                {t.name}
+              </span>
+            ))}
+            {node.isStarred && (
+              <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-300 flex-shrink-0" />
+            )}
+          </div>
+        </div>
+        <div className="px-4">
+          <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 truncate">
+            {getTypeBadge(node)}
+          </span>
+        </div>
+        <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
+          {node.type === 'folder' ? '—' : formatBytes(node.size)}
+        </div>
+        <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
+          {formatDate(node.createdAt)}
+        </div>
+        <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
+          {formatDate(node.updatedAt)}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 dark:bg-gray-900">
-          <tr>
-            <th className="w-10 px-4 py-2">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = someSelected && !allSelected;
-                }}
-                onChange={handleHeaderCheckbox}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
-              />
-            </th>
-            <th
-              className={sortableTh}
-              onClick={() => setSort('name')}
-            >
-              名称 <SortIcon field="name" />
-            </th>
-            <th className={thClass}>类型</th>
-            <th
-              className={sortableTh}
-              onClick={() => setSort('size')}
-            >
-              大小 <SortIcon field="size" />
-            </th>
-            <th
-              className={sortableTh}
-              onClick={() => setSort('createdAt')}
-            >
-              上传时间 <SortIcon field="createdAt" />
-            </th>
-            <th
-              className={sortableTh}
-              onClick={() => setSort('updatedAt')}
-            >
-              修改时间 <SortIcon field="updatedAt" />
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-800 dark:divide-gray-700">
-          {isLoading
-            ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-            : nodes.map((node) => {
-                const isSelected = selectedIds.has(node.id);
-                return (
-                  <tr
-                    key={node.id}
-                    className={`group cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/40'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                    }`}
-                    onClick={(e) => handleRowClick(e, node)}
-                    onDoubleClick={() => handleRowDoubleClick(node)}
-                    onContextMenu={(e) => handleContextMenu(e, node)}
-                  >
-                    {/* Checkbox */}
-                    <td className="w-10 px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => selectNode(node.id, true)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
-                      />
-                    </td>
+    <div ref={scrollRef} className="w-full overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
+      {/* Header */}
+      <div className={`grid ${gridCols} items-center sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 dark:bg-gray-900`}>
+        <div className="px-4 py-2">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+            onChange={handleHeaderCheckbox}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
+          />
+        </div>
+        <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('name')}>
+          名称 <SortIcon field="name" />
+        </div>
+        <div className={thClass}>类型</div>
+        <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('size')}>
+          大小 <SortIcon field="size" />
+        </div>
+        <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('createdAt')}>
+          上传时间 <SortIcon field="createdAt" />
+        </div>
+        <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('updatedAt')}>
+          修改时间 <SortIcon field="updatedAt" />
+        </div>
+      </div>
 
-                    {/* Name */}
-                    <td className="px-4 py-3 max-w-xs">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          {node.type === 'folder' ? (
-                            <Folder className="w-5 h-5 text-yellow-400 fill-yellow-300" />
-                          ) : (
-                            getMimeIcon(node.mimeType)
-                          )}
-                          {node.isLocked && (
-                            <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5 dark:text-gray-400" />
-                          )}
-                        </div>
-                        <span className="truncate font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
-                        {node.tags?.slice(0, 2).map((t: any) => (
-                          <span key={t.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex-shrink-0 max-w-[80px] truncate"
-                            style={t.color ? { backgroundColor: t.color + '20', color: t.color } : {}}>
-                            {t.name}
-                          </span>
-                        ))}
-                        {node.isStarred && (
-                          <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-300 flex-shrink-0" />
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Type badge */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                        {getTypeBadge(node)}
-                      </span>
-                    </td>
-
-                    {/* Size */}
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                      {node.type === 'folder' ? '—' : formatBytes(node.size)}
-                    </td>
-
-                    {/* Created (上传时间) */}
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                      {formatDate(node.createdAt)}
-                    </td>
-
-                    {/* Updated (修改时间) */}
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                      {formatDate(node.updatedAt)}
-                    </td>
-                  </tr>
-                );
-              })}
-        </tbody>
-      </table>
+      {/* Virtual body */}
+      <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+        {isLoading
+          ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+          : virtualizer.getVirtualItems().map(vRow => (
+              <div
+                key={nodes[vRow.index].id}
+                className="absolute top-0 left-0 w-full"
+                style={{ transform: `translateY(${vRow.start}px)` }}
+              >
+                <Row node={nodes[vRow.index]} />
+              </div>
+            ))}
+      </div>
     </div>
   );
 }
