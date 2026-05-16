@@ -15,6 +15,7 @@ import {
   Loader2,
   Clock,
   Upload,
+  Tag as TagIcon,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -32,8 +33,9 @@ import ShareDialog from '../dialogs/ShareDialog';
 import LockDialog from '../dialogs/LockDialog';
 import VersionDialog from '../dialogs/VersionDialog';
 import FileRequestDialog from '../dialogs/FileRequestDialog';
+import TagDialog from '../dialogs/TagDialog';
 
-type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | 'version' | 'file-request' | null;
+type DialogType = 'rename' | 'move' | 'copy' | 'share' | 'lock' | 'version' | 'file-request' | 'tag' | null;
 
 export default function FileContextMenu() {
   const queryClient = useQueryClient();
@@ -406,6 +408,15 @@ export default function FileContextMenu() {
             />
           )}
 
+          {/* Tags */}
+          {isSingle && (
+            <Item
+              icon={<TagIcon className="w-4 h-4" />}
+              label="管理标签"
+              onClick={() => openDialog('tag')}
+            />
+          )}
+
           {/* Version History */}
           {isSingle && isFile && (
             <Item
@@ -493,6 +504,13 @@ export default function FileContextMenu() {
         <FileRequestDialog
           node={dialogNode}
           onClose={closeDialog}
+        />
+      )}
+      {dialog === 'tag' && dialogNode && dialogIsSingle && (
+        <TagDialog
+          node={dialogNode}
+          onClose={closeDialog}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['files'] })}
         />
       )}
     </>

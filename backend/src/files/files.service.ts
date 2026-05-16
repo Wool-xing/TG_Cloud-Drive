@@ -534,6 +534,41 @@ export class FilesService {
     return { isStarred: !node.isStarred };
   }
 
+  // ─── Tags ────────────────────────────────────────────────────────────────────
+
+  async listTags(userId: string) {
+    return this.tagRepo.find({ where: { userId }, order: { name: 'ASC' } });
+  }
+
+  async createTag(userId: string, name: string, color?: string) {
+    const exists = await this.tagRepo.findOne({ where: { userId, name } });
+    if (exists) return exists;
+    return this.tagRepo.save(this.tagRepo.create({ userId, name: name.slice(0, 50), color: color?.slice(0, 20) }));
+  }
+
+  async deleteTag(userId: string, tagId: string) {
+    const tag = await this.tagRepo.findOne({ where: { id: tagId, userId } });
+    if (!tag) throw new NotFoundException('标签不存在');
+    await this.tagRepo.remove(tag);
+  }
+
+  async addTagToNode(userId: string, nodeId: string, tagId: string) {
+    const node = await this.getNodeOwned(userId, nodeId);
+    const tag = await this.tagRepo.findOne({ where: { id: tagId, userId } });
+    if (!tag) throw new NotFoundException('标签不存在');
+    if (!node.tags) node.tags = [];
+    if (node.tags.some(t => t.id === tagId)) return;
+    node.tags.push(tag);
+    await this.nodeRepo.save(node);
+  }
+
+  async removeTagFromNode(userId: string, nodeId: string, tagId: string) {
+    const node = await this.nodeRepo.findOne({ where: { id: nodeId, userId }, relations: ['tags'] });
+    if (!node) throw new NotFoundException('文件不存在');
+    node.tags = (node.tags || []).filter(t => t.id !== tagId);
+    await this.nodeRepo.save(node);
+  }
+
   async listRecent(userId: string, limit = 50) {
     // P1-B16: clamp client-supplied limit so a user can't request 10^9 rows.
     const safeLimit = Math.min(500, Math.max(1, limit | 0 || 50));
