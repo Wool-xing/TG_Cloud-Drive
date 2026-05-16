@@ -46,9 +46,11 @@ export class FilesController {
     @Body('iv') iv: string,
     @Body('size') size: number,
     @Body('mimeType') mimeType: string,
+    @Body('encryptedDek') encryptedDek?: string,
+    @Body('dekIv') dekIv?: string,
   ) {
     const buffer = Buffer.from(data, 'base64');
-    return this.filesService.updateFileContent(userId, nodeId, buffer, iv, size, mimeType);
+    return this.filesService.updateFileContent(userId, nodeId, buffer, iv, size, mimeType, encryptedDek, dekIv);
   }
 
   @Post('document')

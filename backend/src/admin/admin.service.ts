@@ -95,19 +95,20 @@ export class AdminService {
     ip?: string,
     ua?: string,
   ): Promise<any> {
-    // P1-I7: role / status changes are high-risk (privilege escalation, account
-    // lockout). Quota / nickname / username changes are cosmetic — keep them
-    // free of MFA so admin UX stays usable.
-    // Self-edit only blocked for role/status changes; admin CAN adjust own quota.
-    if ((dto.role !== undefined || dto.status !== undefined) && adminId === userId) {
-      throw new BadRequestException('不能修改自身账户角色或状态');
-    }
-    if (dto.role !== undefined || dto.status !== undefined) {
-      await this.requireConfirm(adminId, dto.confirmPassword);
-    }
-
     const user = await this.userRepo.findOne({ where: { id: userId, deletedAt: IsNull() } });
     if (!user) throw new NotFoundException('用户不存在');
+
+    const roleChanged = dto.role !== undefined && dto.role !== user.role;
+    const statusChanged = dto.status !== undefined && dto.status !== user.status;
+
+    // P1-I7: role / status changes are high-risk.
+    // Self-edit only blocked for role/status changes; admin CAN adjust own quota.
+    if ((roleChanged || statusChanged) && adminId === userId) {
+      throw new BadRequestException('不能修改自身账户角色或状态');
+    }
+    if (roleChanged || statusChanged) {
+      await this.requireConfirm(adminId, dto.confirmPassword);
+    }
 
     if (dto.username !== undefined) {
       const trimmed = dto.username.trim();
@@ -118,8 +119,8 @@ export class AdminService {
         user.username = trimmed;
       }
     }
-    if (dto.role !== undefined) user.role = dto.role;
-    if (dto.status !== undefined) user.status = dto.status;
+    if (roleChanged) user.role = dto.role!;
+    if (statusChanged) user.status = dto.status!;
     if (dto.quotaBytes !== undefined) {
       if (dto.quotaBytes < 0) throw new BadRequestException('配额不能为负数');
       user.quotaBytes = dto.quotaBytes;

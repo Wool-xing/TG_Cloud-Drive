@@ -23,7 +23,7 @@ import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
-import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer, encryptChunk } from '../../utils/crypto';
+import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer, encryptChunk, generateDEK, encryptDEK, exportDEKAsBase64 } from '../../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
 import { Node, DownloadInfo } from '../../types';
 
@@ -458,14 +458,31 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       const mek = getSessionMEK();
       if (!mek || !mekDerived) { toast.error('会话密钥已失效'); return; }
       const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
-      if (!info.key) { toast.error('无法获取加密密钥'); return; }
-      const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+
+      let dek: CryptoKey;
+      let encryptedDek: string | undefined;
+      let dekIv: string | undefined;
+
+      if (info.key) {
+        dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+      } else {
+        // New empty file — generate fresh DEK and wrap with MEK
+        dek = await generateDEK();
+        const wrapped = await encryptDEK(dek, mek);
+        encryptedDek = wrapped.encryptedDek;
+        dekIv = wrapped.iv;
+      }
+
       const encoder = new TextEncoder();
       const plain = encoder.encode(editText);
       const { data, iv } = await encryptChunk(plain.buffer, dek);
       const base64 = btoa(String.fromCharCode(...new Uint8Array(data)));
-      await filesApi.updateContent(previewNode.id, { data: base64, iv, size: plain.byteLength, mimeType: previewNode.mimeType || 'text/plain' });
-      // Refresh preview with new content
+      await filesApi.updateContent(previewNode.id, {
+        data: base64, iv, size: plain.byteLength,
+        mimeType: previewNode.mimeType || 'text/plain',
+        encryptedDek, dekIv,
+      });
+
       setPreviewState({ status: 'text', content: editText, mimeType: previewNode.mimeType || 'text/plain' });
       setEditing(false);
       toast.success('已保存');
