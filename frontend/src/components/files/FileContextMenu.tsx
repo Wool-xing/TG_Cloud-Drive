@@ -194,10 +194,10 @@ export default function FileContextMenu() {
       }
       const zip = new JSZip();
       let completed = 0;
-      const total = downloadList.files.length;
+      let skipped = 0;
 
       for (const file of downloadList.files) {
-        if (!file.key) continue; // skip unencrypted
+        if (!file.key) { skipped++; continue; }
         const fileDek = await decryptDEK(file.key.encryptedDek, file.key.iv, mek);
         const chunks: ArrayBuffer[] = [];
         for (let i = 0; i < file.chunks.length; i++) {
@@ -228,7 +228,7 @@ export default function FileContextMenu() {
       a.download = `${savedNode.name}.zip`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      toast.success(`已打包下载 ${completed} 个文件`);
+      toast.success(`已打包下载 ${completed} 个文件` + (skipped ? `，${skipped} 个未加密文件已跳过` : ''));
     } catch (err: any) {
       toast.error(err?.message ?? '文件夹下载失败');
     } finally {

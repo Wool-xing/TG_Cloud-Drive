@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Node } from './node.entity';
 
 @Entity('node_versions')
 export class NodeVersion {
@@ -6,8 +7,12 @@ export class NodeVersion {
   id: string;
 
   @Index()
-  @Column('uuid')
+  @Column('uuid', { name: 'node_id' })
   nodeId: string;
+
+  @ManyToOne(() => Node, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'node_id' })
+  node: Node;
 
   @Column('int')
   version: number;

@@ -550,6 +550,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (editing) return; // Don't capture keys when editing text
       if (e.key === 'Escape') {
         setPreview(null);
       } else if (e.key === 'ArrowLeft' && hasPrev) {
