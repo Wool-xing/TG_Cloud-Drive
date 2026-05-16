@@ -93,7 +93,7 @@ export class TelegramService {
     return !this.workersUrl && this.cs.get<string>('NODE_ENV') === 'development';
   }
 
-  async sendDocument(buffer: Buffer, filename: string, mimeType: string): Promise<{ fileId: string; messageId: number }> {
+  async sendDocument(buffer: Buffer, filename: string, mimeType: string): Promise<{ fileId: string; messageId: number; thumbnailFileId: string | null }> {
     // P1-B20 (续): refuse direct-Telegram mode in PRODUCTION. The direct mode
     // hits api.telegram.org via fetch — on failure the node-fetch error
     // message `request to .../bot{TOKEN}/sendDocument failed` would relay
@@ -141,7 +141,8 @@ export class TelegramService {
 
     const msg = json.result;
     const doc = msg.document || msg.video || msg.audio || msg.photo?.[0];
-    return { fileId: doc.file_id, messageId: msg.message_id };
+    const thumb = (doc?.thumbnail as { file_id?: string } | undefined)?.file_id || null;
+    return { fileId: doc.file_id, messageId: msg.message_id, thumbnailFileId: thumb };
   }
 
   async getFileUrl(fileId: string): Promise<string> {
