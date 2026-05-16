@@ -2,7 +2,7 @@
 
 > 把 Telegram 当存储后端的自托管私有云盘。文件在浏览器端 AES-256-GCM 加密后上传到 Telegram 私有频道，服务端只看得到密文。
 
-![License](https://img.shields.io/badge/license-MIT-blue) ![Node](https://img.shields.io/badge/node-20%2B-brightgreen) ![Stack](https://img.shields.io/badge/stack-NestJS%20%2B%20React%20%2B%20Postgres-orange) ![Status](https://img.shields.io/badge/status-self--hosted-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-blue) ![Node](https://img.shields.io/badge/node-22%2B-brightgreen) ![Stack](https://img.shields.io/badge/stack-NestJS%20%2B%20React%20%2B%20Postgres-orange) ![Status](https://img.shields.io/badge/status-self--hosted-lightgrey)
 
 ---
 
