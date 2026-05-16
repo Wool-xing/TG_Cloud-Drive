@@ -109,9 +109,11 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
               ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
               : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
           }`}>
+            <span className="break-all">
             {isLocked
               ? `输入锁定密码以解锁${itemLabel} "${node.name}"`
               : `为${itemLabel} "${node.name}" 设置访问密码，访问时需要输入密码`}
+            </span>
           </div>
 
           {/* Password input */}
