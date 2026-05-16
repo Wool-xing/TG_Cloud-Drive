@@ -25,6 +25,7 @@ import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer, encryptChunk, generateDEK, encryptDEK, exportDEKAsBase64 } from '../../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
+import RichTextEditor from './RichTextEditor';
 import { Node, DownloadInfo } from '../../types';
 
 // P1-F24: preview path has to buffer into a Blob URL for <img>/<video>/<pdf>.
@@ -754,11 +755,12 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       case 'text': {
         const lang = languageFromMime(previewState.mimeType);
+        const isCode = !!lang;
         return (
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-hidden p-4">
             <div className="rounded-xl overflow-hidden border border-white/10 h-full flex flex-col">
               <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10">
-                <span className="text-xs text-white/50 font-mono">{lang || 'text'}</span>
+                <span className="text-xs text-white/50 font-mono">{lang || 'richtext'}</span>
                 <div className="flex-1" />
                 {editing ? (
                   <>
@@ -774,16 +776,31 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                 )}
               </div>
               {editing ? (
-                <textarea
-                  value={editText}
-                  onChange={e => setEditText(e.target.value)}
-                  className="flex-1 text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 outline-none resize-none border-0"
-                  autoFocus
-                />
+                isCode ? (
+                  <textarea
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    className="flex-1 text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 outline-none resize-none border-0"
+                    autoFocus
+                  />
+                ) : (
+                  <RichTextEditor
+                    content={editText}
+                    onChange={setEditText}
+                    placeholder="开始编辑文档…"
+                  />
+                )
               ) : (
-                <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 flex-1 overflow-auto m-0">
-                  {previewState.content}
-                </pre>
+                isCode ? (
+                  <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 flex-1 overflow-auto m-0">
+                    {previewState.content}
+                  </pre>
+                ) : (
+                  <div
+                    className="prose prose-sm dark:prose-invert max-w-none p-6 flex-1 overflow-auto bg-gray-950 text-gray-100"
+                    dangerouslySetInnerHTML={{ __html: previewState.content }}
+                  />
+                )
               )}
             </div>
           </div>
