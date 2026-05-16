@@ -23,8 +23,20 @@ interface DriveProps {
 export default function Drive({ isPrivate = false }: DriveProps) {
   const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
+  const uploadTasks = useUploadStore(s => s.tasks);
   const warned80 = useRef(false);
   const warned95 = useRef(false);
+  const doneRef = useRef(new Set<string>());
+
+  // Auto-refresh file list when uploads complete
+  useEffect(() => {
+    for (const t of uploadTasks) {
+      if (t.status === 'done' && !doneRef.current.has(t.id)) {
+        doneRef.current.add(t.id);
+        queryClient.invalidateQueries({ queryKey: ['files'] });
+      }
+    }
+  }, [uploadTasks, queryClient]);
 
   // Quota warning — toast once per session at 80% / 95% thresholds
   useEffect(() => {
