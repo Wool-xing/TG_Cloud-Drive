@@ -118,6 +118,7 @@ export default function Trash() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<ModalState>(null);
   const [isActing, setIsActing] = useState(false);
+  const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
 
   const { data: nodes = [], isLoading, error } = useQuery<Node[]>({
     queryKey: ['trash'],
@@ -336,15 +337,19 @@ export default function Trash() {
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => {
+                            setRestoringIds(prev => new Set(prev).add(node.id));
                             filesApi.restore([node.id]).then(() => {
                               invalidate();
                               toast.success('已还原');
+                            }).finally(() => {
+                              setRestoringIds(prev => { const n = new Set(prev); n.delete(node.id); return n; });
                             });
                           }}
-                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors"
+                          disabled={restoringIds.has(node.id)}
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
                           title="还原"
                         >
-                          <RotateCcw className="w-4 h-4" />
+                          {restoringIds.has(node.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={() => setModal({ type: 'permanentDelete', ids: [node.id] })}

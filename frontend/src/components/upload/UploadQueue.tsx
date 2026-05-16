@@ -83,9 +83,14 @@ function TaskRow({ task }: TaskRowProps) {
         <StatusIcon status={task.status} />
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate dark:text-gray-100" title={task.file.name}>
-            {task.file.name}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate dark:text-gray-100" title={task.file.name}>
+              {task.file.name}
+            </p>
+            <span className={`text-[10px] px-1 py-px rounded font-medium flex-shrink-0 ${task.isPrivate ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+              {task.isPrivate ? '私有' : '公开'}
+            </span>
+          </div>
           <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             <span>{statusLabel(task.status)}</span>
             {(task.status === 'uploading' || task.status === 'encrypting') && task.progress > 0 && (

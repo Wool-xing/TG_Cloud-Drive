@@ -192,6 +192,13 @@ export default function FileContextMenu() {
         toast.error('文件夹为空，无文件可下载');
         return;
       }
+      // Memory safety: refuse folder downloads > 500MB to avoid OOM
+      const MAX_FOLDER_BYTES = 500 * 1024 * 1024;
+      const totalSize = (downloadList.files as any[]).reduce((s: number, f: any) => s + Number(f.size || 0), 0);
+      if (totalSize > MAX_FOLDER_BYTES) {
+        toast.error(`文件夹总大小 ${(totalSize / 1024 / 1024).toFixed(0)}MB 超过 500MB 限制，请分批下载`);
+        return;
+      }
       const zip = new JSZip();
       let completed = 0;
       let skipped = 0;

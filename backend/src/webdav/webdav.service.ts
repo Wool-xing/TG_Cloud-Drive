@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { Node, NodeType } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
+import { NodeKey } from '../files/entities/node-key.entity';
 import { User } from '../users/entities/user.entity';
 import { TelegramService } from '../telegram/telegram.service';
 
@@ -18,6 +19,7 @@ export class WebdavService {
     @InjectRepository(Node) private nodeRepo: Repository<Node>,
     @InjectRepository(FileChunk) private chunkRepo: Repository<FileChunk>,
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(NodeKey) private keyRepo: Repository<NodeKey>,
     private jwtService: JwtService,
     private telegram: TelegramService,
   ) {}
@@ -83,7 +85,7 @@ export class WebdavService {
       return res.status(404).send();
     }
     const children = await this.nodeRepo.find({
-      where: { parentId: folder.id, userId, deletedAt: IsNull() },
+      where: { parentId: folder.id, userId, isPrivate: false, deletedAt: IsNull() },
       order: { type: 'ASC', name: 'ASC' },
     });
 
@@ -132,10 +134,18 @@ export class WebdavService {
     const file = await this.resolveFile(userId, path);
     if (!file || file.type !== NodeType.FILE) return res.status(404).send();
 
+    // E2E-encrypted files (uploaded via web UI) have a NodeKey row; the MEK
+    // needed to decrypt them lives only in the browser. WebDAV clients cannot
+    // decrypt these — return a clear error instead of streaming ciphertext.
+    const key = await this.keyRepo.findOne({ where: { nodeId: file.id } });
+    if (key) {
+      res.status(415).send('This file is end-to-end encrypted and cannot be accessed via WebDAV. Please use the web interface.');
+      return;
+    }
+
     const chunks = await this.chunkRepo.find({ where: { nodeId: file.id }, order: { chunkIndex: 'ASC' } });
     if (!chunks.length) return res.status(404).send();
 
-    // Stream file data from Telegram URLs
     res.set({
       'Content-Type': file.mimeType || 'application/octet-stream',
       'Content-Length': String(file.size),
@@ -161,9 +171,22 @@ export class WebdavService {
     const parent = parentPath ? await this.resolvePath(userId, parentPath) : null;
     if (parent && parent.type !== NodeType.FOLDER) return res.status(409).send();
 
-    // Read raw binary body from request stream
+    // Enforce size limit before buffering (DoS protection — matches multer limit)
+    const MAX_WEBDAV_UPLOAD = 25 * 1024 * 1024; // 25MB
+    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+    if (contentLength > MAX_WEBDAV_UPLOAD) {
+      res.status(413).send('Payload too large');
+      return;
+    }
+
     const chunks: Buffer[] = [];
+    let totalBytes = 0;
     for await (const chunk of req) {
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_WEBDAV_UPLOAD) {
+        res.status(413).send('Payload too large');
+        return;
+      }
       chunks.push(Buffer.from(chunk));
     }
     const body = Buffer.concat(chunks);
@@ -173,6 +196,13 @@ export class WebdavService {
     const cleanMime = mimeType.split(';')[0].trim();
 
     try {
+      // Quota check before upload
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (user && Number(user.usedBytes) + body.length > Number(user.quotaBytes)) {
+        res.status(507).send('Insufficient storage');
+        return;
+      }
+
       const { fileId, messageId } = await this.telegram.sendDocument(body, filename, cleanMime);
 
       const node = await this.nodeRepo.save(
@@ -209,7 +239,7 @@ export class WebdavService {
       const stack = [node.id];
       while (stack.length) {
         const parentId = stack.pop()!;
-        const children = await this.nodeRepo.find({ where: { parentId, userId, deletedAt: IsNull() } });
+        const children = await this.nodeRepo.find({ where: { parentId, userId, isPrivate: false, deletedAt: IsNull() } });
         for (const child of children) {
           ids.push(child.id);
           if (child.type === NodeType.FOLDER) stack.push(child.id);
@@ -235,42 +265,77 @@ export class WebdavService {
     }
     if (!destPath) return res.status(400).send();
 
-    const src = await this.resolveTarget(userId, path);
-    if (!src) return res.status(404).send();
-
-    // Determine destination parent and new name
+    // Parse destination segments
     const destSegments = destPath.split('/').filter(Boolean);
     if (!destSegments.length) return res.status(400).send();
     const newName = destSegments.pop()!;
     const destParentPath = destSegments.join('/');
+
+    const src = await this.resolveTarget(userId, path);
+    if (!src) return res.status(404).send();
+
+    // Self-move check
+    if (src.name === newName && src.parentId === (destParentPath ? (await this.resolvePath(userId, destParentPath))?.id ?? null : null)) {
+      res.status(204).send();
+      return;
+    }
+
+    // Cycle detection: prevent moving a folder into itself or its descendants
+    if (src.type === NodeType.FOLDER && destParentPath) {
+      const destParent = await this.resolvePath(userId, destParentPath);
+      if (destParent) {
+        if (destParent.id === src.id) return res.status(409).send();
+        if (await this.isDescendant(userId, src.id, destParent.id)) return res.status(409).send();
+      }
+    }
+
     const destParent = destParentPath ? await this.resolvePath(userId, destParentPath) : null;
     if (destParentPath && !destParent) return res.status(409).send();
-
     const destParentId = destParent?.id ?? null;
 
     // Check duplicate
     const existing = await this.nodeRepo.findOne({
-      where: { parentId: destParentId, name: newName, userId, deletedAt: IsNull() },
+      where: { parentId: destParentId, name: newName, userId, isPrivate: false, deletedAt: IsNull() },
     });
-    if (existing && existing.id !== src.id) {
-      // Overwrite: delete existing, move src
-      await this.nodeRepo.update(existing.id, { deletedAt: new Date() });
+    const isOverwrite = existing && existing.id !== src.id;
+    if (isOverwrite) {
+      // Clean up overwritten file's Telegram chunks and quota
+      const oldChunks = await this.chunkRepo.find({ where: { nodeId: existing.id } });
+      for (const c of oldChunks) {
+        if (c.tgMessageId) await this.telegram.deleteMessage(c.tgMessageId).catch(() => {});
+      }
+      if (existing.type === NodeType.FILE) {
+        await this.userRepo.decrement({ id: userId }, 'usedBytes', Number(existing.size));
+      }
+      await this.nodeRepo.delete(existing.id);
     }
 
     if (src.parentId === destParentId) {
-      // Same folder — rename
       await this.nodeRepo.update(src.id, { name: newName });
     } else {
-      // Different folder — move
       if (destParentId && src.type !== NodeType.FOLDER) {
-        const target = await this.nodeRepo.findOne({ where: { id: destParentId, userId, type: NodeType.FOLDER, deletedAt: IsNull() } });
+        const target = await this.nodeRepo.findOne({ where: { id: destParentId, userId, type: NodeType.FOLDER, isPrivate: false, deletedAt: IsNull() } });
         if (!target) return res.status(409).send();
       }
       await this.nodeRepo.update(src.id, { name: newName, parentId: destParentId });
     }
 
     this.logger.log(`WebDAV MOVE: ${src.name} → ${newName} (parent ${destParentId ?? 'root'})`);
-    res.status(destPath ? 201 : 204).send();
+    res.status(isOverwrite ? 204 : 201).send();
+  }
+
+  // Check if targetId is a descendant of ancestorId
+  private async isDescendant(userId: string, ancestorId: string, targetId: string): Promise<boolean> {
+    const visited = new Set<string>();
+    let currentId: string | null = targetId;
+    while (currentId) {
+      if (currentId === ancestorId) return true;
+      if (visited.has(currentId)) return false;
+      visited.add(currentId);
+      const node = await this.nodeRepo.findOne({ where: { id: currentId, userId }, select: ['parentId'] });
+      currentId = node?.parentId ?? null;
+    }
+    return false;
   }
 
   private async resolveTarget(userId: string, path: string): Promise<Node | null> {
@@ -288,7 +353,7 @@ export class WebdavService {
     if (parent && parent.type !== NodeType.FOLDER) return res.status(409).send();
 
     const exists = await this.nodeRepo.findOne({
-      where: { parentId: parent?.id ?? null, name, userId, type: NodeType.FOLDER, deletedAt: IsNull() },
+      where: { parentId: parent?.id ?? null, name, userId, type: NodeType.FOLDER, isPrivate: false, deletedAt: IsNull() },
     });
     if (exists) return res.status(405).send();
 
@@ -306,7 +371,7 @@ export class WebdavService {
     const parent = folderPath ? await this.resolvePath(userId, folderPath) : null;
     if (folderPath && !parent) return null;
     return this.nodeRepo.findOne({
-      where: { parentId: parent?.id ?? null, name: filename, userId, deletedAt: IsNull() },
+      where: { parentId: parent?.id ?? null, name: filename, userId, isPrivate: false, deletedAt: IsNull() },
     });
   }
 
@@ -317,7 +382,7 @@ export class WebdavService {
     let current: Node | null = null;
     for (const seg of segments) {
       current = await this.nodeRepo.findOne({
-        where: { parentId, name: seg, userId, type: NodeType.FOLDER, deletedAt: IsNull() },
+        where: { parentId, name: seg, userId, type: NodeType.FOLDER, isPrivate: false, deletedAt: IsNull() },
       });
       if (!current) return null;
       parentId = current.id;

@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Node } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
+import { NodeKey } from '../files/entities/node-key.entity';
 import { User } from '../users/entities/user.entity';
 import { TelegramModule } from '../telegram/telegram.module';
 import { WebdavController } from './webdav.controller';
@@ -11,7 +12,7 @@ import { WebdavService } from './webdav.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Node, FileChunk, User]),
+    TypeOrmModule.forFeature([Node, FileChunk, User, NodeKey]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -19,7 +19,7 @@ export class FileRequestController {
 
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post(':token/upload')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }))
   upload(
     @Param('token') token: string,
     @UploadedFile() file: Express.Multer.File,

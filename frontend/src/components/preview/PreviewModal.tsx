@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   X,
@@ -482,6 +483,8 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       if (info.key) {
         dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+        encryptedDek = info.key.encryptedDek;
+        dekIv = info.key.iv;
       } else {
         // New empty file — generate fresh DEK and wrap with MEK
         dek = await generateDEK();
@@ -821,7 +824,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                   <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 flex-1 overflow-auto m-0">{previewState.content}</pre>
                 ) : (
                   <div className="prose prose-sm dark:prose-invert max-w-none p-6 flex-1 overflow-auto bg-gray-950 text-gray-100"
-                    dangerouslySetInnerHTML={{ __html: previewState.content }} />
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewState.content) }} />
                 )
               )}
             </div>

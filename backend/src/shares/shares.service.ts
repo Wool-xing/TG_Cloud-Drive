@@ -257,8 +257,16 @@ export class SharesService {
           message: '分享密码错误',
         });
       }
+      // Share password brute-force protection: per-token counter, 5 fails = 15-min cooldown
+      const bruteKey = `share:fail:${token}`;
+      const failCount = parseInt((await this.redis.get(bruteKey).catch(() => '0')) || '0', 10);
+      if (failCount >= 5) {
+        throw new ForbiddenException('尝试次数过多，请15分钟后再试');
+      }
+
       const valid = await comparePassword(password, row.passwordHash);
       if (!valid) {
+        await this.redis.setex(bruteKey, 900, String(failCount + 1)).catch(() => {});
         throw new UnauthorizedException({
           code: 'SHARE_PASSWORD_INVALID',
           message: '分享密码错误',

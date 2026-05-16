@@ -344,8 +344,7 @@ export class FilesService {
     let processed = 0;
     while (queue.length > 0) {
       if (++processed > maxNodes) {
-        this.logger.warn(`copy() exceeded ${maxNodes} nodes, aborting recursion`);
-        break;
+        throw new BadRequestException(`文件夹包含超过 ${maxNodes} 个节点，无法完整复制。请分批操作。`);
       }
       const { srcId, destId } = queue.shift()!;
       const children = await this.nodeRepo.find({
@@ -444,7 +443,7 @@ export class FilesService {
     for (const node of nodes) {
       // Collect all descendant nodes to properly decrement quota
       if (node.type === NodeType.FOLDER) {
-        const descendants = await this.collectDescendantNodes(userId, node.id);
+        const descendants = await this.collectDescendantNodes(userId, node.id, true);
         const totalBytes = descendants.reduce((sum, d) => sum + (d.type === NodeType.FILE ? Number(d.size) : 0), 0);
         if (totalBytes > 0) await this.userRepo.decrement({ id: userId }, 'usedBytes', totalBytes);
       } else if (node.type === NodeType.FILE) {
@@ -459,12 +458,14 @@ export class FilesService {
     return { message: '永久删除成功' };
   }
 
-  private async collectDescendantNodes(userId: string, folderId: string): Promise<Node[]> {
+  private async collectDescendantNodes(userId: string, folderId: string, includeSoftDeleted = false): Promise<Node[]> {
     const result: Node[] = [];
     const stack = [folderId];
     while (stack.length) {
       const parentId = stack.pop()!;
-      const children = await this.nodeRepo.find({ where: { parentId, userId, deletedAt: IsNull() } });
+      const where: any = { parentId, userId };
+      if (!includeSoftDeleted) where.deletedAt = IsNull();
+      const children = await this.nodeRepo.find({ where });
       for (const child of children) {
         result.push(child);
         if (child.type === NodeType.FOLDER) stack.push(child.id);
@@ -632,7 +633,7 @@ export class FilesService {
   async listStarred(userId: string) {
     // P1-B16: bound. Sustained pagination tracked as a separate UI fix.
     const nodes = await this.nodeRepo.find({
-      where: { userId, isStarred: true, deletedAt: IsNull() },
+      where: { userId, isStarred: true, isPrivate: false, deletedAt: IsNull() },
       order: { updatedAt: 'DESC' },
       take: 500,
     });
@@ -873,6 +874,12 @@ export class FilesService {
 
     req.uploadCount++;
     await this.fileRequestRepo.save(req);
+
+    // Quota check on the receiving folder owner
+    const owner = await this.userRepo.findOne({ where: { id: req.userId } });
+    if (owner && Number(owner.usedBytes) + fileBuffer.length > Number(owner.quotaBytes)) {
+      throw new BadRequestException('接收方存储空间不足');
+    }
 
     // Upload as a simple file node (no encryption for external uploads)
     const node = this.nodeRepo.create({

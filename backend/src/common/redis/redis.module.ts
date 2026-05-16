@@ -10,7 +10,7 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
     {
       provide: REDIS_CLIENT,
       inject: [ConfigService],
-      useFactory: (cs: ConfigService) => {
+      useFactory: async (cs: ConfigService) => {
         // Password is passed as a separate option (rather than baked into
         // REDIS_URL) so passwords containing URL-reserved chars work without
         // encoding tricks. In production, validateEnvOrExit() guarantees this
@@ -20,11 +20,10 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
           password,
           lazyConnect: true,
         });
-        // NOTE: silent fallback below is INCORRECT for production (the safety
-        // mechanisms — force-logout, rate-limiting — depend on Redis being up).
-        // Tracked as part of the D7-family fail-close work; not changed here
-        // to keep this fix scoped to network/auth surface (B3).
-        client.connect().catch(() => console.warn('Redis not available, using in-memory fallback'));
+        // Redis is required for security mechanisms (force-logout, rate-limiting,
+        // brute-force lockouts, upload idempotency). Fail-closed: refuse to start
+        // without it so these protections cannot silently degrade.
+        await client.connect();
         return client;
       },
     },

@@ -28,7 +28,8 @@ export async function encryptDEK(dek: CryptoKey, mek: CryptoKey): Promise<{ encr
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const rawDek = await crypto.subtle.exportKey('raw', dek);
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, mek, rawDek);
-  return { encryptedDek: bufferToHex(encrypted), iv: bufferToHex(iv), salt: bufferToHex(new Uint8Array(0)) };
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { encryptedDek: bufferToHex(encrypted), iv: bufferToHex(iv), salt: bufferToHex(salt) };
 }
 
 // Decrypt DEK with MEK

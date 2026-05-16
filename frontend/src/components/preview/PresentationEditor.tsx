@@ -45,6 +45,7 @@ export default function PresentationEditor({ content, onChange }: Props) {
   };
 
   const moveSlide = (from: number, to: number) => {
+    if (from < 0 || from >= slides.length) return;
     if (to < 0 || to >= slides.length) return;
     const s = [...slides];
     [s[from], s[to]] = [s[to], s[from]];
