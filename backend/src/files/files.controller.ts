@@ -330,4 +330,15 @@ export class FilesController {
   ) {
     return this.filesService.createFileRequest(userId, nodeId, maxFiles, ttlHours);
   }
+
+  @Post('offline-download')
+  @HttpCode(202)
+  createOfflineDownload(
+    @CurrentUser('id') userId: string,
+    @Body('url') url: string,
+    @Body('parentId') parentId: string,
+    @Body('name') name: string,
+  ) {
+    return this.filesService.createOfflineDownload(userId, url, parentId, name);
+  }
 }
