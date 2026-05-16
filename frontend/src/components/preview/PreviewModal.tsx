@@ -16,12 +16,14 @@ import {
   VolumeX,
   Maximize,
   Minimize,
+  Edit3,
+  Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
-import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer } from '../../utils/crypto';
+import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer, encryptChunk } from '../../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
 import { Node, DownloadInfo } from '../../types';
 
@@ -437,6 +439,39 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
   const [downloadProgress, setDownloadProgress] = useState(-1);
   const [lockPassword, setLockPassword] = useState('');
   const [needsLockPassword, setNeedsLockPassword] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const savedNodeRef = useRef<Node | null>(null);
+
+  const handleEdit = () => {
+    if (previewState.status === 'text') {
+      setEditText(previewState.content);
+      setEditing(true);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!previewNode || saving) return;
+    setSaving(true);
+    try {
+      const mek = getSessionMEK();
+      if (!mek || !mekDerived) { toast.error('会话密钥已失效'); return; }
+      const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
+      if (!info.key) { toast.error('无法获取加密密钥'); return; }
+      const dek = await decryptDEK(info.key.encryptedDek, info.key.iv, mek);
+      const encoder = new TextEncoder();
+      const plain = encoder.encode(editText);
+      const { data, iv } = await encryptChunk(plain.buffer, dek);
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(data)));
+      await filesApi.updateContent(previewNode.id, { data: base64, iv, size: plain.byteLength, mimeType: previewNode.mimeType || 'text/plain' });
+      // Refresh preview with new content
+      setPreviewState({ status: 'text', content: editText, mimeType: previewNode.mimeType || 'text/plain' });
+      setEditing(false);
+      toast.success('已保存');
+    } catch (err: any) { toast.error(err?.message || '保存失败');
+    } finally { setSaving(false); }
+  };
   const [downloadInfo, setDownloadInfo] = useState<DownloadInfo | null>(null);
 
   const blobUrlRef = useRef<string | null>(null);
@@ -697,13 +732,35 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         const lang = languageFromMime(previewState.mimeType);
         return (
           <div className="flex-1 overflow-auto p-4">
-            <div className="rounded-xl overflow-hidden border border-white/10 h-full">
+            <div className="rounded-xl overflow-hidden border border-white/10 h-full flex flex-col">
               <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10">
                 <span className="text-xs text-white/50 font-mono">{lang || 'text'}</span>
+                <div className="flex-1" />
+                {editing ? (
+                  <>
+                    <button onClick={() => setEditing(false)} className="text-xs text-white/60 hover:text-white px-2 py-1 rounded transition-colors">取消</button>
+                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors">
+                      <Save className="w-3 h-3" />{saving ? '保存中…' : '保存'}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={handleEdit} className="flex items-center gap-1 text-xs text-white/60 hover:text-white px-2 py-1 rounded transition-colors">
+                    <Edit3 className="w-3 h-3" />编辑
+                  </button>
+                )}
               </div>
-              <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 h-[calc(100%-2.5rem)] overflow-auto">
-                {previewState.content}
-              </pre>
+              {editing ? (
+                <textarea
+                  value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  className="flex-1 text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 outline-none resize-none border-0"
+                  autoFocus
+                />
+              ) : (
+                <pre className="text-sm font-mono whitespace-pre-wrap break-words bg-gray-950 text-green-400 p-6 flex-1 overflow-auto m-0">
+                  {previewState.content}
+                </pre>
+              )}
             </div>
           </div>
         );

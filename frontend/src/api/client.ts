@@ -120,6 +120,7 @@ export const filesApi = {
   list: (params: any) => api.get('/files', { params }),
   createFolder: (data: any) => api.post('/files/folder', data),
   createDocument: (data: any) => api.post('/files/document', data),
+  updateContent: (nodeId: string, data: any) => api.put(`/files/${nodeId}/content`, data),
   rename: (nodeId: string, name: string) => api.patch(`/files/${nodeId}/rename`, { name }),
   move: (nodeId: string, targetParentId: string) => api.patch(`/files/${nodeId}/move`, { targetParentId }),
   copy: (nodeId: string, targetParentId: string) => api.post(`/files/${nodeId}/copy`, { targetParentId }),
