@@ -129,6 +129,13 @@ export default function Drive({ isPrivate = false }: DriveProps) {
     }
   };
 
+  const warnDuplicates = (filenames: string[]) => {
+    const existing = new Set(nodes.map(n => n.name.toLowerCase()));
+    const dupes = filenames.filter(f => existing.has(f.toLowerCase()));
+    if (dupes.length === 1) toast(`"${dupes[0]}" 已存在，上传后将覆盖原文件`, { icon: '⚠️', duration: 5000 });
+    else if (dupes.length > 1) toast(`${dupes.length} 个文件名已存在，上传后将覆盖原文件`, { icon: '⚠️', duration: 5000 });
+  };
+
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -139,6 +146,7 @@ export default function Drive({ isPrivate = false }: DriveProps) {
     try {
       const files = await collectFiles(items);
       if (files.length) {
+        warnDuplicates(files.map(f => f.name));
         addFiles(files, currentParentId, isPrivate);
         toast.success(`已添加 ${files.length} 个文件到上传队列`);
       }
