@@ -591,19 +591,45 @@ export class FilesService {
   }
 
   async search(userId: string, keyword: string, type?: string, isPrivate = false, tagId?: string) {
-    // P1-B15: escape ILIKE wildcards in user input.
-    const kw = (keyword ?? '').slice(0, 100);
-    const escaped = kw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const kw = (keyword ?? '').slice(0, 100).trim();
+    if (!kw) {
+      // empty search = list all in current space
+      return this.list(userId, '', isPrivate, 'updatedAt', 'DESC', type);
+    }
+
     const qb = this.nodeRepo.createQueryBuilder('n')
       .where('n.user_id = :userId', { userId })
       .andWhere('n.deleted_at IS NULL')
-      .andWhere('n.is_private = :isPrivate', { isPrivate })
-      .andWhere("n.name ILIKE :kw ESCAPE '\\'", { kw: `%${escaped}%` });
+      .andWhere('n.is_private = :isPrivate', { isPrivate });
+
+    // Full-text search using PostgreSQL tsvector — supports multi-word queries,
+    // prefix matching via :* suffix, and ranks results by relevance.
+    // Escaping: plainto_tsquery splits input into tokens; we additionally strip
+    // tsquery special chars (! & | ( ) < > ~ :) to prevent syntax errors.
+    const sanitized = kw.replace(/[!&|()<>~:@*\\]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (sanitized) {
+      // Build a prefix-match tsquery: "report 2024" → "report:* & 2024:*"
+      const tokens = sanitized.split(/\s+/).filter(t => t.length > 0).slice(0, 10);
+      const tsquery = tokens.map(t => `${t}:*`).join(' & ');
+      qb.andWhere(
+        "to_tsvector('simple', n.name) @@ to_tsquery('simple', :tsquery)",
+        { tsquery },
+      );
+      // Rank by relevance (higher = better match)
+      qb.addSelect(
+        "ts_rank(to_tsvector('simple', n.name), to_tsquery('simple', :tsquery))",
+        'search_rank',
+      );
+      qb.orderBy('search_rank', 'DESC');
+    }
+
     if (type) this.applyMimeTypeFilter(qb, type);
     if (tagId) {
       qb.innerJoin('n.tags', 'tag', 'tag.id = :tagId', { tagId });
     }
-    const nodes = await qb.orderBy('n.updatedAt', 'DESC').limit(100).getMany();
+
+    qb.addOrderBy('n.updatedAt', 'DESC');
+    const nodes = await qb.limit(100).getMany();
     return nodes.map(n => this.safeNode(n));
   }
 

@@ -32,11 +32,14 @@ export default () => ({
   R2_BUCKET: process.env.R2_BUCKET,
   R2_PUBLIC_URL: process.env.R2_PUBLIC_URL,
 
+  // Resend (primary email — higher deliverability than raw SMTP)
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
-  SMTP_FROM: process.env.SMTP_FROM || 'TG云盘 <noreply@example.com>',
+  SMTP_FROM: process.env.SMTP_FROM || 'TG云盘 <noreply@tgpan.com>',
 
   // No fallback — startup validated; seed script also re-checks.
   ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD,
