@@ -235,7 +235,11 @@ export class FilesController {
     @Query('type') type: string,
     @Query('private') isPrivate: string,
     @Query('tagId') tagId?: string,
+    @Query('semantic') semantic?: string,
   ) {
+    if (semantic === 'true') {
+      return this.filesService.semanticSearch(userId, keyword, isPrivate === 'true');
+    }
     return this.filesService.search(userId, keyword, type, isPrivate === 'true', tagId);
   }
 
@@ -330,6 +334,15 @@ export class FilesController {
     @Body('ttlHours') ttlHours = 72,
   ) {
     return this.filesService.createFileRequest(userId, nodeId, maxFiles, ttlHours);
+  }
+
+  @Put(':nodeId/note')
+  async setNote(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Body('note') note: string,
+  ) {
+    return this.filesService.setNote(userId, nodeId, note);
   }
 
   @Post('offline-download')

@@ -58,6 +58,10 @@ export default () => ({
   OAUTH_GITHUB_CLIENT_ID: process.env.OAUTH_GITHUB_CLIENT_ID,
   OAUTH_GITHUB_CLIENT_SECRET: process.env.OAUTH_GITHUB_CLIENT_SECRET,
 
+  EMBEDDING_API_KEY: process.env.EMBEDDING_API_KEY,
+  EMBEDDING_API_BASE: process.env.EMBEDDING_API_BASE || 'https://api.openai.com/v1',
+  EMBEDDING_MODEL: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
+
   DEFAULT_USER_QUOTA_GB: parseInt(process.env.DEFAULT_USER_QUOTA_GB, 10) || 50,
 
   MAX_FOLDERS_PER_DIR: parseInt(process.env.MAX_FOLDERS_PER_DIR, 10) || 10,
