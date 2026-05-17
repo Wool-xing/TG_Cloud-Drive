@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import * as Sentry from '@sentry/react';
+import posthog from 'posthog-js';
 import App from './App';
 import './index.css';
 
@@ -15,6 +16,16 @@ if (sentryDsn) {
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
+  });
+}
+
+// Initialize PostHog for frontend analytics
+const phKey = import.meta.env.VITE_POSTHOG_API_KEY as string | undefined;
+if (phKey) {
+  posthog.init(phKey, {
+    api_host: import.meta.env.VITE_POSTHOG_HOST as string || 'https://us.i.posthog.com',
+    autocapture: true,
+    capture_pageview: true,
   });
 }
 

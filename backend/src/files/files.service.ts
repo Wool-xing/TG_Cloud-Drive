@@ -755,6 +755,9 @@ export class FilesService {
     const node = await this.getNodeOwned(userId, nodeId);
     if (node.type !== NodeType.FILE) throw new BadRequestException('仅文件支持');
 
+    // Auto-save version before overwrite (keep last 10 auto-versions per file)
+    await this.autoSaveVersion(userId, node).catch(() => {});
+
     const backend = this.storage.getPrimary();
     const r2Key = this.storage.buildR2Key(userId, nodeId, 0);
     const result = await this.storage.upload(backend, encryptedBuffer, r2Key, mimeType);
@@ -1164,6 +1167,47 @@ export class FilesService {
       key: { encryptedDek: version.encryptedDek, iv: version.dekIv, salt: version.salt },
       chunks,
     };
+  }
+
+  /** Auto-save a version of the current file state before it's overwritten. */
+  private async autoSaveVersion(userId: string, node: Node) {
+    const maxAutoVersions = this.cs.get<number>('AUTO_VERSION_LIMIT', 10);
+    const chunks = await this.chunkRepo.find({ where: { nodeId: node.id }, order: { chunkIndex: 'ASC' } });
+    if (!chunks.length) return; // nothing to snapshot
+
+    const key = await this.keyRepo.findOne({ where: { nodeId: node.id } });
+    const existingVersions = await this.versionRepo.count({ where: { nodeId: node.id } });
+
+    // Drop oldest auto-version if over limit
+    if (existingVersions >= maxAutoVersions) {
+      const oldest = await this.versionRepo.find({
+        where: { nodeId: node.id },
+        order: { version: 'ASC' },
+        take: existingVersions - maxAutoVersions + 1,
+      });
+      if (oldest.length) {
+        await this.versionRepo.delete(oldest.map(v => v.id));
+      }
+    }
+
+    const nextVersion = existingVersions + 1;
+    const version = this.versionRepo.create({
+      nodeId: node.id,
+      version: nextVersion,
+      size: Number(node.size),
+      encryptedDek: key?.encryptedDek ?? null,
+      dekIv: key?.iv ?? null,
+      salt: key?.salt ?? null,
+      chunkCount: chunks.length,
+      chunkRefs: chunks.map(c => ({
+        index: c.chunkIndex,
+        iv: c.iv,
+        storageBackend: c.storageBackend || 'telegram',
+        telegramFileId: c.tgFileId,
+        r2Key: c.r2Key,
+      })),
+    });
+    await this.versionRepo.save(version);
   }
 
   private async audit(userId: string, action: string, nodeId: string, nodeName: string) {
