@@ -443,6 +443,7 @@ export class FilesController {
     res.send(buffer);
   }
 
+  @Throttle({ default: { ttl: 30000, limit: 10 } })
   @Get('sync/diff')
   async syncDiff(
     @CurrentUser('id') userId: string,
