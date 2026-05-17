@@ -16,6 +16,7 @@ import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { StorageService } from '../storage/storage.service';
 import { EmbeddingService } from './embedding.service';
+import { OcrService } from '../ocr/ocr.service';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
 import { comparePassword, hashPassword, generateSecureToken } from '../common/encryption';
 
@@ -35,6 +36,7 @@ export class FilesService {
     @Inject(REDIS_CLIENT) private redis: any,
     private storage: StorageService,
     private embedding: EmbeddingService,
+    private ocr: OcrService,
     private cs: ConfigService,
   ) {}
 
@@ -121,6 +123,9 @@ export class FilesService {
       await this.nodeRepo.update(node.id, { thumbnailFileId: result.thumbnailFileId });
     }
     await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
+    this.triggerOcrOnUpload(node.id, name).catch(err =>
+      this.logger.warn(`OCR trigger failed for ${node.id}: ${err.message}`),
+    );
     return this.safeNode(node);
   }
 
@@ -214,6 +219,10 @@ export class FilesService {
       await this.userRepo.increment({ id: userId }, 'usedBytes', totalSize);
       await this.redis.del(cacheKey).catch(() => {});
       await this.audit(userId, 'upload', nodeId, filename);
+      // Fire OCR asynchronously for image/PDF files — don't block upload response
+      this.triggerOcrOnUpload(nodeId, filename).catch(err =>
+        this.logger.warn(`OCR trigger failed for ${nodeId}: ${err.message}`),
+      );
       return { done: true, nodeId };
     }
     return { done: false, nodeId, uploaded, total: totalChunks };
@@ -613,13 +622,24 @@ export class FilesService {
       // Build a prefix-match tsquery: "report 2024" → "report:* & 2024:*"
       const tokens = sanitized.split(/\s+/).filter(t => t.length > 0).slice(0, 10);
       const tsquery = tokens.map(t => `${t}:*`).join(' & ');
+      // Search both name and OCR-extracted text
       qb.andWhere(
-        "to_tsvector('simple', n.name) @@ to_tsquery('simple', :tsquery)",
-        { tsquery },
+        new Brackets(b => {
+          b.where(
+            "to_tsvector('simple', n.name) @@ to_tsquery('simple', :tsquery)",
+            { tsquery },
+          ).orWhere(
+            "to_tsvector('simple', coalesce(n.ocr_text, '')) @@ to_tsquery('simple', :tsquery)",
+            { tsquery },
+          );
+        }),
       );
-      // Rank by relevance (higher = better match)
+      // Rank by relevance — combine name match (weighted higher) + OCR text match
       qb.addSelect(
-        "ts_rank(to_tsvector('simple', n.name), to_tsquery('simple', :tsquery))",
+        `ts_rank(
+          to_tsvector('simple', n.name) || to_tsvector('simple', coalesce(n.ocr_text, '')),
+          to_tsquery('simple', :tsquery)
+        )`,
         'search_rank',
       );
       qb.orderBy('search_rank', 'DESC');
@@ -1289,5 +1309,44 @@ export class FilesService {
 
   private async audit(userId: string, action: string, nodeId: string, nodeName: string) {
     await this.auditRepo.save(this.auditRepo.create({ userId, action, nodeId, nodeName })).catch(() => {});
+  }
+
+  private async triggerOcrOnUpload(nodeId: string, filename: string) {
+    const node = await this.nodeRepo.findOne({ where: { id: nodeId }, select: ['id', 'mimeType', 'ocrText'] });
+    if (!node || node.ocrText) return; // already has OCR text, skip
+
+    const mimeType = node.mimeType ?? '';
+    if (!this.ocr.isSupported(mimeType)) return;
+
+    try {
+      const chunks = await this.chunkRepo.find({
+        where: { nodeId },
+        select: ['tgFileId', 'r2Key', 'storageBackend', 'chunkIndex'],
+        order: { chunkIndex: 'ASC' },
+      });
+      if (!chunks.length) return;
+
+      // Assemble file buffer from chunks
+      const buffers: Buffer[] = [];
+      for (const c of chunks) {
+        const backend = (c.storageBackend || 'telegram') as 'telegram' | 'r2';
+        const ref = backend === 'r2' ? c.r2Key! : c.tgFileId!;
+        const url = await this.storage.getUrl(backend, ref);
+        const res = await fetch(url);
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          buffers.push(buf);
+        }
+      }
+      const fullBuffer = Buffer.concat(buffers);
+
+      const result = await this.ocr.extractText(fullBuffer, mimeType);
+      if (result.text.length > 0) {
+        await this.nodeRepo.update(nodeId, { ocrText: result.text.slice(0, 10000) });
+        this.logger.log(`OCR stored for ${nodeId} (${filename}), ${result.text.length} chars, confidence=${result.confidence.toFixed(1)}%`);
+      }
+    } catch (err: any) {
+      this.logger.warn(`OCR failed for ${nodeId} (${filename}): ${err.message}`);
+    }
   }
 }
