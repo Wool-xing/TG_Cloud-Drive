@@ -442,4 +442,12 @@ export class FilesController {
     });
     res.send(buffer);
   }
+
+  @Get('sync/diff')
+  async syncDiff(
+    @CurrentUser('id') userId: string,
+    @Query('since') since: string,
+  ) {
+    return this.filesService.getSyncDiff(userId, since);
+  }
 }
