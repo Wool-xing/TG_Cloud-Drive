@@ -14,6 +14,7 @@ import { VerificationModule } from './verification/verification.module';
 import { WebdavModule } from './webdav/webdav.module';
 import { PaymentModule } from './payment/payment.module';
 import { OauthModule } from './oauth/oauth.module';
+import { CollaborationModule } from './collaboration/collaboration.module';
 import { RedisModule } from './common/redis/redis.module';
 import { StorageModule } from './storage/storage.module';
 import configuration from './config/configuration';
@@ -67,6 +68,7 @@ import configuration from './config/configuration';
     WebdavModule,
     PaymentModule,
     OauthModule,
+    CollaborationModule,
   ],
 })
 export class AppModule {}
