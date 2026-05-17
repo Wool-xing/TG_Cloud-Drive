@@ -17,6 +17,7 @@ import AdminFiles from './pages/admin/Files';
 import AdminConfig from './pages/admin/Config';
 import PrivateSpaceGate from './components/PrivateSpaceGate';
 import FileRequestPage from './pages/FileRequestPage';
+import { I18nProvider } from './i18n/context';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user);
@@ -33,6 +34,7 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <I18nProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -62,5 +64,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </I18nProvider>
   );
 }
