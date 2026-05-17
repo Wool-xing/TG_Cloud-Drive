@@ -18,7 +18,7 @@ import {
   Maximize,
   Minimize,
   Edit3,
-  Save,
+  Save, FileDown, FileText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -510,6 +510,30 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
     } catch (err: any) { toast.error(err?.message || '保存失败');
     } finally { setSaving(false); }
   };
+
+  const downloadExport = async (format: 'pdf' | 'docx') => {
+    if (!previewNode) return;
+    const token = localStorage.getItem('accessToken') || '';
+    const endpoint = format === 'pdf'
+      ? `/api/files/${previewNode.id}/export/pdf`
+      : `/api/files/${previewNode.id}/export/docx`;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ html: editText || (previewState as any).content || '' }),
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = previewNode.name.replace(/\.[^.]+$/, '') + '.' + format;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error('导出失败'); }
+  };
+
   const [downloadInfo, setDownloadInfo] = useState<DownloadInfo | null>(null);
 
   const blobUrlRef = useRef<string | null>(null);
@@ -797,6 +821,18 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                 <div className="flex-1" />
                 {editing ? (
                   <>
+                    {/* Export buttons */}
+                    <button
+                      onClick={() => downloadExport('pdf')}
+                      className="flex items-center gap-1 text-xs text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                      title="导出 PDF"
+                    ><FileText className="w-3 h-3" /> PDF</button>
+                    <button
+                      onClick={() => downloadExport('docx')}
+                      className="flex items-center gap-1 text-xs text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                      title="导出 Word"
+                    ><FileDown className="w-3 h-3" /> Word</button>
+                    <span className="w-px h-4 bg-white/10" />
                     <button onClick={() => setEditing(false)} className="text-xs text-white/70 hover:text-white px-3 py-1 rounded-lg hover:bg-white/10 transition-colors">取消</button>
                     <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium">
                       <Save className="w-3.5 h-3.5" />{saving ? '保存中…' : '保存'}
