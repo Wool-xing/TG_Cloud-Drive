@@ -7,6 +7,7 @@ import { filesApi } from '../api/client';
 import { useAuthStore } from '../stores/auth.store';
 import { useFileStore } from '../stores/file.store';
 import { useUploadStore } from '../stores/upload.store';
+import { useI18n } from '../i18n/context';
 import { Node } from '../types';
 
 import FileToolbar from '../components/files/FileToolbar';
@@ -22,6 +23,7 @@ interface DriveProps {
 
 export default function Drive({ isPrivate = false }: DriveProps) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const user = useAuthStore(s => s.user);
   const uploadTasks = useUploadStore(s => s.tasks);
   const warned80 = useRef(false);
@@ -45,10 +47,10 @@ export default function Drive({ isPrivate = false }: DriveProps) {
     const pct = (user.usedBytes / user.quotaBytes) * 100;
     if (pct >= 95 && !warned95.current) {
       warned95.current = true;
-      toast.error(`存储空间已使用 ${pct.toFixed(1)}%，即将达到上限，请清理文件或联系管理员扩容`, { duration: 8000 });
+      toast.error(t('quota.warn95', { pct: pct.toFixed(1) }), { duration: 8000 });
     } else if (pct >= 80 && !warned80.current) {
       warned80.current = true;
-      toast(`存储空间已使用 ${pct.toFixed(1)}%，建议清理不需要的文件`, { icon: '⚠️', duration: 6000 });
+      toast(t('quota.warn80', { pct: pct.toFixed(1) }), { icon: '⚠️', duration: 6000 });
     }
     if (pct < 75) warned80.current = false;
     if (pct < 90) warned95.current = false;
@@ -147,8 +149,8 @@ export default function Drive({ isPrivate = false }: DriveProps) {
   const warnDuplicates = (filenames: string[]) => {
     const existing = new Set(nodes.map(n => n.name.toLowerCase()));
     const dupes = filenames.filter(f => existing.has(f.toLowerCase()));
-    if (dupes.length === 1) toast(`"${dupes[0]}" 已存在，上传后将覆盖原文件`, { icon: '⚠️', duration: 5000 });
-    else if (dupes.length > 1) toast(`${dupes.length} 个文件名已存在，上传后将覆盖原文件`, { icon: '⚠️', duration: 5000 });
+    if (dupes.length === 1) toast(t('upload.duplicateOne', { name: dupes[0] }), { icon: '⚠️', duration: 5000 });
+    else if (dupes.length > 1) toast(t('upload.duplicateMulti', { n: dupes.length }), { icon: '⚠️', duration: 5000 });
   };
 
   const onDrop = async (e: React.DragEvent) => {
@@ -163,10 +165,10 @@ export default function Drive({ isPrivate = false }: DriveProps) {
       if (files.length) {
         warnDuplicates(files.map(f => f.name));
         addFiles(files, currentParentId, isPrivate);
-        toast.success(`已添加 ${files.length} 个文件到上传队列`);
+        toast.success(t('upload.addedToast', { n: files.length }));
       }
     } catch (err: any) {
-      toast.error('读取拖拽文件失败');
+      toast.error(t('upload.readError'));
     }
   };
 
@@ -266,7 +268,7 @@ export default function Drive({ isPrivate = false }: DriveProps) {
   if (listError && !searchQuery) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3 dark:text-gray-400">
-        <p className="text-red-500">加载失败，请刷新重试</p>
+        <p className="text-red-500">{t('drive.loadError')}</p>
       </div>
     );
   }
@@ -286,10 +288,10 @@ export default function Drive({ isPrivate = false }: DriveProps) {
           <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-4 py-20 dark:text-gray-500">
             <UploadCloud className="w-16 h-16 text-gray-300" />
             <p className="text-lg font-medium">
-              {searchQuery ? '没有找到匹配的文件' : '此文件夹为空'}
+              {searchQuery ? t('drive.noResults') : t('drive.empty')}
             </p>
             <p className="text-sm">
-              {searchQuery ? '请尝试其他关键词' : '拖拽文件到此处，或点击上方按钮上传'}
+              {searchQuery ? t('drive.noResultsHint') : t('drive.emptyHint')}
             </p>
           </div>
         ) : viewMode === 'list' ? (
@@ -304,8 +306,8 @@ export default function Drive({ isPrivate = false }: DriveProps) {
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-500/10 backdrop-blur-sm border-2 border-dashed border-blue-400 rounded-xl pointer-events-none">
           <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-2xl bg-white/90 dark:bg-gray-900/90 shadow-xl">
             <FolderUp className="w-12 h-12 text-blue-500" />
-            <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">释放以上传</p>
-            <p className="text-sm text-gray-500">支持文件和文件夹</p>
+            <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('upload.dragDrop')}</p>
+            <p className="text-sm text-gray-500">{t('upload.dragDropHint')}</p>
           </div>
         </div>
       )}

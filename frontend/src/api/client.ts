@@ -165,6 +165,14 @@ export const filesApi = {
       timeout: 120_000,
       signal,
     }),
+  setNote: (nodeId: string, note: string) => api.put(`/files/${nodeId}/note`, { note }),
+  offlineDownload: (url: string, parentId: string, name: string) =>
+    api.post('/files/offline-download', { url, parentId, name }),
+  listTemplates: () => api.get('/files/templates'),
+  createTemplate: (data: { name: string; description: string; category: string; content: string }) =>
+    api.post('/files/templates', data),
+  deleteTemplate: (templateId: string) => api.delete(`/files/templates/${templateId}`),
+  getTemplateContent: (templateId: string) => api.get(`/files/templates/${templateId}/content`),
 };
 
 // Shares APIs

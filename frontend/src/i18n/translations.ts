@@ -61,6 +61,53 @@ const zh: Record<string, string> = {
   'fileRequest.created': '文件请求链接已生成',
   'fileRequest.copied': '已复制链接',
   'fileRequest.expires': '过期时间',
+  // Templates
+  'template.title': '从模板创建',
+  'template.search': '搜索模板...',
+  'template.system': '系统',
+  'template.my': '我的',
+  'template.empty': '暂无模板',
+  'template.preview': '选择左侧模板预览',
+  'template.create': '使用此模板创建',
+  'template.created': '已从模板"{name}"创建',
+  // Sidebar
+  'sidebar.storage': '存储空间',
+  'sidebar.used': '{pct}% 已使用',
+  'sidebar.admin': '管理控制台',
+  'sidebar.adminRole': '管理员',
+  'sidebar.userRole': '普通用户',
+  'sidebar.logout': '退出登录',
+  // Toolbar
+  'toolbar.loading': '加载中…',
+  'toolbar.count': '共 {n} 个项目',
+  'toolbar.new': '新建',
+  'toolbar.createFolder': '新建文件夹',
+  'toolbar.createFile': '未命名{ext}',
+  'toolbar.confirm': '确定',
+  'toolbar.creating': '创建中…',
+  'toolbar.template': '从模板创建',
+  'toolbar.folderName': '文件夹名称',
+  'toolbar.fileName': '文件名称',
+  'toolbar.nameEmpty': '名称不能为空',
+  'toolbar.createdFolder': '文件夹 "{name}" 已创建',
+  'toolbar.createdFile': '文件 "{name}" 已创建',
+  // Quota
+  'quota.warn80': '存储空间已使用 {pct}%，建议清理不需要的文件',
+  'quota.warn95': '存储空间已使用 {pct}%，即将达到上限，请清理文件或联系管理员扩容',
+  // Upload
+  'upload.addedToast': '已添加 {n} 个文件到上传队列',
+  'upload.duplicateOne': '"{name}" 已存在，上传后将覆盖原文件',
+  'upload.duplicateMulti': '{n} 个文件名已存在，上传后将覆盖原文件',
+  'upload.readError': '读取拖拽文件失败',
+  // Delete
+  'delete.done': '已删除 {n} 个文件',
+  // New item types
+  'new.folder': '文件夹',
+  'new.text': '文本文档',
+  'new.markdown': 'Markdown',
+  'new.word': 'Word 文档',
+  'new.excel': 'Excel 表格',
+  'new.ppt': 'PPT 演示',
 };
 
 const en: Record<string, string> = {
@@ -126,6 +173,53 @@ const en: Record<string, string> = {
   'fileRequest.created': 'File request link generated',
   'fileRequest.copied': 'Link copied',
   'fileRequest.expires': 'Expires',
+  // Templates
+  'template.title': 'Create from Template',
+  'template.search': 'Search templates...',
+  'template.system': 'System',
+  'template.my': 'My',
+  'template.empty': 'No templates',
+  'template.preview': 'Select a template on the left',
+  'template.create': 'Create from template',
+  'template.created': 'Created from "{name}"',
+  // Sidebar
+  'sidebar.storage': 'Storage',
+  'sidebar.used': '{pct}% used',
+  'sidebar.admin': 'Admin Console',
+  'sidebar.adminRole': 'Admin',
+  'sidebar.userRole': 'User',
+  'sidebar.logout': 'Logout',
+  // Toolbar
+  'toolbar.loading': 'Loading…',
+  'toolbar.count': '{n} items',
+  'toolbar.new': 'New',
+  'toolbar.createFolder': 'New Folder',
+  'toolbar.createFile': 'Untitled{ext}',
+  'toolbar.confirm': 'OK',
+  'toolbar.creating': 'Creating…',
+  'toolbar.template': 'From Template',
+  'toolbar.folderName': 'Folder name',
+  'toolbar.fileName': 'File name',
+  'toolbar.nameEmpty': 'Name cannot be empty',
+  'toolbar.createdFolder': 'Folder "{name}" created',
+  'toolbar.createdFile': 'File "{name}" created',
+  // Quota
+  'quota.warn80': 'Storage {pct}% full. Consider cleaning up.',
+  'quota.warn95': 'Storage {pct}% full. Near limit, please clear files or contact admin.',
+  // Upload
+  'upload.addedToast': '{n} files added to queue',
+  'upload.duplicateOne': '"{name}" already exists, will be overwritten',
+  'upload.duplicateMulti': '{n} filenames already exist, will be overwritten',
+  'upload.readError': 'Failed to read dropped files',
+  // Delete
+  'delete.done': 'Deleted {n} items',
+  // New item types
+  'new.folder': 'Folder',
+  'new.text': 'Text Document',
+  'new.markdown': 'Markdown',
+  'new.word': 'Word Document',
+  'new.excel': 'Excel Spreadsheet',
+  'new.ppt': 'PPT Slides',
 };
 
 const translations: Record<string, Record<string, string>> = { zh, en };
