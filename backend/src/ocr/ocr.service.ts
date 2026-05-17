@@ -58,11 +58,13 @@ export class OcrService {
   private async extractPdf(buffer: Buffer): Promise<OcrResult> {
     const start = Date.now();
 
-    // Step 1: try pdf-parse for native text extraction
+    // Step 1: try pdf-parse v2 for native text extraction
     try {
-      const pdfParse = require('pdf-parse');
-      const data = await pdfParse(buffer);
-      const text = (data.text ?? '').trim();
+      const { PDFParse } = await import('pdf-parse');
+      const parser: any = new PDFParse(new Uint8Array(buffer));
+      await parser.load();
+      const result: any = await parser.getText();
+      const text = (typeof result === 'string' ? result : String(result)).trim();
 
       if (text.length >= 20) {
         const elapsed = Date.now() - start;
