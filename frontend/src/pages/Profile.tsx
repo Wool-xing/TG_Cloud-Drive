@@ -464,7 +464,7 @@ function BindPhoneDialog(props: {
                   {oldCountdown > 0 ? t('security.resendAfter', { s: oldCountdown }) : t('bindPhone.sendToCurrent')}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {currentPhone}（双重验证防接管）</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('bindPhone.doubleAuthHint', {phone: currentPhone ?? ''})}</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
@@ -663,7 +663,7 @@ function BindEmailDialog(props: {
                   {oldCountdown > 0 ? t('security.resendAfter', { s: oldCountdown }) : t('bindEmail.sendToCurrent')}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {currentEmail}（双重验证防接管）</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('bindEmail.doubleAuthHint', {email: currentEmail ?? ''})}</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
@@ -1094,7 +1094,7 @@ function DevicesTab() {
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5 dark:text-gray-400">
-              IP: {device.ipAddress ?? '—'} &nbsp;·&nbsp; 最后活跃: {formatDate(device.lastActiveAt)}
+              IP: {device.ipAddress ?? '—'} &nbsp;·&nbsp; {t('devices.lastActive')}: {formatDate(device.lastActiveAt)}
             </p>
           </div>
           {!device.isCurrent && (
