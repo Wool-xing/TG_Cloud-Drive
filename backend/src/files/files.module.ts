@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilesController } from './files.controller';
 import { FileRequestController } from './file-request.controller';
 import { FilesService } from './files.service';
+import { ExportService } from './export.service';
 import { Node } from './entities/node.entity';
 import { FileChunk } from './entities/file-chunk.entity';
 import { NodeKey } from './entities/node-key.entity';
@@ -18,7 +19,7 @@ import { TelegramModule } from '../telegram/telegram.module';
     TypeOrmModule.forFeature([Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, User, AuditLog]),
   ],
   controllers: [FilesController, FileRequestController],
-  providers: [FilesService],
+  providers: [FilesService, ExportService],
   exports: [FilesService],
 })
 export class FilesModule {}

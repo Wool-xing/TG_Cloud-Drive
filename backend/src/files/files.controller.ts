@@ -8,13 +8,14 @@ import { memoryStorage } from 'multer';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesService } from './files.service';
+import { ExportService } from './export.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('文件管理')
 @ApiBearerAuth()
 @Controller('files')
 export class FilesController {
-  constructor(private filesService: FilesService) {}
+  constructor(private filesService: FilesService, private exportService: ExportService) {}
 
   @Get()
   list(
@@ -340,5 +341,51 @@ export class FilesController {
     @Body('name') name: string,
   ) {
     return this.filesService.createOfflineDownload(userId, url, parentId, name);
+  }
+
+  // ─── Export ──────────────────────────────────────────────────────────
+
+  @Post(':nodeId/export/pdf')
+  async exportPdf(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Body('html') html: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.exportService.exportPdf(userId, nodeId, html);
+    res.set({
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+    });
+    res.send(buffer);
+  }
+
+  @Post(':nodeId/export/docx')
+  async exportDocx(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Body('html') html: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.exportService.exportDocx(userId, nodeId, html);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+    });
+    res.send(buffer);
+  }
+
+  @Post(':nodeId/export/markdown')
+  async exportMarkdown(
+    @CurrentUser('id') userId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.exportService.exportMarkdown(userId, nodeId);
+    res.set({
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+    });
+    res.send(buffer);
   }
 }
