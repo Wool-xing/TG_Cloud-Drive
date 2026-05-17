@@ -1,22 +1,29 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: Build React app
+# Build context = project root. Directory layout MUST mirror monorepo:
+#   /app/frontend/...   (frontend source)
+#   /app/packages/...   (shared packages)
+# src/utils/crypto.ts imports ../../../packages/crypto/src (= /app/packages/crypto/src)
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies (cached layer)
-COPY package.json package-lock.json ./
-RUN npm ci
+# Install frontend dependencies (cached layer)
+COPY frontend/package.json frontend/package-lock.json frontend/
+RUN cd frontend && npm ci
 
-# Copy source files
-COPY . .
+# Copy shared packages (needed by src/utils/crypto.ts relative import)
+COPY packages/ packages/
+
+# Copy frontend source files into frontend/ subdirectory
+COPY frontend/ frontend/
 
 # Build-time env vars can be injected via --build-arg or docker-compose env
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-RUN npx vite build
+RUN cd frontend && npx vite build
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Serve with Nginx
@@ -68,7 +75,7 @@ server {
 EOF
 
 # Copy built assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 

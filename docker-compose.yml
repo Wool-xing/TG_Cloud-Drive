@@ -98,8 +98,8 @@ services:
   # ── Frontend (Nginx / Static) ─────────────────────────────────
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       target: production
     container_name: tgpan_frontend
     restart: unless-stopped
