@@ -61,6 +61,9 @@ export class Node {
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date;
 
+  @Column({ name: 'note', type: 'text', nullable: true })
+  note: string;
+
   /** PostgreSQL full-text search vector — auto-populated via trigger */
   @Index('idx_nodes_search', { synchronize: false }) // created via raw SQL
   @Column({ name: 'search_vector', type: 'tsvector', nullable: true, select: false })

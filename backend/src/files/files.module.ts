@@ -4,6 +4,7 @@ import { FilesController } from './files.controller';
 import { FileRequestController } from './file-request.controller';
 import { FilesService } from './files.service';
 import { ExportService } from './export.service';
+import { EmbeddingService } from './embedding.service';
 import { Node } from './entities/node.entity';
 import { FileChunk } from './entities/file-chunk.entity';
 import { NodeKey } from './entities/node-key.entity';
@@ -19,7 +20,7 @@ import { TelegramModule } from '../telegram/telegram.module';
     TypeOrmModule.forFeature([Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, User, AuditLog]),
   ],
   controllers: [FilesController, FileRequestController],
-  providers: [FilesService, ExportService],
+  providers: [FilesService, ExportService, EmbeddingService],
   exports: [FilesService],
 })
 export class FilesModule {}

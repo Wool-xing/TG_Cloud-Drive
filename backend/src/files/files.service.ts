@@ -15,6 +15,7 @@ import { Tag } from './entities/tag.entity';
 import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { StorageService } from '../storage/storage.service';
+import { EmbeddingService } from './embedding.service';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
 import { comparePassword, hashPassword, generateSecureToken } from '../common/encryption';
 
@@ -33,6 +34,7 @@ export class FilesService {
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @Inject(REDIS_CLIENT) private redis: any,
     private storage: StorageService,
+    private embedding: EmbeddingService,
     private cs: ConfigService,
   ) {}
 
@@ -631,6 +633,81 @@ export class FilesService {
     qb.addOrderBy('n.updatedAt', 'DESC');
     const nodes = await qb.limit(100).getMany();
     return nodes.map(n => this.safeNode(n));
+  }
+
+  async semanticSearch(userId: string, query: string, isPrivate = false, limit = 20) {
+    if (!this.embedding.enabled) {
+      // Fall back to FTS when embeddings not configured
+      return this.search(userId, query, undefined, isPrivate);
+    }
+
+    const sanitized = query.slice(0, 500).trim();
+    if (!sanitized) return [];
+
+    // Generate embedding for the search query
+    const { embedding } = await this.embedding.embed(sanitized);
+    const vector = EmbeddingService.toVectorLiteral(embedding);
+
+    // Cosine similarity search via pgvector
+    const raw: any[] = await this.nodeRepo.query(
+      `SELECT n.id, n.name, n.type, n.size, n.mime_type, n.is_starred,
+              n.is_locked, n.is_private, n.thumbnail_file_id,
+              n.parent_id, n.user_id, n.created_at, n.updated_at,
+              1 - (ne.embedding <=> $1::vector) AS similarity
+       FROM node_embeddings ne
+       JOIN nodes n ON n.id = ne.node_id
+       WHERE n.user_id = $2
+         AND n.deleted_at IS NULL
+         AND n.is_private = $3
+         AND n.type = 'file'
+       ORDER BY ne.embedding <=> $1::vector
+       LIMIT $4`,
+      [vector, userId, isPrivate, limit],
+    );
+
+    return raw.map(row => ({
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      size: Number(row.size || 0),
+      mimeType: row.mime_type,
+      isStarred: row.is_starred,
+      isLocked: row.is_locked,
+      isPrivate: row.is_private,
+      thumbnailFileId: row.thumbnail_file_id,
+      parentId: row.parent_id,
+      userId: row.user_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      _similarity: Number(row.similarity),
+    }));
+  }
+
+  /** Index a node's content for semantic search */
+  async indexNodeEmbedding(userId: string, nodeId: string, textContent: string) {
+    if (!this.embedding.enabled) return;
+    const node = await this.getNodeOwned(userId, nodeId);
+    if (node.type !== NodeType.FILE) return;
+
+    const hash = this.embedding.contentHash(textContent);
+    const { embedding } = await this.embedding.embed(textContent);
+    const vector = EmbeddingService.toVectorLiteral(embedding);
+
+    // Upsert embedding
+    await this.nodeRepo.query(
+      `INSERT INTO node_embeddings (node_id, embedding, model, content_hash, updated_at)
+       VALUES ($1, $2::vector, $3, $4, now())
+       ON CONFLICT (node_id)
+       DO UPDATE SET embedding = $2::vector, model = $3, content_hash = $4, updated_at = now()`,
+      [nodeId, vector, embedding, hash],
+    );
+  }
+
+  async setNote(userId: string, nodeId: string, note: string) {
+    await this.getNodeOwned(userId, nodeId);
+    const trimmed = note ? note.slice(0, 5000) : null;
+    await this.nodeRepo.update(nodeId, { note: trimmed });
+    return { note: trimmed };
   }
 
   async toggleStar(userId: string, nodeId: string) {
