@@ -79,6 +79,12 @@ export class User {
   @Column({ name: 'notify_foreign_login', default: true })
   notifyForeignLogin: boolean;
 
+  @Column({ name: 'oauth_provider', nullable: true, length: 20 })
+  oauthProvider: string;
+
+  @Column({ name: 'oauth_id', nullable: true, length: 100 })
+  oauthId: string;
+
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date;
 

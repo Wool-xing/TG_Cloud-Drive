@@ -1,0 +1,30 @@
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
+import { OauthController } from './oauth.controller';
+import { OauthService } from './oauth.service';
+import { GoogleStrategy } from './google.strategy';
+import { GithubStrategy } from './github.strategy';
+import { User } from '../users/entities/user.entity';
+import { Subscription } from '../payment/entities/subscription.entity';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([User, Subscription]),
+    PassportModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (cs: ConfigService) => ({
+        secret: cs.get('JWT_SECRET'),
+        signOptions: { expiresIn: '2h' },
+      }),
+    }),
+  ],
+  controllers: [OauthController],
+  providers: [OauthService, GoogleStrategy, GithubStrategy],
+  exports: [OauthService],
+})
+export class OauthModule {}
