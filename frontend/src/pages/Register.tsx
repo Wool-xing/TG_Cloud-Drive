@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Cloud, Eye, EyeOff, Loader2, Phone, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi, verificationApi } from '../api/client';
+import { t } from '../i18n/translations';
 
 // ── Password strength ─────────────────────────────────────────────────────────
 
@@ -15,9 +16,9 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
 
-  if (score <= 1) return { score: 1, label: '弱', color: 'bg-red-500' };
-  if (score <= 3) return { score: 2, label: '中', color: 'bg-yellow-400' };
-  return { score: 3, label: '强', color: 'bg-green-500' };
+  if (score <= 1) return { score: 1, label: t('pwdStrength.weak'), color: 'bg-red-500' };
+  if (score <= 3) return { score: 2, label: t('pwdStrength.medium'), color: 'bg-yellow-400' };
+  return { score: 3, label: t('pwdStrength.strong'), color: 'bg-green-500' };
 }
 
 function PasswordStrengthBar({ password }: { password: string }) {
@@ -34,7 +35,7 @@ function PasswordStrengthBar({ password }: { password: string }) {
         ))}
       </div>
       <p className={`text-xs font-medium ${score === 1 ? 'text-red-500' : score === 2 ? 'text-yellow-500' : 'text-green-500'}`}>
-        密码强度：{label}
+        {t('pwdStrength.label', {label})}
       </p>
     </div>
   );
@@ -70,18 +71,18 @@ export default function Register() {
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!username.trim()) errs.username = '请输入用户名';
-    else if (username.trim().length < 3) errs.username = '用户名至少 3 位';
-    else if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) errs.username = '用户名只能含字母、数字和下划线';
+    if (!username.trim()) errs.username = t('register.error.usernameRequired');
+    else if (username.trim().length < 3) errs.username = t('register.error.usernameMinLength');
+    else if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) errs.username = t('register.error.usernameFormat');
 
-    if (!password) errs.password = '请输入密码';
-    else if (password.length < 8) errs.password = '密码至少 8 位';
+    if (!password) errs.password = t('register.error.passwordRequired');
+    else if (password.length < 8) errs.password = t('register.error.passwordMinLength');
 
-    if (!confirmPassword) errs.confirmPassword = '请确认密码';
-    else if (password !== confirmPassword) errs.confirmPassword = '两次密码不一致';
+    if (!confirmPassword) errs.confirmPassword = t('register.error.confirmPasswordRequired');
+    else if (password !== confirmPassword) errs.confirmPassword = t('register.error.passwordMismatch');
 
-    if (!contact.trim()) errs.contact = `请输入${contactType === 'email' ? '邮箱' : '手机号'}`;
-    if (!code.trim()) errs.code = '请输入验证码';
+    if (!contact.trim()) errs.contact = t('register.error.contactRequired', {type: contactType === 'email' ? t('register.email') : t('register.phone')});
+    if (!code.trim()) errs.code = t('register.error.codeRequired');
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -89,13 +90,13 @@ export default function Register() {
 
   const handleSendCode = async () => {
     if (!contact.trim()) {
-      setErrors(e => ({ ...e, contact: `请输入${contactType === 'email' ? '邮箱' : '手机号'}` }));
+      setErrors(e => ({ ...e, contact: t('register.error.contactRequired', {type: contactType === 'email' ? t('register.email') : t('register.phone')}) }));
       return;
     }
     setSending(true);
     try {
       await verificationApi.sendCode(contact.trim(), 'register');
-      toast.success('验证码已发送');
+      toast.success(t('register.codeSent'));
       startCountdown();
       setErrors(e => { const n = { ...e }; delete n.contact; return n; });
     } catch {
@@ -117,7 +118,7 @@ export default function Register() {
         [contactType]: contact.trim(),
         code: code.trim(),
       });
-      toast.success('注册成功！请登录');
+      toast.success(t('register.success'));
       navigate('/login');
     } catch {
       // handled
@@ -141,22 +142,22 @@ export default function Register() {
               <Cloud className="h-8 w-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">TG 云盘</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">创建您的账号，开始安全存储</p>
+            <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{t('register.tagline')}</p>
           </div>
 
           {/* Card */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/30 p-8">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 dark:text-gray-100">注册账号</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 dark:text-gray-100">{t('register.title')}</h2>
 
             <form onSubmit={handleRegister} className="space-y-4" noValidate>
               {/* Username */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">用户名</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('register.username')}</label>
                 <input
                   type="text"
                   value={username}
                   onChange={e => { setUsername(e.target.value); setErrors(v => { const n={...v}; delete n.username; return n; }); }}
-                  placeholder="字母、数字、下划线，至少 3 位"
+                  placeholder={t('register.placeholderUsername')}
                   autoComplete="username"
                   className={inputCls('username')}
                 />
@@ -165,13 +166,13 @@ export default function Register() {
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">密码</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('register.password')}</label>
                 <div className="relative">
                   <input
                     type={showPw ? 'text' : 'password'}
                     value={password}
                     onChange={e => { setPassword(e.target.value); setErrors(v => { const n={...v}; delete n.password; return n; }); }}
-                    placeholder="至少 8 位，建议含大写字母和符号"
+                    placeholder={t('register.placeholderPassword')}
                     autoComplete="new-password"
                     className={`${inputCls('password')} pr-11`}
                   />
@@ -189,13 +190,13 @@ export default function Register() {
 
               {/* Confirm password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">确认密码</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('register.confirmPassword')}</label>
                 <div className="relative">
                   <input
                     type={showConfirmPw ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={e => { setConfirmPassword(e.target.value); setErrors(v => { const n={...v}; delete n.confirmPassword; return n; }); }}
-                    placeholder="再次输入密码"
+                    placeholder={t('register.placeholderConfirmPw')}
                     autoComplete="new-password"
                     className={`${inputCls('confirmPassword')} pr-11`}
                   />
@@ -214,7 +215,7 @@ export default function Register() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {contactType === 'email' ? '邮箱' : '手机号'}
+                    {contactType === 'email' ? t('register.email') : t('register.phone')}
                   </label>
                   <button
                     type="button"
@@ -222,8 +223,8 @@ export default function Register() {
                     className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     {contactType === 'email'
-                      ? <><Phone className="h-3.5 w-3.5" />切换为手机号</>
-                      : <><Mail className="h-3.5 w-3.5" />切换为邮箱</>
+                      ? <><Phone className="h-3.5 w-3.5" />{t('register.switchToPhone')}</>
+                      : <><Mail className="h-3.5 w-3.5" />{t('register.switchToEmail')}</>
                     }
                   </button>
                 </div>
@@ -239,13 +240,13 @@ export default function Register() {
 
               {/* Verification code */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">验证码</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('register.verifyCode')}</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={code}
                     onChange={e => { setCode(e.target.value); setErrors(v => { const n={...v}; delete n.code; return n; }); }}
-                    placeholder="6 位验证码"
+                    placeholder={t('register.placeholderCode')}
                     maxLength={6}
                     className={`${inputCls('code')} flex-1`}
                   />
@@ -256,7 +257,7 @@ export default function Register() {
                     className="shrink-0 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-60 whitespace-nowrap flex items-center gap-1.5 dark:hover:bg-gray-700/50"
                   >
                     {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                    {countdown > 0 ? `${countdown}s` : t('register.sendCode')}
                   </button>
                 </div>
                 {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code}</p>}
@@ -269,14 +270,14 @@ export default function Register() {
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-md shadow-blue-500/25 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm mt-2"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {loading ? '注册中…' : '注 册'}
+                {loading ? t('register.submitting') : t('register.submit')}
               </button>
             </form>
 
             <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
-              已有账号？{' '}
+              {t('register.hasAccount')}{' '}
               <Link to="/login" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
-                立即登录
+                {t('register.loginNow')}
               </Link>
             </div>
           </div>
