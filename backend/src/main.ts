@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import * as Sentry from '@sentry/nestjs';
 import { PostHog } from 'posthog-node';
 import { AppModule } from './app.module';
+import { WsAdapter } from '@nestjs/platform-ws';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { validateEnvOrExit } from './common/env-validator';
@@ -65,6 +66,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   app.setGlobalPrefix('api');
+
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   // Swagger only mounted in non-production. In production it would expose the full
   // API surface (including admin endpoints + bearer auth scheme) to anyone — a free
