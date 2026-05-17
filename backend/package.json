@@ -8,7 +8,10 @@
     "start:debug": "nest start --debug --watch",
     "migration:generate": "typeorm migration:generate -d dist/database/data-source.js",
     "migration:run": "typeorm migration:run -d dist/database/data-source.js",
-    "migration:revert": "typeorm migration:revert -d dist/database/data-source.js"
+    "migration:revert": "typeorm migration:revert -d dist/database/data-source.js",
+    "test": "jest --no-coverage",
+    "test:watch": "jest --watch --no-coverage",
+    "test:cov": "jest --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
