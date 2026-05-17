@@ -24,7 +24,13 @@ import { Subscription } from '../payment/entities/subscription.entity';
     }),
   ],
   controllers: [OauthController],
-  providers: [OauthService, GoogleStrategy, GithubStrategy],
+  providers: [
+    OauthService,
+    // Only register OAuth strategies when credentials are configured.
+    // PassportStrategy with empty clientID crashes on bootstrap.
+    ...(process.env.OAUTH_GOOGLE_CLIENT_ID ? [GoogleStrategy] : []),
+    ...(process.env.OAUTH_GITHUB_CLIENT_ID ? [GithubStrategy] : []),
+  ],
   exports: [OauthService],
 })
 export class OauthModule {}
