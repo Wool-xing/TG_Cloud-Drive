@@ -1307,6 +1307,38 @@ export class FilesService {
     await this.versionRepo.save(version);
   }
 
+  async getSyncDiff(userId: string, since: string) {
+    const sinceDate = new Date(since);
+    if (isNaN(sinceDate.getTime())) throw new BadRequestException('Invalid "since" date');
+
+    const nodes = await this.nodeRepo.find({
+      where: { userId, deletedAt: undefined as any },
+      select: ['id', 'name', 'type', 'size', 'mimeType', 'parentId', 'isPrivate', 'isStarred', 'createdAt', 'updatedAt'],
+      order: { updatedAt: 'ASC' },
+    });
+
+    const deleted = await this.nodeRepo
+      .createQueryBuilder('n')
+      .where('n.user_id = :userId', { userId })
+      .andWhere('n.deleted_at IS NOT NULL')
+      .andWhere('n.deleted_at >= :since', { since: sinceDate })
+      .select(['n.id', 'n.name', 'n.deleted_at'])
+      .getMany();
+
+    const created = nodes.filter(n => new Date(n.createdAt) >= sinceDate);
+    const modified = nodes.filter(n =>
+      new Date(n.updatedAt) >= sinceDate && new Date(n.createdAt) < sinceDate,
+    );
+
+    return {
+      since: sinceDate.toISOString(),
+      created: created.map(n => this.safeNode(n)),
+      modified: modified.map(n => this.safeNode(n)),
+      deleted: deleted.map(n => ({ id: n.id, name: n.name })),
+      total: nodes.length,
+    };
+  }
+
   private async audit(userId: string, action: string, nodeId: string, nodeName: string) {
     await this.auditRepo.save(this.auditRepo.create({ userId, action, nodeId, nodeName })).catch(() => {});
   }
