@@ -7,7 +7,7 @@ import { t } from '../i18n/translations';
 
 // ── Password strength ─────────────────────────────────────────────────────────
 
-function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+export function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: '', color: '' };
   let score = 0;
   if (pw.length >= 8) score++;
