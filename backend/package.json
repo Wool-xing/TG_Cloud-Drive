@@ -59,7 +59,9 @@
     "tar": "^7.4.3",
     "file-type": "^22.0.1",
     "js-yaml": "^4.1.1",
-    "multer": "^2.1.1"
+    "multer": "^2.1.1",
+    "jszip": "^3.10.1",
+    "lodash.merge": "^4.6.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",
