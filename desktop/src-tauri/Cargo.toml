@@ -20,9 +20,10 @@ tauri-plugin-notification = "2"
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "multipart", "rustls-tls"], default-features = false }
 tokio = { version = "1", features = ["full"] }
 notify = "7"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 keyring = "3"
+md5 = "0.7"

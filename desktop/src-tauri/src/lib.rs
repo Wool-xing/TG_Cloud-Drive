@@ -67,10 +67,12 @@ async fn list_remote_files(state: State<'_, AppState>) -> Result<Vec<FileInfo>, 
         .map_err(|e| e.to_string())?;
 
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let nodes = json["nodes"].as_array()
+    // API wraps in {ok: true, data: [...]}
+    let data = json["data"].as_array()
+        .or_else(|| json["nodes"].as_array())
         .ok_or("Invalid response".to_string())?;
 
-    nodes.iter().map(|n| Ok(FileInfo {
+    data.iter().map(|n| Ok(FileInfo {
         id: n["id"].as_str().unwrap_or("").to_string(),
         name: n["name"].as_str().unwrap_or("").to_string(),
         size: n["size"].as_u64().unwrap_or(0),

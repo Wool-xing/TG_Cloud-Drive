@@ -10,7 +10,6 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "title": "TG Cloud Desktop",
     "windows": [
       {
         "title": "TG Cloud Desktop",
