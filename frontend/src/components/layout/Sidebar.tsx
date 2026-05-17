@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useI18n } from '../../i18n/context';
 import {
   Cloud,
   Home,
@@ -36,6 +37,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, logout, isAdmin } = useAuthStore();
+  const { t } = useI18n();
 
   const handleLogout = async () => {
     try {
@@ -68,7 +70,7 @@ export default function Sidebar() {
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
           <Cloud className="h-4 w-4 text-white" />
         </div>
-        <span className="text-base font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">TG 云盘</span>
+        <span className="text-base font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">{t('app.name')}</span>
       </div>
 
       {/* Main nav */}
