@@ -25,6 +25,7 @@ import JSZip from 'jszip';
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
+import { useI18n } from '../../i18n/context';
 import { Node, DownloadInfo } from '../../types';
 import {
   getSessionMEK,
@@ -35,6 +36,7 @@ import MoveDialog from '../dialogs/MoveDialog';
 import RenameDialog from '../dialogs/RenameDialog';
 import ShareDialog from '../dialogs/ShareDialog';
 import LockDialog from '../dialogs/LockDialog';
+import TemplatePicker from '../dialogs/TemplatePicker';
 
 interface FileToolbarProps {
   nodes: Node[];
@@ -45,6 +47,7 @@ type DialogType = 'move' | 'copy' | 'rename' | 'share' | 'lock' | null;
 
 export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const { mekDerived } = useAuthStore();
   const {
     selectedIds,
@@ -62,6 +65,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const newMenuRef = useRef<HTMLDivElement>(null);
   const [dialog, setDialog] = useState<DialogType>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -89,16 +93,16 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
 
   const submitNewItem = async () => {
     const name = newFolderName.trim();
-    if (!name) { toast.error('名称不能为空'); return; }
+    if (!name) { toast.error(t('toolbar.nameEmpty')); return; }
     setCreatingFolder(true);
     try {
       if (createMode === 'folder') {
         await filesApi.createFolder({ name, parentId: currentParentId, private: isPrivate });
-        toast.success(`文件夹 "${name}" 已创建`);
+        toast.success(t('toolbar.createdFolder', { name }));
       } else {
         const finalName = name.endsWith(createExt) ? name : name + createExt;
         await filesApi.createDocument({ name: finalName, parentId: currentParentId, mimeType: createMime, private: isPrivate });
-        toast.success(`文件 "${finalName}" 已创建`);
+        toast.success(t('toolbar.createdFile', { name: finalName }));
       }
       invalidateFiles();
       setNewFolderMode(false);
@@ -116,7 +120,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       await filesApi.delete(selectedArray);
       invalidateFiles();
       clearSelection();
-      toast.success(`已删除 ${selectedArray.length} 个项目`);
+      toast.success(t('delete.done', { n: selectedArray.length }));
     } catch {
       // handled
     }
@@ -198,7 +202,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       await filesApi.star(singleSelectedNode.id);
       invalidateFiles();
       queryClient.invalidateQueries({ queryKey: ['starred'] });
-      toast.success(was ? '已取消收藏' : '已收藏');
+      toast.success(was ? t('toolbar.unstar') : t('toolbar.star'));
     } catch {
       // handled
     }
@@ -210,19 +214,19 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       await filesApi.moveToPrivate(selectedArray, !isPrivate);
       invalidateFiles();
       clearSelection();
-      toast.success(isPrivate ? '已移出隐私空间' : '已移入隐私空间');
+      toast.success(isPrivate ? t('toolbar.fromPrivate') : t('toolbar.toPrivate'));
     } catch {
       // handled
     }
   };
 
   const NEW_ITEMS = [
-    { label: '文件夹', icon: <FolderPlus className="w-4 h-4" />, mode: 'folder' as const, ext: '', mime: '' },
-    { label: '文本文档', icon: <FileText className="w-4 h-4" />, mode: 'document' as const, ext: '.txt', mime: 'text/plain' },
-    { label: 'Markdown', icon: <FileText className="w-4 h-4" />, mode: 'document' as const, ext: '.md', mime: 'text/markdown' },
-    { label: 'Word 文档', icon: <File className="w-4 h-4 text-blue-500" />, mode: 'document' as const, ext: '.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-    { label: 'Excel 表格', icon: <File className="w-4 h-4 text-green-500" />, mode: 'document' as const, ext: '.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    { label: 'PPT 演示', icon: <File className="w-4 h-4 text-orange-500" />, mode: 'document' as const, ext: '.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
+    { labelKey: 'new.folder', icon: <FolderPlus className="w-4 h-4" />, mode: 'folder' as const, ext: '', mime: '' },
+    { labelKey: 'new.text', icon: <FileText className="w-4 h-4" />, mode: 'document' as const, ext: '.txt', mime: 'text/plain' },
+    { labelKey: 'new.markdown', icon: <FileText className="w-4 h-4" />, mode: 'document' as const, ext: '.md', mime: 'text/markdown' },
+    { labelKey: 'new.word', icon: <File className="w-4 h-4 text-blue-500" />, mode: 'document' as const, ext: '.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    { labelKey: 'new.excel', icon: <File className="w-4 h-4 text-green-500" />, mode: 'document' as const, ext: '.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    { labelKey: 'new.ppt', icon: <File className="w-4 h-4 text-orange-500" />, mode: 'document' as const, ext: '.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
   ];
 
   const NewDropdown = () => (
@@ -232,33 +236,43 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
       >
         <FolderPlus className="w-4 h-4" />
-        新建
+        {t('toolbar.new')}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${newMenuOpen ? 'rotate-180' : ''}`} />
       </button>
       {newMenuOpen && (
         <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-[150px]">
           {NEW_ITEMS.map(item => (
             <button
-              key={item.label}
+              key={item.labelKey}
               onClick={() => {
                 setCreateMode(item.mode);
                 setCreateMime(item.mime);
                 setCreateExt(item.ext);
                 setNewFolderMode(true);
                 setNewMenuOpen(false);
-                // Auto-fill name for convenience
                 if (item.mode === 'folder') {
-                  setNewFolderName('新建文件夹');
+                  setNewFolderName(t('toolbar.createFolder'));
                 } else {
-                  setNewFolderName(`未命名${item.ext}`);
+                  setNewFolderName(t('toolbar.createFile', { ext: item.ext }));
                 }
               }}
               className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
             >
               {item.icon}
-              {item.label}
+              {t(item.labelKey)}
             </button>
           ))}
+          <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+          <button
+            onClick={() => {
+              setNewMenuOpen(false);
+              setShowTemplatePicker(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+          >
+            <FileText className="w-4 h-4 text-purple-500" />
+            {t('toolbar.template')}
+          </button>
         </div>
       )}
     </div>
@@ -293,22 +307,22 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
           {selectedCount > 0 ? (
             <>
               <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
-                已选 {selectedCount} 项
+                {t('toolbar.selected', { n: selectedCount })}
               </span>
               <button
                 onClick={clearSelection}
                 className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 dark:text-gray-400"
               >
                 <X className="w-3.5 h-3.5" />
-                取消选择
+                {t('toolbar.deselect')}
               </button>
               <div className="flex items-center gap-1.5 ml-2 flex-wrap">
-                <BtnSm icon={<Trash2 className="w-4 h-4" />} label="删除" onClick={handleBatchDelete} danger />
-                <BtnSm icon={<FolderInput className="w-4 h-4" />} label="移动" onClick={() => setDialog('move')} />
-                <BtnSm icon={<Copy className="w-4 h-4" />} label="复制" onClick={() => setDialog('copy')} />
+                <BtnSm icon={<Trash2 className="w-4 h-4" />} label={t('toolbar.delete')} onClick={handleBatchDelete} danger />
+                <BtnSm icon={<FolderInput className="w-4 h-4" />} label={t('toolbar.move')} onClick={() => setDialog('move')} />
+                <BtnSm icon={<Copy className="w-4 h-4" />} label={t('toolbar.copy')} onClick={() => setDialog('copy')} />
                 <BtnSm
                   icon={batchDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  label={batchDownloading ? '打包中…' : '下载'}
+                  label={batchDownloading ? t('ctxmenu.packaging') : t('toolbar.download')}
                   onClick={handleBatchDownload}
                 />
                 {/* Per-file actions only when exactly 1 selected — backend
@@ -317,18 +331,18 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                   <>
                     <BtnSm
                       icon={<Edit className="w-4 h-4" />}
-                      label="重命名"
+                      label={t('toolbar.rename')}
                       onClick={() => setDialog('rename')}
                     />
                     <BtnSm
                       icon={<Star className="w-4 h-4" />}
-                      label={singleSelectedNode.isStarred ? '取消收藏' : '收藏'}
+                      label={singleSelectedNode.isStarred ? t('toolbar.unstar') : t('toolbar.star')}
                       onClick={handleStar}
                     />
                     {singleSelectedNode.type === 'file' && (
                       <BtnSm
                         icon={<Share2 className="w-4 h-4" />}
-                        label="分享"
+                        label={t('toolbar.share')}
                         onClick={() => setDialog('share')}
                       />
                     )}
@@ -336,21 +350,21 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                       icon={singleSelectedNode.isLocked
                         ? <Unlock className="w-4 h-4" />
                         : <Lock className="w-4 h-4" />}
-                      label={singleSelectedNode.isLocked ? '解锁' : '加密锁定'}
+                      label={singleSelectedNode.isLocked ? t('toolbar.unlock') : t('toolbar.lock')}
                       onClick={() => setDialog('lock')}
                     />
                   </>
                 )}
                 <BtnSm
                   icon={isPrivate ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  label={isPrivate ? '移出隐私' : '移入隐私'}
+                  label={isPrivate ? t('toolbar.fromPrivate') : t('toolbar.toPrivate')}
                   onClick={handleMovePrivate}
                 />
               </div>
             </>
           ) : (
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {isLoading ? '加载中…' : `共 ${nodes.length} 个项目`}
+              {isLoading ? t('toolbar.loading') : t('toolbar.count', { n: nodes.length })}
             </span>
           )}
         </div>
@@ -366,7 +380,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={handleNewFolderKeyDown}
                 onBlur={() => { setNewFolderMode(false); setNewFolderName(''); }}
-                placeholder={createMode === 'folder' ? '文件夹名称' : '文件名称'}
+                placeholder={createMode === 'folder' ? t('toolbar.folderName') : t('toolbar.fileName')}
                 maxLength={500}
                 className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 dark:text-gray-100"
                 disabled={creatingFolder}
@@ -376,7 +390,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 disabled={creatingFolder}
                 className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {creatingFolder ? '创建中…' : '确定'}
+                {creatingFolder ? t('toolbar.creating') : t('toolbar.confirm')}
               </button>
               <button
                 onClick={() => { setNewFolderMode(false); setNewFolderName(''); }}
@@ -417,6 +431,15 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
           node={singleSelectedNode}
           onClose={() => setDialog(null)}
           onSuccess={() => { setDialog(null); invalidateFiles(); }}
+        />
+      )}
+
+      {showTemplatePicker && (
+        <TemplatePicker
+          parentId={currentParentId}
+          isPrivate={isPrivate}
+          onClose={() => setShowTemplatePicker(false)}
+          onSuccess={() => invalidateFiles()}
         />
       )}
     </>

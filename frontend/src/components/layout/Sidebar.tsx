@@ -21,23 +21,23 @@ import { formatBytes } from '../../utils/crypto';
 interface NavItem {
   to: string;
   icon: React.ReactNode;
-  label: string;
+  labelKey: string;
 }
-
-const mainNavItems: NavItem[] = [
-  { to: '/', icon: <Home className="h-4.5 w-4.5" />, label: '我的文件' },
-  { to: '/recent', icon: <Clock className="h-4.5 w-4.5" />, label: '最近' },
-  { to: '/starred', icon: <Star className="h-4.5 w-4.5" />, label: '收藏' },
-  { to: '/shares', icon: <Share2 className="h-4.5 w-4.5" />, label: '分享' },
-  { to: '/trash', icon: <Trash2 className="h-4.5 w-4.5" />, label: '回收站' },
-  { to: '/private', icon: <Lock className="h-4.5 w-4.5" />, label: '隐私空间' },
-];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, logout, isAdmin } = useAuthStore();
   const { t } = useI18n();
+
+  const mainNavItems: NavItem[] = [
+    { to: '/', icon: <Home className="h-4.5 w-4.5" />, labelKey: 'nav.files' },
+    { to: '/recent', icon: <Clock className="h-4.5 w-4.5" />, labelKey: 'nav.recent' },
+    { to: '/starred', icon: <Star className="h-4.5 w-4.5" />, labelKey: 'nav.starred' },
+    { to: '/shares', icon: <Share2 className="h-4.5 w-4.5" />, labelKey: 'nav.shares' },
+    { to: '/trash', icon: <Trash2 className="h-4.5 w-4.5" />, labelKey: 'nav.trash' },
+    { to: '/private', icon: <Lock className="h-4.5 w-4.5" />, labelKey: 'nav.private' },
+  ];
 
   const handleLogout = async () => {
     try {
@@ -46,7 +46,7 @@ export default function Sidebar() {
     // Clear all cached queries so the next user doesn't see stale data
     queryClient.clear();
     logout();
-    toast.success('已退出登录');
+    toast.success(t('auth.logout'));
     navigate('/login', { replace: true });
   };
 
@@ -83,7 +83,7 @@ export default function Sidebar() {
             className={navLinkCls}
           >
             <span className="shrink-0">{item.icon}</span>
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </NavLink>
         ))}
 
@@ -93,7 +93,7 @@ export default function Sidebar() {
             <div className="my-2 border-t border-gray-100 dark:border-gray-800 dark:border-gray-700" />
             <NavLink to="/admin" className={navLinkCls}>
               <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
-              <span>管理控制台</span>
+              <span>{t('sidebar.admin')}</span>
             </NavLink>
           </>
         )}
@@ -102,7 +102,7 @@ export default function Sidebar() {
       {/* Storage quota */}
       <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 dark:border-gray-700">
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
-          <span>存储空间</span>
+          <span>{t('sidebar.storage')}</span>
           <span>{formatBytes(usedBytes)} / {formatBytes(quotaBytes)}</span>
         </div>
         <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -111,7 +111,7 @@ export default function Sidebar() {
             style={{ width: `${usedPct}%` }}
           />
         </div>
-        <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 text-right dark:text-gray-500">{usedPct}% 已使用</p>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-600 text-right dark:text-gray-500">{t('sidebar.used', { pct: usedPct })}</p>
       </div>
 
       {/* User info + logout. Clicking avatar/name navigates to /profile (where
@@ -135,13 +135,13 @@ export default function Sidebar() {
               {user?.nickname || user?.username}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-              {user?.role === 'admin' ? '管理员' : '普通用户'}
+              {user?.role === 'admin' ? t('sidebar.adminRole') : t('sidebar.userRole')}
             </p>
           </div>
         </button>
         <button
           onClick={handleLogout}
-          title="退出登录"
+          title={t('sidebar.logout')}
           className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition dark:text-gray-500"
         >
           <LogOut className="h-4 w-4" />

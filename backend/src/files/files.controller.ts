@@ -9,13 +9,18 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesService } from './files.service';
 import { ExportService } from './export.service';
+import { TemplateService } from './template.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('文件管理')
 @ApiBearerAuth()
 @Controller('files')
 export class FilesController {
-  constructor(private filesService: FilesService, private exportService: ExportService) {}
+  constructor(
+    private filesService: FilesService,
+    private exportService: ExportService,
+    private templateService: TemplateService,
+  ) {}
 
   @Get()
   list(
@@ -354,6 +359,42 @@ export class FilesController {
     @Body('name') name: string,
   ) {
     return this.filesService.createOfflineDownload(userId, url, parentId, name);
+  }
+
+  // ─── Templates ──────────────────────────────────────────────────────
+
+  @Get('templates')
+  listTemplates(@CurrentUser('id') userId: string) {
+    return this.templateService.list(userId);
+  }
+
+  @Post('templates')
+  @HttpCode(201)
+  createTemplate(
+    @CurrentUser('id') userId: string,
+    @Body('name') name: string,
+    @Body('description') description: string,
+    @Body('category') category: string,
+    @Body('content') content: string,
+  ) {
+    return this.templateService.create(userId, name, description, category, content);
+  }
+
+  @Delete('templates/:templateId')
+  @HttpCode(200)
+  deleteTemplate(
+    @CurrentUser('id') userId: string,
+    @Param('templateId', ParseUUIDPipe) templateId: string,
+  ) {
+    return this.templateService.delete(userId, templateId);
+  }
+
+  @Get('templates/:templateId/content')
+  getTemplateContent(
+    @CurrentUser('id') userId: string,
+    @Param('templateId', ParseUUIDPipe) templateId: string,
+  ) {
+    return this.templateService.getContent(userId, templateId);
   }
 
   // ─── Export ──────────────────────────────────────────────────────────

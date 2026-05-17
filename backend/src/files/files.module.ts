@@ -11,16 +11,18 @@ import { NodeKey } from './entities/node-key.entity';
 import { NodeVersion } from './entities/node-version.entity';
 import { FileRequest } from './entities/file-request.entity';
 import { Tag } from './entities/tag.entity';
+import { NoteTemplate } from './entities/note-template.entity';
 import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { TelegramModule } from '../telegram/telegram.module';
+import { TemplateService } from './template.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, User, AuditLog]),
+    TypeOrmModule.forFeature([Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, NoteTemplate, User, AuditLog]),
   ],
   controllers: [FilesController, FileRequestController],
-  providers: [FilesService, ExportService, EmbeddingService],
+  providers: [FilesService, ExportService, EmbeddingService, TemplateService],
   exports: [FilesService],
 })
 export class FilesModule {}
