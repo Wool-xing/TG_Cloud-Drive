@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import * as Sentry from '@sentry/nestjs';
+import { PostHog } from 'posthog-node';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -29,6 +30,14 @@ async function bootstrap() {
       tracesSampleRate: 0.1,
       profilesSampleRate: 0.1,
     });
+  }
+
+  // PostHog analytics (production only)
+  const phKey = configService.get<string>('POSTHOG_API_KEY');
+  if (phKey && isProduction) {
+    const ph = new PostHog(phKey, { host: configService.get<string>('POSTHOG_HOST', 'https://us.i.posthog.com') });
+    // Store on app for access in filters/services
+    (app as any).posthog = ph;
   }
 
   const port = configService.get<number>('PORT', 3000);

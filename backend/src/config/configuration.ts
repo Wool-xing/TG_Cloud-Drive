@@ -16,6 +16,9 @@ export default () => ({
   JWT_EXPIRES_IN: '2h',
   JWT_REFRESH_EXPIRES_IN: '30d',
 
+  POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
+  POSTHOG_HOST: process.env.POSTHOG_HOST || 'https://us.i.posthog.com',
+
   SENTRY_DSN: process.env.SENTRY_DSN,
 
   ENCRYPTION_MASTER_KEY: process.env.ENCRYPTION_MASTER_KEY,
@@ -61,5 +64,6 @@ export default () => ({
   VERIFICATION_CODE_TTL: 300,
   LOGIN_LOCK_ATTEMPTS: 5,
   LOGIN_LOCK_MINUTES: 15,
+  AUTO_VERSION_LIMIT: parseInt(process.env.AUTO_VERSION_LIMIT, 10) || 10,
   TRASH_RETENTION_DAYS: 30,
 });

@@ -43,6 +43,7 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.11.3",
+    "posthog-node": "^5.34.2",
     "reflect-metadata": "^0.2.1",
     "resend": "^6.12.3",
     "rxjs": "^7.8.1",

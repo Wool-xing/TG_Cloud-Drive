@@ -35,6 +35,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.395.0",
     "mime": "^4.0.4",
+    "posthog-js": "^1.373.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.3",
