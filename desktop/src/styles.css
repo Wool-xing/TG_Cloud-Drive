@@ -44,3 +44,21 @@ tbody tr:hover { background: #0f172a; }
 .num-cell { font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
 .loading, .empty { text-align: center; padding: 32px; color: #64748b; font-size: 13px; }
 .error { padding: 8px 12px; background: #7f1d1d; color: #fca5a5; border-radius: 8px; font-size: 12px; }
+
+.btn-secondary { padding: 8px 16px; background: #334155; border: none; border-radius: 8px; color: #e2e8f0; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.btn-secondary:hover { background: #475569; }
+.btn-primary { display: inline-flex; align-items: center; gap: 6px; }
+
+.sync-summary { display: flex; gap: 16px; margin-top: 12px; align-items: center; }
+.sync-stat { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #94a3b8; }
+.sync-status-active { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #22c55e; }
+
+.changes-panel { margin-top: 0; }
+.change-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 13px; }
+.change-row:last-child { border-bottom: none; }
+.tag { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.tag-new { background: #14532d; color: #4ade80; }
+.tag-modified { background: #1e3a5f; color: #60a5fa; }
+.tag-deleted { background: #7f1d1d; color: #fca5a5; }
+.change-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.change-size { font-size: 11px; color: #64748b; font-variant-numeric: tabular-nums; }
