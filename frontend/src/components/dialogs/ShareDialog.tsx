@@ -3,6 +3,7 @@ import { X, Copy, Check, Share2, Link } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { sharesApi } from '../../api/client';
 import { Node, Share } from '../../types';
+import { t, getLang } from '../../i18n/translations';
 
 interface ShareDialogProps {
   node: Node;
@@ -12,18 +13,18 @@ interface ShareDialogProps {
 type Expiry = '1d' | '7d' | '30d' | 'never';
 type MaxDownloads = 'unlimited' | '1' | '5' | 'custom';
 
-const EXPIRY_OPTIONS: { value: Expiry; label: string }[] = [
-  { value: '1d', label: '1天' },
-  { value: '7d', label: '7天' },
-  { value: '30d', label: '30天' },
-  { value: 'never', label: '永久' },
+const EXPIRY_OPTIONS: { value: Expiry; labelKey: string }[] = [
+  { value: '1d', labelKey: 'share.expiry.1d' },
+  { value: '7d', labelKey: 'share.expiry.7d' },
+  { value: '30d', labelKey: 'share.expiry.30d' },
+  { value: 'never', labelKey: 'share.expiry.never' },
 ];
 
-const DOWNLOAD_OPTIONS: { value: MaxDownloads; label: string }[] = [
-  { value: 'unlimited', label: '无限制' },
-  { value: '1', label: '1次' },
-  { value: '5', label: '5次' },
-  { value: 'custom', label: '自定义' },
+const DOWNLOAD_OPTIONS: { value: MaxDownloads; labelKey: string }[] = [
+  { value: 'unlimited', labelKey: 'share.downloads.unlimited' },
+  { value: '1', labelKey: 'share.downloads.1' },
+  { value: '5', labelKey: 'share.downloads.5' },
+  { value: 'custom', labelKey: 'share.downloads.custom' },
 ];
 
 function expiryToDate(expiry: Expiry): string | undefined {
@@ -43,7 +44,6 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
   const [share, setShare] = useState<Share | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -63,18 +63,13 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
       if (maxDownloadsType === '1') maxDownloads = 1;
       else if (maxDownloadsType === '5') maxDownloads = 5;
       else if (maxDownloadsType === 'custom') {
-        // parseInt happily eats a 30-digit string and returns a JS Number that
-        // switches to scientific notation (1e+27 etc) when serialized — PG
-        // int4 rejects that, surfaces as 500. Cap to 10_000 which is more
-        // than any real-world share needs (1 link per recipient if you have
-        // 10k recipients you should use an unlisted bucket, not a share).
         const n = parseInt(customDownloads, 10);
         if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
-          toast.error('请输入 1 到 10000 之间的整数');
+          toast.error(t('share.error.range'));
           return;
         }
         if (n > 10_000) {
-          toast.error('单个分享的最大下载次数不能超过 10000，请选择"无限制"');
+          toast.error(t('share.error.max'));
           return;
         }
         maxDownloads = n;
@@ -90,9 +85,9 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
       const res = await sharesApi.create(payload) as any;
       const created: Share = res?.share ?? res?.data ?? res;
       setShare(created);
-      toast.success('分享链接已创建');
+      toast.success(t('share.createdToast'));
     } catch {
-      // handled
+      toast.error(t('share.error.create'));
     } finally {
       setSubmitting(false);
     }
@@ -102,21 +97,20 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      toast.success('链接已复制到剪贴板');
+      toast.success(t('share.copiedToast'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('复制失败，请手动复制');
+      toast.error(t('share.copyFailToast'));
     }
   };
 
-  // Simple QR text representation
   const QRPlaceholder = () => (
     <div className="mt-4 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-center">
-      <div className="text-xs text-gray-400 dark:text-gray-500 mb-2">扫码访问</div>
+      <div className="text-xs text-gray-400 dark:text-gray-500 mb-2">{t('share.scanQr')}</div>
       <div className="inline-block p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:border-gray-700">
         <div className="text-xs font-mono text-gray-600 dark:text-gray-300 max-w-[200px] break-all">{shareUrl}</div>
       </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">可使用手机扫码或直接分享链接</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{t('share.qrHint')}</p>
     </div>
   );
 
@@ -126,11 +120,10 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Share2 className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">分享文件</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('share.title')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -142,17 +135,15 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
 
         <div className="px-6 py-5">
           {!share ? (
-            /* Creation form */
             <div className="space-y-5">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
-                  文件：<span className="font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
+                  {t('share.fileLabel')}<span className="font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
                 </p>
               </div>
 
-              {/* Expiry */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">有效期</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('share.expiry')}</label>
                 <div className="grid grid-cols-4 gap-2">
                   {EXPIRY_OPTIONS.map((opt) => (
                     <button
@@ -164,15 +155,14 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                           : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Max downloads */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">最大下载次数</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('share.maxDownloads')}</label>
                 <div className="grid grid-cols-4 gap-2">
                   {DOWNLOAD_OPTIONS.map((opt) => (
                     <button
@@ -184,7 +174,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                           : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -197,76 +187,68 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                     value={customDownloads}
                     onChange={(e) => setCustomDownloads(e.target.value.replace(/[^\d]/g, ''))}
                     className="mt-2 w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
-                    placeholder="1 - 10000 次"
+                    placeholder={t('share.downloads.placeholder')}
                   />
                 )}
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  访问密码
-                  <span className="text-gray-400 dark:text-gray-500 font-normal ml-1.5">(可选)</span>
+                  {t('share.password')}
+                  <span className="text-gray-400 dark:text-gray-500 font-normal ml-1.5">{t('share.optional')}</span>
                 </label>
                 <input
                   type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="留空则不设置密码"
+                  placeholder={t('share.passwordPlaceholder')}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
                 />
               </div>
 
-              {/* P1-F22: red warning when expiry=never AND no password — that
-                  combination produces a permanent, anonymously-accessible link.
-                  Pre-fix the dialog silently created such links; users routinely
-                  shipped "永久免密" share URLs not realizing the leakage surface. */}
               {expiry === 'never' && !password.trim() && (
                 <div className="rounded-xl border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-                  <div className="font-semibold mb-0.5">⚠ 永久 + 无密码 = 公开访问</div>
+                  <div className="font-semibold mb-0.5">{t('share.warningTitle')}</div>
                   <div className="text-xs leading-relaxed">
-                    任何拿到此链接的人都可直接访问该文件，且永不过期。强烈建议设置密码或选择有效期。
+                    {t('share.warningBody')}
                   </div>
                 </div>
               )}
 
-              {/* Actions */}
               <div className="flex justify-end gap-3 pt-1">
                 <button
                   onClick={onClose}
                   className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors dark:border-gray-700"
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleCreate}
                   disabled={submitting}
                   className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
                 >
-                  {submitting ? '创建中…' : '生成分享链接'}
+                  {submitting ? t('share.creating') : t('share.createBtn')}
                 </button>
               </div>
             </div>
           ) : (
-            /* Share result */
             <div className="space-y-4">
               <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl px-4 py-3">
-                <p className="text-sm font-medium text-green-700 dark:text-green-300">分享链接已创建</p>
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">{t('share.created')}</p>
                 {share.expireAt && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    有效期至：{new Date(share.expireAt).toLocaleString('zh-CN')}
+                    {t('share.expiresAt', { date: new Date(share.expireAt).toLocaleString(getLang() === 'en' ? 'en-US' : 'zh-CN') })}
                   </p>
                 )}
                 {share.hasPassword && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">已设置访问密码</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">{t('share.hasPassword')}</p>
                 )}
               </div>
 
-              {/* Link */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   <Link className="w-3.5 h-3.5 inline mr-1" />
-                  分享链接
+                  {t('share.link')}
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -285,19 +267,18 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                     {copied ? (
                       <>
                         <Check className="w-4 h-4" />
-                        已复制
+                        {t('share.copied')}
                       </>
                     ) : (
                       <>
                         <Copy className="w-4 h-4" />
-                        复制
+                        {t('share.copy')}
                       </>
                     )}
                   </button>
                 </div>
               </div>
 
-              {/* QR */}
               <QRPlaceholder />
 
               <div className="flex justify-end pt-1">
@@ -305,7 +286,7 @@ export default function ShareDialog({ node, onClose }: ShareDialogProps) {
                   onClick={onClose}
                   className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
                 >
-                  完成
+                  {t('share.done')}
                 </button>
               </div>
             </div>
