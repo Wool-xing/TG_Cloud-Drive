@@ -17,6 +17,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Node } from '../../types';
 import { useFileStore } from '../../stores/file.store';
 import { formatBytes } from '../../utils/crypto';
+import { t } from '../../i18n/translations';
 
 const ROW_HEIGHT = 52;
 
@@ -64,16 +65,16 @@ function formatDate(dateStr: string): string {
 }
 
 function getTypeBadge(node: Node): string {
-  if (node.type === 'folder') return '文件夹';
+  if (node.type === 'folder') return t('filelist.folder');
   const mime = node.mimeType ?? '';
-  if (mime.startsWith('image/')) return '图片';
-  if (mime.startsWith('video/')) return '视频';
-  if (mime.startsWith('audio/')) return '音频';
-  if (mime === 'application/pdf') return 'PDF';
+  if (mime.startsWith('image/')) return t('filelist.image');
+  if (mime.startsWith('video/')) return t('filelist.video');
+  if (mime.startsWith('audio/')) return t('filelist.audio');
+  if (mime === 'application/pdf') return t('filelist.pdf');
   if (mime.includes('zip') || mime.includes('rar') || mime.includes('tar') || mime.includes('gz'))
-    return '压缩包';
-  if (mime.startsWith('text/')) return '文本';
-  return '文件';
+    return t('filelist.archive');
+  if (mime.startsWith('text/')) return t('filelist.text');
+  return t('filelist.file');
 }
 
 const gridCols = 'grid-cols-[40px_1fr_80px_90px_130px_130px]';
@@ -234,7 +235,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
           </span>
         </div>
         <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
-          {node.type === 'folder' ? '—' : node.size === 0 ? <span className="text-blue-500 dark:text-blue-400">空白</span> : formatBytes(node.size)}
+          {node.type === 'folder' ? '—' : node.size === 0 ? <span className="text-blue-500 dark:text-blue-400">{t('filelist.empty')}</span> : formatBytes(node.size)}
         </div>
         <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
           {formatDate(node.createdAt)}
@@ -262,7 +263,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
         <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('name')}>
           名称 <SortIcon field="name" />
         </div>
-        <div className={thClass}>类型</div>
+        <div className={thClass}>{t('filelist.colType')}</div>
         <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('size')}>
           大小 <SortIcon field="size" />
         </div>

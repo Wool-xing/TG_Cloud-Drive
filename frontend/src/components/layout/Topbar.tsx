@@ -18,6 +18,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useFileStore } from '../../stores/file.store';
 import { FileFilter, SortField } from '../../types';
+import { t } from '../../i18n/translations';
 
 // ── Dark mode hook ────────────────────────────────────────────────────────────
 
@@ -47,20 +48,20 @@ function useDarkMode() {
 // ── Filter tab labels ─────────────────────────────────────────────────────────
 
 const filterTabs: { value: FileFilter | 'other'; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'image', label: '图片' },
-  { value: 'video', label: '视频' },
-  { value: 'audio', label: '音频' },
-  { value: 'document', label: '文档' },
-  { value: 'archive', label: '压缩包' },
-  { value: 'other', label: '其他' },
+  { value: 'all', label: t('topbar.filter.all') },
+  { value: 'image', label: t('topbar.filter.image') },
+  { value: 'video', label: t('topbar.filter.video') },
+  { value: 'audio', label: t('topbar.filter.audio') },
+  { value: 'document', label: t('topbar.filter.document') },
+  { value: 'archive', label: t('topbar.filter.archive') },
+  { value: 'other', label: t('topbar.filter.other') },
 ];
 
 const sortOptions: { value: SortField; label: string }[] = [
-  { value: 'name', label: '名称' },
-  { value: 'size', label: '大小' },
-  { value: 'createdAt', label: '上传时间' },
-  { value: 'updatedAt', label: '修改时间' },
+  { value: 'name', label: t('filelist.colName') },
+  { value: 'size', label: t('filelist.colSize') },
+  { value: 'createdAt', label: t('filelist.colUploaded') },
+  { value: 'updatedAt', label: t('filelist.colModified') },
 ];
 
 // ── Topbar ────────────────────────────────────────────────────────────────────
@@ -96,12 +97,12 @@ export default function Topbar({ onUpload }: TopbarProps) {
   // toggle) for those routes.
   const path = location.pathname;
   const pageTitle = (() => {
-    if (path.startsWith('/profile')) return '账户设置';
-    if (path.startsWith('/recent')) return '最近文件';
-    if (path.startsWith('/starred')) return '收藏';
-    if (path.startsWith('/shares')) return '我的分享';
-    if (path.startsWith('/trash')) return '回收站';
-    if (path.startsWith('/private')) return '隐私空间';
+    if (path.startsWith('/profile')) return t('nav.profile');
+    if (path.startsWith('/recent')) return t('nav.recent');
+    if (path.startsWith('/starred')) return t('nav.starred');
+    if (path.startsWith('/shares')) return t('nav.shares');
+    if (path.startsWith('/trash')) return t('nav.trash');
+    if (path.startsWith('/private')) return t('nav.private');
     return '';
   })();
   const isMinimalRoute = pageTitle !== '';
@@ -147,7 +148,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
       <div className="flex items-center gap-3 px-4 h-14">
         <button
           onClick={() => routerNavigate('/')}
-          title="返回文件"
+          title={t("topbar.backToFiles")}
           className="p-1.5 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition"
         >
           <ArrowLeft className="h-4.5 w-4.5" />
@@ -158,7 +159,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
         </div>
         <button
           onClick={() => setDark(d => !d)}
-          title={dark ? '切换亮色模式' : '切换暗色模式'}
+          title={dark ? t('topbar.lightMode') : t('topbar.darkMode')}
           className="p-1.5 rounded-xl text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition"
         >
           {dark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
@@ -178,7 +179,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition dark:hover:bg-gray-700"
             >
               <Home className="h-4 w-4" />
-              <span className="font-medium">我的文件</span>
+              <span className="font-medium">{t("nav.files")}</span>
             </button>
 
             {currentPath.map((crumb, idx) => (
@@ -205,7 +206,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
               type="text"
               value={localSearch}
               onChange={e => setLocalSearch(e.target.value)}
-              placeholder="搜索文件…"
+              placeholder={t("topbar.searchPlaceholder")}
               className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
             />
           </div>
@@ -215,14 +216,14 @@ export default function Topbar({ onUpload }: TopbarProps) {
           <div className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
-              title="列表视图"
+              title={t("topbar.listView")}
               className={`p-1.5 transition ${viewMode === 'list' ? 'bg-blue-600 text-white dark:bg-blue-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
               <LayoutList className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              title="网格视图"
+              title={t("topbar.gridView")}
               className={`p-1.5 transition ${viewMode === 'grid' ? 'bg-blue-600 text-white dark:bg-blue-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -236,7 +237,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition dark:hover:bg-gray-700/50"
             >
               <ArrowUpDown className="h-3.5 w-3.5" />
-              <span>{sortOptions.find(s => s.value === sortField)?.label ?? '排序'}</span>
+              <span>{sortOptions.find(s => s.value === sortField)?.label ?? t('topbar.sort')}</span>
               {sortOrder === 'ASC'
                 ? <SortAsc className="h-3.5 w-3.5" />
                 : <SortDesc className="h-3.5 w-3.5" />
@@ -269,14 +270,14 @@ export default function Topbar({ onUpload }: TopbarProps) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition shadow-sm shadow-blue-500/20"
             >
               <UploadCloud className="h-4 w-4" />
-              <span className="hidden lg:inline">上传</span>
+              <span className="hidden lg:inline">{t("topbar.upload")}</span>
             </button>
           )}
 
           {/* Profile */}
           <button
             onClick={() => routerNavigate('/profile')}
-            title="个人资料"
+            title={t("topbar.profile")}
             className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition dark:text-gray-500 dark:hover:bg-gray-700"
           >
             <UserCircle className="h-4.5 w-4.5" />
@@ -285,7 +286,7 @@ export default function Topbar({ onUpload }: TopbarProps) {
           {/* Dark mode toggle */}
           <button
             onClick={() => setDark(d => !d)}
-            title={dark ? '切换亮色模式' : '切换暗色模式'}
+            title={dark ? t('topbar.lightMode') : t('topbar.darkMode')}
             className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition dark:text-gray-500 dark:hover:bg-gray-700"
           >
             {dark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
