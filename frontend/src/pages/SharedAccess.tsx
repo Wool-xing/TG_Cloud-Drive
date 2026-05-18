@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { sharesApi } from '../api/client';
 import { importShareDEK, decryptChunk, formatBytes } from '../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../utils/streaming-download';
+import { t } from '../i18n/translations';
 
 // P1-F5: preview is the only path that still has to buffer the whole file
 // (Blob URL → <img>/<video>/<iframe src>). Above this size we refuse to
@@ -105,18 +106,18 @@ export default function SharedAccess() {
         setState('password');
       } else if (code === 'SHARE_PASSWORD_INVALID') {
         setState('password');
-        toast.error('密码错误，请重试');
+        toast.error(t('shareAccess.wrongPassword'));
       } else if (status === 401 || legacyPwdHit) {
         setState('password');
-        if (pwd) toast.error('密码错误，请重试');
+        if (pwd) toast.error(t('shareAccess.wrongPassword'));
       } else if (status === 404) {
-        setErrorMessage('分享链接不存在或已失效');
+        setErrorMessage(t('shareAccess.invalidLink'));
         setState('error');
       } else if (status === 410) {
-        setErrorMessage('分享链接已过期或下载次数已达上限');
+        setErrorMessage(t('shareAccess.expiredOrLimit'));
         setState('error');
       } else {
-        setErrorMessage('加载失败，请稍后重试');
+        setErrorMessage(t('shareAccess.loadFail'));
         setState('error');
       }
     }
@@ -140,7 +141,7 @@ export default function SharedAccess() {
       const chunks = info.chunks ?? [];
 
       if (!chunks.length) {
-        toast.error('无法获取文件块信息');
+        toast.error(t('shareAccess.noChunks'));
         return;
       }
 
@@ -184,7 +185,7 @@ export default function SharedAccess() {
         },
       );
 
-      toast.success('下载完成');
+      toast.success(t('preview.downloadDone'));
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         // User cancelled the save dialog — silent.
@@ -195,7 +196,7 @@ export default function SharedAccess() {
         return;
       }
       console.error(err);
-      toast.error('下载失败，请重试');
+      toast.error(t('preview.downloadFail'));
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
@@ -259,7 +260,7 @@ export default function SharedAccess() {
       // P1-F24: on the error path the partially-built blob URL would have
       // leaked. Revoke it before bubbling up.
       if (createdUrl) URL.revokeObjectURL(createdUrl);
-      toast.error('预览失败');
+      toast.error(t('shareAccess.previewFail'));
     } finally {
       setIsDownloading(false);
     }
@@ -299,7 +300,7 @@ export default function SharedAccess() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="输入密码"
+                placeholder={t("shareAccess.passwordPlaceholder")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 dark:border-gray-600"
                 autoFocus
               />
@@ -386,11 +387,11 @@ export default function SharedAccess() {
           <div className="px-8 py-4 border-b border-gray-100 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
               <div className="flex justify-between">
-                <dt className="text-gray-500 dark:text-gray-400">文件大小</dt>
+                <dt className="text-gray-500 dark:text-gray-400">{t('shareAccess.fileSize')}</dt>
                 <dd className="font-medium text-gray-800 dark:text-gray-100">{formatBytes(node.size)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-500 dark:text-gray-400">下载次数</dt>
+                <dt className="text-gray-500 dark:text-gray-400">{t('shareAccess.downloadCount')}</dt>
                 <dd className="font-medium text-gray-800 dark:text-gray-100">
                   {shareInfo.downloadCount}
                   {shareInfo.maxDownloads ? ` / ${shareInfo.maxDownloads}` : ''}
@@ -398,7 +399,7 @@ export default function SharedAccess() {
               </div>
               {shareInfo.expireAt && (
                 <div className="flex justify-between col-span-2">
-                  <dt className="text-gray-500 dark:text-gray-400">过期时间</dt>
+                  <dt className="text-gray-500 dark:text-gray-400">{t('shareAccess.expiry')}</dt>
                   <dd className="font-medium text-gray-800 dark:text-gray-100">
                     {new Date(shareInfo.expireAt).toLocaleDateString('zh-CN', {
                       year: 'numeric', month: 'short', day: 'numeric',
@@ -437,7 +438,7 @@ export default function SharedAccess() {
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              {isDownloading ? '下载中...' : '下载文件'}
+              {isDownloading ? t('shareAccess.downloadingBtn') : '下载文件'}
             </button>
 
             {canPreview && (

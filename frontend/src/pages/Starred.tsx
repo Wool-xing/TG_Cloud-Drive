@@ -20,6 +20,7 @@ import { filesApi } from '../api/client';
 import { useFileStore } from '../stores/file.store';
 import { Node } from '../types';
 import { formatBytes } from '../utils/crypto';
+import { t } from '../i18n/translations';
 import FileContextMenu from '../components/files/FileContextMenu';
 import PreviewModal from '../components/preview/PreviewModal';
 import RenameDialog from '../components/dialogs/RenameDialog';
@@ -56,10 +57,10 @@ function getMimeCategory(node: Node): 'image' | 'video' | 'audio' | 'document' |
 }
 
 function getTypeLabel(node: Node): string {
-  if (node.type === 'folder') return '文件夹';
+  if (node.type === 'folder') return t('filelist.folder');
   const labels = {
-    image: '图片', video: '视频', audio: '音频',
-    document: '文档', archive: '压缩包', other: '其他',
+    image: t('filelist.image'), video: t('filelist.video'), audio: t('filelist.audio'),
+    document: t('topbar.filter.document'), archive: t('filelist.archive'), other: t('topbar.filter.other'),
   };
   return labels[getMimeCategory(node)];
 }
@@ -120,7 +121,7 @@ export default function Starred() {
     try {
       await filesApi.star(node.id);
       invalidate();
-      toast.success('已取消收藏');
+      toast.success(t('ctxmenu.unstarSuccess'));
     } catch {
       // handled by interceptor
     }
@@ -160,9 +161,9 @@ export default function Starred() {
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 dark:border-gray-700">
         <Star className="w-5 h-5 text-yellow-400 fill-yellow-300" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
-          我的收藏
+          {t('starred.title')}
           {filteredNodes.length > 0 && (
-            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({filteredNodes.length} 个项目)</span>
+            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({t('toolbar.count', { n: filteredNodes.length })})</span>
           )}
         </span>
       </div>
@@ -178,18 +179,18 @@ export default function Starred() {
             <div className="w-20 h-20 rounded-full bg-yellow-50 dark:bg-yellow-950/30 flex items-center justify-center">
               <Star className="w-10 h-10 text-yellow-300" />
             </div>
-            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">暂无收藏</p>
-            <p className="text-sm text-center max-w-xs">右键点击文件或文件夹，选择"收藏"将其添加到这里</p>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">{t('starred.empty')}</p>
+            <p className="text-sm text-center max-w-xs">{t('starred.emptyHint')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">名称</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">类型</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">大小</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">修改时间</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">操作</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('filelist.colName')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">{t('filelist.colType')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">{t('filelist.colSize')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">{t('filelist.colModified')}</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('starred.colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 dark:divide-gray-700">
@@ -220,7 +221,7 @@ export default function Starred() {
                   {/* Type */}
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                      {node.type === 'folder' ? '文件夹' : getTypeLabel(node)}
+                      {node.type === 'folder' ? t('filelist.folder') : getTypeLabel(node)}
                     </span>
                   </td>
 
@@ -240,7 +241,7 @@ export default function Starred() {
                       <button
                         onClick={e => handleUnstar(node, e)}
                         className="p-1.5 rounded-lg text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 transition-colors opacity-0 group-hover:opacity-100"
-                        title="取消收藏"
+                        title={t('toolbar.unstar')}
                       >
                         <Star className="w-4 h-4 fill-yellow-400" />
                       </button>
