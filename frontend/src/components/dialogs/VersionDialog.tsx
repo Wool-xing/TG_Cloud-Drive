@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
 import { formatBytes } from '../../utils/crypto';
 import { Node } from '../../types';
+import { t } from '../../i18n/translations';
 
 interface VersionDialogProps {
   node: Node;
@@ -32,7 +33,7 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
       const res = await filesApi.getVersions(node.id) as any;
       setVersions(res ?? []);
     } catch {
-      toast.error('加载版本列表失败');
+      toast.error(t('version.loadError'));
     } finally {
       setLoading(false);
     }
@@ -42,10 +43,10 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
     setCreating(true);
     try {
       const res = await filesApi.createVersion(node.id) as any;
-      toast.success(`已保存为版本 ${res.version}`);
+      toast.success(t('version.saved', { v: res.version }));
       await loadVersions();
     } catch {
-      toast.error('创建版本失败');
+      toast.error(t('version.createError'));
     } finally {
       setCreating(false);
     }
@@ -56,7 +57,6 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
     try {
       const info = await filesApi.getVersionDownloadInfo(node.id, versionId) as any;
       if (info?.chunks?.length) {
-        // Simple download: fetch first chunk
         const chunks: ArrayBuffer[] = [];
         for (const chunk of info.chunks) {
           const res = await fetch(chunk.url);
@@ -72,10 +72,10 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
         a.href = url; a.download = `${node.name}.v${info.version ?? ''}`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 10_000);
-        toast.success('下载完成');
+        toast.success(t('download.done'));
       }
     } catch {
-      toast.error('下载版本失败');
+      toast.error(t('version.downloadError'));
     } finally {
       setDownloading(null);
     }
@@ -92,7 +92,7 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
           <div className="flex items-center gap-2">
             <Clock className="w-4.5 h-4.5 text-blue-500" />
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-              版本历史 · {node.name}
+              {t('version.history', { name: node.name })}
             </h3>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
@@ -104,14 +104,14 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
           ) : versions.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">暂无历史版本</p>
+            <p className="text-center text-sm text-gray-400 py-8">{t('version.empty')}</p>
           ) : (
             <div className="space-y-2">
               {versions.map((v) => (
                 <div key={v.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                      版本 {v.version}
+                      {t('version.prefix', { n: v.version })}
                     </p>
                     <p className="text-xs text-gray-400">
                       {formatBytes(v.size)} · {formatDate(v.createdAt)}
@@ -121,7 +121,7 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
                     onClick={() => handleDownload(v.id)}
                     disabled={downloading === v.id}
                     className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition"
-                    title="下载此版本"
+                    title={t('version.downloadTitle')}
                   >
                     {downloading === v.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   </button>
@@ -138,7 +138,7 @@ export default function VersionDialog({ node, onClose }: VersionDialogProps) {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition"
           >
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            {creating ? '保存中…' : '保存当前为版本'}
+            {creating ? t('version.saving') : t('version.create')}
           </button>
         </div>
       </div>
