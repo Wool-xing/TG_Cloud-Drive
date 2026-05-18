@@ -3,6 +3,7 @@ import { X, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
 import { Node } from '../../types';
+import { t } from '../../i18n/translations';
 
 interface LockDialogProps {
   node: Node;
@@ -12,7 +13,7 @@ interface LockDialogProps {
 
 export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps) {
   const isLocked = node.isLocked;
-  const itemLabel = node.type === 'folder' ? '文件夹' : '文件';
+  const itemLabel = node.type === 'folder' ? t('lock.folder') : t('lock.file');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +21,6 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -31,19 +31,16 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
 
   const validate = (): boolean => {
     if (!password) {
-      setError('请输入密码');
+      setError(t('lock.error.empty'));
       return false;
     }
     if (!isLocked) {
-      // P1-F19: floor lifted from 4 → 6 to match the backend setLock contract
-      // (B12). Pre-fix, a user could set a 4-char lock here which the backend
-      // then rejected with a different error message — confusing UX.
       if (password.length < 6) {
-        setError('密码至少 6 个字符');
+        setError(t('lock.error.tooShort'));
         return false;
       }
       if (password !== confirmPassword) {
-        setError('两次密码输入不一致');
+        setError(t('lock.error.mismatch'));
         return false;
       }
     }
@@ -57,19 +54,16 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
     setSubmitting(true);
     try {
       if (isLocked) {
-        // P1-B12: actually clear the lock instead of merely verifying. The old
-        // verifyLock call just confirmed the password was correct without
-        // changing state — the UI showed "已解锁" but the lock was still on.
         await filesApi.removeLock(node.id, password);
-        toast.success(`${itemLabel}已解锁`);
+        toast.success(t('lock.success.unlock', { item: itemLabel }));
       } else {
         await filesApi.setLock(node.id, password);
-        toast.success(`${itemLabel}已加密锁定`);
+        toast.success(t('lock.success.lock', { item: itemLabel }));
       }
       onSuccess();
     } catch {
       if (isLocked) {
-        setError('密码错误，请重试');
+        setError(t('lock.error.wrong'));
       }
     } finally {
       setSubmitting(false);
@@ -82,7 +76,6 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             {isLocked ? (
@@ -91,7 +84,7 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
               <Lock className="w-5 h-5 text-blue-500" />
             )}
             <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-              {isLocked ? `解锁${itemLabel}` : `加密锁定${itemLabel}`}
+              {isLocked ? t('lock.unlockTitle', { item: itemLabel }) : t('lock.lockTitle', { item: itemLabel })}
             </h2>
           </div>
           <button
@@ -103,7 +96,6 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {/* Description */}
           <div className={`rounded-xl p-3 text-sm ${
             isLocked
               ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
@@ -111,15 +103,14 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
           }`}>
             <span className="break-all">
             {isLocked
-              ? `输入锁定密码以解锁${itemLabel} "${node.name}"`
-              : `为${itemLabel} "${node.name}" 设置访问密码，访问时需要输入密码`}
+              ? t('lock.unlockDesc', { item: itemLabel, name: node.name })
+              : t('lock.lockDesc', { item: itemLabel, name: node.name })}
             </span>
           </div>
 
-          {/* Password input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              {isLocked ? '当前密码' : '设置密码'}
+              {isLocked ? t('lock.currentPassword') : t('lock.setPassword')}
             </label>
             <div className="relative">
               <input
@@ -130,7 +121,7 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
                 className={`w-full border rounded-xl px-4 py-2.5 pr-10 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-shadow ${
                   error ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
                 }`}
-                placeholder={isLocked ? '输入锁定密码' : '至少 6 个字符'}
+                placeholder={isLocked ? t('lock.placeholderCurrent') : t('lock.placeholderNew')}
                 disabled={submitting}
               />
               <button
@@ -143,10 +134,9 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
             </div>
           </div>
 
-          {/* Confirm password (only when locking) */}
           {!isLocked && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">确认密码</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('lock.confirmPassword')}</label>
               <div className="relative">
                 <input
                   type={showConfirm ? 'text' : 'password'}
@@ -155,7 +145,7 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
                   className={`w-full border rounded-xl px-4 py-2.5 pr-10 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-shadow ${
                     error ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
                   }`}
-                  placeholder="再次输入密码"
+                  placeholder={t('lock.placeholderConfirm')}
                   disabled={submitting}
                 />
                 <button
@@ -169,17 +159,15 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
             </div>
           )}
 
-          {/* Error */}
           {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
 
-          {/* Footer */}
           <div className="flex justify-end gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors dark:border-gray-700"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -190,7 +178,7 @@ export default function LockDialog({ node, onClose, onSuccess }: LockDialogProps
                   : 'bg-blue-600 hover:bg-blue-700'
               }`}
             >
-              {submitting ? '处理中…' : isLocked ? '解锁' : '确认锁定'}
+              {submitting ? t('lock.processing') : isLocked ? t('lock.unlockBtn') : t('lock.lockBtn')}
             </button>
           </div>
         </form>
