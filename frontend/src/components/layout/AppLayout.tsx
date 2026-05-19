@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { t } from '../../i18n/translations';
 import { useAuthStore } from '../../stores/auth.store';
 import { useFileStore } from '../../stores/file.store';
 import { useUploadStore } from '../../stores/upload.store';
@@ -33,9 +34,9 @@ export default function AppLayout() {
         // Surface the first rejection reason — usually file-too-large.
         const reason = rejections[0].errors[0]?.code ?? 'unknown';
         if (reason === 'file-too-large') {
-          toast.error(`文件超过 ${(MAX_UPLOAD_BYTES / 1024 / 1024 / 1024).toFixed(0)} GB 上限`);
+          toast.error(t('upload.tooLargeGB', { size: (MAX_UPLOAD_BYTES / 1024 / 1024 / 1024).toFixed(0) }));
         } else {
-          toast.error(`部分文件被拒绝（${rejections.length} 个）`);
+          toast.error(t('upload.rejectedN', { n: rejections.length }));
         }
       }
       if (acceptedFiles.length === 0) return;
@@ -68,9 +69,9 @@ export default function AppLayout() {
               <UploadCloud className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="text-center">
-              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">松开以上传文件</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('upload.dropRelease')}</p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {isPrivate ? '将上传到隐私空间' : '将上传到当前文件夹'}
+                {isPrivate ? t('upload.toPrivateSpace') : t('upload.toCurrentFolder')}
               </p>
             </div>
           </div>

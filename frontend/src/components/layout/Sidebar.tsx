@@ -120,7 +120,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => navigate('/profile')}
-          title="个人中心 / 修改密码"
+          title={t('nav.profileTitle')}
           className="flex-1 min-w-0 flex items-center gap-3 -mx-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 transition text-left dark:hover:bg-gray-700/50"
         >
           {/* Avatar */}

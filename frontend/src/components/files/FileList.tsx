@@ -261,17 +261,17 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
           />
         </div>
         <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('name')}>
-          名称 <SortIcon field="name" />
+          {t('files.colName')} <SortIcon field="name" />
         </div>
         <div className={thClass}>{t('filelist.colType')}</div>
         <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('size')}>
-          大小 <SortIcon field="size" />
+          {t('files.colSize')} <SortIcon field="size" />
         </div>
         <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('createdAt')}>
-          上传时间 <SortIcon field="createdAt" />
+          {t('files.colUploadTime')} <SortIcon field="createdAt" />
         </div>
         <div className={`${sortableTh} cursor-pointer`} onClick={() => setSort('updatedAt')}>
-          修改时间 <SortIcon field="updatedAt" />
+          {t('files.colModifiedTime')} <SortIcon field="updatedAt" />
         </div>
       </div>
 
