@@ -150,7 +150,7 @@ export default function Starred() {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-red-500 gap-2">
         <AlertTriangle className="w-10 h-10" />
-        <p>加载失败，请刷新重试</p>
+        <p>{t('drive.loadError')}</p>
       </div>
     );
   }

@@ -391,8 +391,8 @@ export default function Trash() {
         <ConfirmModal
           title={t('trash.emptyTrash')}
           message={t('trash.emptyTrashConfirm', { n: nodes.length })}
-          inputLabel={t('trash.confirmWordLabel')}
-          confirmWord="确认"
+          inputLabel={t('trash.confirmWordLabel', { word: t('trash.confirmWord') })}
+          confirmWord={t('trash.confirmWord')}
           confirmLabel={t('trash.emptyTrash')}
           danger
           onConfirm={handleEmptyTrash}
