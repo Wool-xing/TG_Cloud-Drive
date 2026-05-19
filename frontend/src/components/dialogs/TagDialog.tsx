@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../../api/client';
 import { Node } from '../../types';
+import { t } from '../../i18n/translations';
 
 interface TagDialogProps {
   node: Node;
@@ -41,7 +42,7 @@ export default function TagDialog({ node, onClose, onSuccess }: TagDialogProps) 
       await filesApi.createTag(name);
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       setNewName('');
-      toast.success('标签已创建');
+      toast.success(t('tag.created'));
     } catch { /* handled */ } finally { setCreating(false); }
   };
 
@@ -75,7 +76,7 @@ export default function TagDialog({ node, onClose, onSuccess }: TagDialogProps) 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">管理标签</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('tag.title')}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-colors">
             <X className="w-5 h-5" />
@@ -92,7 +93,7 @@ export default function TagDialog({ node, onClose, onSuccess }: TagDialogProps) 
               value={newName}
               onChange={e => setNewName(e.target.value.slice(0, 50))}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
-              placeholder="新建标签…"
+              placeholder={t('tag.newPlaceholder')}
               className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
@@ -109,7 +110,7 @@ export default function TagDialog({ node, onClose, onSuccess }: TagDialogProps) 
           {isLoading ? (
             <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
           ) : tags.length === 0 ? (
-            <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">暂无标签，请先创建</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">{t('tag.empty')}</p>
           ) : (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {tags.map((tag: any) => {
