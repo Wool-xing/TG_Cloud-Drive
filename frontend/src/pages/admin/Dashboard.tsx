@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { t } from '../../i18n/translations';
 import {
   Users,
   Upload,
@@ -97,7 +98,7 @@ export default function AdminDashboard() {
   if (error || !data) {
     return (
       <div className="flex items-center justify-center h-64 text-red-500">
-        <p>加载失败，请刷新重试</p>
+        <p>{t('admin.dashboard.loadError')}</p>
       </div>
     );
   }
@@ -107,39 +108,39 @@ export default function AdminDashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">仪表盘</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">系统运行概览</p>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('admin.dashboard.title')}</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('admin.dashboard.subtitle')}</p>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          title="总用户数"
+          title={t('admin.dashboard.totalUsers')}
           value={data.totalUsers.toLocaleString()}
           icon={<Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />}
           color="bg-blue-100"
           darkColor="dark:bg-blue-900/40"
         />
         <StatCard
-          title="今日上传"
+          title={t('admin.dashboard.todayUploads')}
           value={data.todayUploads.toLocaleString()}
-          subtitle="个文件"
+          subtitle={t('admin.dashboard.filesUnit')}
           icon={<Upload className="w-6 h-6 text-green-600 dark:text-green-400" />}
           color="bg-green-100"
           darkColor="dark:bg-green-900/40"
         />
         <StatCard
-          title="总存储量"
+          title={t('admin.dashboard.totalStorage')}
           value={formatBytes(data.totalStorageBytes)}
-          subtitle="全部用户"
+          subtitle={t('admin.dashboard.allUsers')}
           icon={<HardDrive className="w-6 h-6 text-purple-600 dark:text-purple-400" />}
           color="bg-purple-100"
           darkColor="dark:bg-purple-900/40"
         />
         <StatCard
-          title="Telegram API 成功率"
+          title={t('admin.dashboard.tgSuccessRate')}
           value={`${apiRate.toFixed(1)}%`}
-          subtitle="近 24 小时"
+          subtitle={t('admin.dashboard.last24h')}
           icon={
             apiRate >= 99
               ? <CheckCircle className="w-6 h-6 text-teal-600 dark:text-teal-400" />
@@ -154,17 +155,17 @@ export default function AdminDashboard() {
         {/* Recent audit logs */}
         <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">最近操作日志</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">最近 20 条</span>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('admin.dashboard.recentLogs')}</h2>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{t('admin.dashboard.recent20')}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 dark:bg-gray-900">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">操作</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">用户</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">文件</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">时间</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('logs.column.action')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">{t('admin.dashboard.colUser')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">{t('logs.column.file')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('logs.column.time')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -186,7 +187,7 @@ export default function AdminDashboard() {
                 ))}
                 {(!data.recentLogs || data.recentLogs.length === 0) && (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-600 text-sm dark:text-gray-500">暂无日志</td>
+                    <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-600 text-sm dark:text-gray-500">{t('admin.dashboard.noLogs')}</td>
                   </tr>
                 )}
               </tbody>
@@ -197,7 +198,7 @@ export default function AdminDashboard() {
         {/* Top storage users */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">存储使用 Top 10</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('admin.dashboard.topStorage')}</h2>
             <TrendingUp className="w-4 h-4 text-gray-400 dark:text-gray-500" />
           </div>
           <div className="p-4 space-y-3">
@@ -224,7 +225,7 @@ export default function AdminDashboard() {
               );
             })}
             {(!data.topStorageUsers || data.topStorageUsers.length === 0) && (
-              <p className="text-center text-gray-400 dark:text-gray-600 text-sm py-4 dark:text-gray-500">暂无数据</p>
+              <p className="text-center text-gray-400 dark:text-gray-600 text-sm py-4 dark:text-gray-500">{t('admin.dashboard.noData')}</p>
             )}
           </div>
         </div>
