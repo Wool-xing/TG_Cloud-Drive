@@ -417,10 +417,10 @@ async function fetchAndDecrypt(
   for (let i = 0; i < info.chunks.length; i++) {
     const chunk = info.chunks[i];
     if (!chunk.iv) {
-      throw new Error(`分片 ${i} 缺少 IV，可能是 A1 修复前上传的历史损坏文件`);
+      throw new Error(t('preview.chunkNoIV', { i }));
     }
     const res = await fetch(chunk.url);
-    if (!res.ok) throw new Error(`{t('preview.download')}分片 ${i} 失败`);
+    if (!res.ok) throw new Error(t('preview.chunkDownloadFail', { i }));
     const encryptedData = await res.arrayBuffer();
     const decrypted = await decryptBuffer(encryptedData, dek, chunk.iv);
     chunks.push(decrypted);
@@ -475,7 +475,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
     setSaving(true);
     try {
       const mek = getSessionMEK();
-      if (!mek || !mekDerived) { toast.error('{t('preview.sessionExpired')}'); return; }
+      if (!mek || !mekDerived) { toast.error(t('preview.sessionExpired')); return; }
       const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
 
       let dek: CryptoKey;
@@ -506,9 +506,9 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       setPreviewState({ status: 'text', content: editText, mimeType: previewNode.mimeType || 'text/plain' });
       setEditing(false);
-      toast.success('{t('preview.saved')}');
+      toast.success(t('preview.saved'));
       queryClient.invalidateQueries({ queryKey: ['files'] });
-    } catch (err: any) { toast.error(err?.message || '{t('preview.saveFail')}');
+    } catch (err: any) { toast.error(err?.message || t('preview.saveFail'));
     } finally { setSaving(false); }
   };
 
@@ -532,7 +532,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       a.download = previewNode.name.replace(/\.[^.]+$/, '') + '.' + format;
       a.click();
       URL.revokeObjectURL(url);
-    } catch { toast.error('{t('preview.exportFail')}'); }
+    } catch { toast.error(t('preview.exportFail')); }
   };
 
   const [downloadInfo, setDownloadInfo] = useState<DownloadInfo | null>(null);
@@ -598,9 +598,9 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         }
       } catch (err: any) {
         const msg = err?.response?.data?.message ?? err?.message ?? t('preview.loadError');
-        if (msg.includes('lock') || msg.includes('密码') || err?.response?.status === 403) {
+        if (msg.includes('lock') || msg.includes('密码') || msg.toLowerCase().includes('password') || err?.response?.status === 403) {
           setNeedsLockPassword(true);
-          setPreviewState({ status: 'error', message: '{t('preview.locked')}' });
+          setPreviewState({ status: 'error', message: t('preview.locked') });
         } else {
           setPreviewState({ status: 'error', message: msg });
         }
@@ -684,7 +684,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         if (directUrl) {
           window.open(directUrl, '_blank');
         } else {
-          toast.error('{t('preview.noDownloadUrl')}');
+          toast.error(t('preview.noDownloadUrl'));
         }
         return;
       }
@@ -698,9 +698,9 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           count: info.chunks.length,
           fetchChunk: async (i: number) => {
             const chunk = info.chunks[i];
-            if (!chunk.iv) throw new Error(`分片 ${i} 缺少 IV，可能是历史损坏文件`);
+            if (!chunk.iv) throw new Error(t('preview.chunkNoIV', { i }));
             const res = await fetch(chunk.url);
-            if (!res.ok) throw new Error(`{t('preview.download')}分片 ${i} 失败`);
+            if (!res.ok) throw new Error(t('preview.chunkDownloadFail', { i }));
             const encrypted = await res.arrayBuffer();
             const plain = await decryptBuffer(encrypted, dek, chunk.iv);
             return new Uint8Array(plain);
@@ -714,20 +714,20 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           onLargeFileFallback: () => {
             if (!warnedFallback) {
               warnedFallback = true;
-              toast('当前浏览器将在内存中缓冲完整文件，大文件可能较慢。建议使用 Chrome / Edge 获得流式{t('preview.download')}。');
+              toast(t('preview.blobFallbackWarn'));
             }
           },
         },
       );
       setDownloadProgress(-1);
-      toast.success('{t('preview.downloadDone')}');
+      toast.success(t('preview.downloadDone'));
     } catch (err: any) {
       if (err?.name === 'AbortError') return; // user cancelled save dialog
       if (err instanceof BlobFallbackTooLargeError) {
         toast.error(err.message);
         return;
       }
-      toast.error('{t('preview.downloadFail')}');
+      toast.error(t('preview.downloadFail'));
     }
   };
 
@@ -778,9 +778,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8 text-center dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
             <p className="text-sm">
-              文件大小 {formatBytes(previewState.size)} 超过在线预览上限 {formatBytes(PREVIEW_BLOB_MAX_BYTES)}。
-              <br />
-              直接{t('preview.download')}后用本地播放器/查看器打开，体验更顺。
+              {t('preview.tooLarge', { size: formatBytes(previewState.size), limit: formatBytes(PREVIEW_BLOB_MAX_BYTES) })}
             </p>
             <button
               onClick={handleDownload}
@@ -836,7 +834,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                     <span className="w-px h-4 bg-white/10" />
                     <button onClick={() => setEditing(false)} className="text-xs text-white/70 hover:text-white px-3 py-1 rounded-lg hover:bg-white/10 transition-colors">{t('common.cancel')}</button>
                     <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium">
-                      <Save className="w-3.5 h-3.5" />{saving ? '{t('preview.saving')}' : '{t('preview.save')}'}
+                      <Save className="w-3.5 h-3.5" />{saving ? t('preview.saving') : t('preview.save')}
                     </button>
                   </>
                 ) : (
@@ -854,7 +852,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                 ) : isSlide ? (
                   <PresentationEditor content={editText} onChange={setEditText} />
                 ) : (
-                  <RichTextEditor content={editText} onChange={setEditText} placeholder="开始{t('preview.edit')}文档…" />
+                  <RichTextEditor content={editText} onChange={setEditText} placeholder={t('editor.placeholder')} />
                 )
               ) : (
                 isCode ? (

@@ -289,7 +289,7 @@ export default function Login() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 mb-4">
                 <Cloud className="h-8 w-8 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">TG 云盘</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight dark:text-gray-100">{t('app.name')}</h1>
               <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{t('app.tagline')}</p>
             </div>
 

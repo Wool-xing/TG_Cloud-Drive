@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { usersApi } from '../api/client';
+import { t } from '../i18n/translations';
 import DrivePage from '../pages/Drive';
 
 // P1-F17 + P1-F18: in-memory session token storage.
@@ -71,14 +72,14 @@ export default function PrivateSpaceGate() {
           <ShieldAlert className="w-10 h-10 text-gray-400 dark:text-gray-500" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">尚未设置隐私空间密码</p>
-          <p className="mt-1 text-sm">请前往「个人资料」页面设置隐私空间密码后再访问</p>
+          <p className="text-lg font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">{t('privateSpace.notSet')}</p>
+          <p className="mt-1 text-sm">{t('privateSpace.notSetHint')}</p>
         </div>
         <button
           onClick={() => navigate('/profile?tab=security#private-space')}
           className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
         >
-          前往设置
+          {t('privateSpace.goSetup')}
         </button>
       </div>
     );
@@ -102,10 +103,10 @@ export default function PrivateSpaceGate() {
         __memUnlockedAt__ = Date.now();
         setUnlocked(true);
       } else {
-        setError('验证失败，请重试');
+        setError(t('privateSpace.verifyFailed'));
       }
     } catch {
-      setError('密码错误');
+      setError(t('privateSpace.wrongPassword'));
     } finally {
       setLoading(false);
     }
@@ -118,8 +119,8 @@ export default function PrivateSpaceGate() {
           <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">隐私空间</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">请输入密码以访问隐私空间</p>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">{t('privateSpace.title')}</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('privateSpace.enterHint')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -128,7 +129,7 @@ export default function PrivateSpaceGate() {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={e => { setPassword(e.target.value); setError(''); }}
-              placeholder="请输入隐私空间密码"
+              placeholder={t('privateSpace.passwordPlaceholder')}
               autoFocus
               className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition"
             />
@@ -150,7 +151,7 @@ export default function PrivateSpaceGate() {
             disabled={loading || !password}
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
           >
-            {loading ? '验证中…' : '进入隐私空间'}
+            {loading ? t('privateSpace.verifying') : t('privateSpace.enter')}
           </button>
         </form>
       </div>

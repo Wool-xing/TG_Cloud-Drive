@@ -9,12 +9,13 @@ import {
   Shield,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth.store';
+import { t } from '../../i18n/translations';
 
 const NAV_ITEMS = [
-  { to: '/admin', label: '仪表盘', icon: <LayoutDashboard className="w-4 h-4" />, end: true },
-  { to: '/admin/users', label: '用户管理', icon: <Users className="w-4 h-4" />, end: false },
-  { to: '/admin/files', label: '文件管理', icon: <FolderOpen className="w-4 h-4" />, end: false },
-  { to: '/admin/config', label: '系统配置', icon: <Settings className="w-4 h-4" />, end: false },
+  { to: '/admin', label: t('admin.nav.dashboard'), icon: <LayoutDashboard className="w-4 h-4" />, end: true },
+  { to: '/admin/users', label: t('admin.nav.users'), icon: <Users className="w-4 h-4" />, end: false },
+  { to: '/admin/files', label: t('admin.nav.files'), icon: <FolderOpen className="w-4 h-4" />, end: false },
+  { to: '/admin/config', label: t('admin.nav.config'), icon: <Settings className="w-4 h-4" />, end: false },
 ];
 
 export default function AdminLayout() {
@@ -31,8 +32,8 @@ export default function AdminLayout() {
             <Shield className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">管理后台</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">TG 云盘</p>
+            <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">{t('admin.layout.title')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">{t('app.name')}</p>
           </div>
         </div>
 
@@ -43,7 +44,7 @@ export default function AdminLayout() {
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            返回云盘
+            {t('admin.layout.backToDrive')}
           </Link>
         </div>
 
@@ -80,7 +81,7 @@ export default function AdminLayout() {
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
                 {user?.nickname ?? user?.username}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">管理员</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('admin.layout.role')}</p>
             </div>
           </div>
         </div>
