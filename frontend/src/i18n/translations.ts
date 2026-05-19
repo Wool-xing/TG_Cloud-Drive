@@ -765,6 +765,20 @@ const zh: Record<string, string> = {
   'toolbar.packFail': '打包 {name} 失败',
   'toolbar.noDownloadableFiles': '没有可下载的文件',
   'toolbar.packSuccess': '已打包下载 {n} 个文件',
+  // App layout upload
+  'upload.tooLargeGB': '文件超过 {size} GB 上限',
+  'upload.rejectedN': '部分文件被拒绝（{n} 个）',
+  'upload.dropRelease': '松开以上传文件',
+  'upload.toPrivateSpace': '将上传到隐私空间',
+  'upload.toCurrentFolder': '将上传到当前文件夹',
+  // Shared access / File list
+  'files.colName': '名称',
+  'files.colSize': '大小',
+  'files.colUploadTime': '上传时间',
+  'files.colModifiedTime': '修改时间',
+  'share.secureShare': '安全文件分享',
+  // Sidebar
+  'nav.profileTitle': '个人中心 / 修改密码',
 };
 
 const en: Record<string, string> = {
@@ -1534,6 +1548,20 @@ const en: Record<string, string> = {
   'toolbar.packFail': 'Pack {name} failed',
   'toolbar.noDownloadableFiles': 'No downloadable files',
   'toolbar.packSuccess': 'Packaged {n} files',
+  // App layout upload
+  'upload.tooLargeGB': 'File exceeds {size} GB limit',
+  'upload.rejectedN': 'Some files rejected ({n})',
+  'upload.dropRelease': 'Release to upload',
+  'upload.toPrivateSpace': 'Upload to private space',
+  'upload.toCurrentFolder': 'Upload to current folder',
+  // Shared access / File list
+  'files.colName': 'Name',
+  'files.colSize': 'Size',
+  'files.colUploadTime': 'Upload time',
+  'files.colModifiedTime': 'Modified time',
+  'share.secureShare': 'Secure file sharing',
+  // Sidebar
+  'nav.profileTitle': 'Profile / Change password',
 };
 
 const translations: Record<string, Record<string, string>> = { zh, en };
