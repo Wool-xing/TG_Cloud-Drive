@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { t } from '../../i18n/translations';
 import {
   Search,
   Trash2,
@@ -26,14 +27,14 @@ import ConfirmPasswordDialog from '../../components/dialogs/ConfirmPasswordDialo
 const PAGE_SIZE = 20;
 
 const TYPE_TABS = [
-  { key: '', label: '全部' },
-  { key: 'folder', label: '文件夹' },
-  { key: 'image', label: '图片' },
-  { key: 'video', label: '视频' },
-  { key: 'audio', label: '音频' },
-  { key: 'document', label: '文档' },
-  { key: 'archive', label: '压缩包' },
-  { key: 'other', label: '其他' },
+  { key: '', labelKey: 'admin.files.filterAll' },
+  { key: 'folder', labelKey: 'admin.files.filterFolder' },
+  { key: 'image', labelKey: 'admin.files.filterImage' },
+  { key: 'video', labelKey: 'admin.files.filterVideo' },
+  { key: 'audio', labelKey: 'admin.files.filterAudio' },
+  { key: 'document', labelKey: 'admin.files.filterDocument' },
+  { key: 'archive', labelKey: 'admin.files.filterArchive' },
+  { key: 'other', labelKey: 'admin.files.filterOther' },
 ] as const;
 
 function getTypeCategory(node: { type: string; mimeType?: string }): string {
@@ -62,17 +63,17 @@ function typeIcon(type: string) {
 
 function typeLabel(type: string): string {
   switch (type) {
-    case 'folder': return '文件夹';
-    case 'image': return '图片';
-    case 'video': return '视频';
-    case 'audio': return '音频';
-    case 'document': return '文档';
-    case 'archive': return '压缩包';
-    default: return '其他';
+    case 'folder': return t('admin.files.filterFolder');
+    case 'image': return t('admin.files.filterImage');
+    case 'video': return t('admin.files.filterVideo');
+    case 'audio': return t('admin.files.filterAudio');
+    case 'document': return t('admin.files.filterDocument');
+    case 'archive': return t('admin.files.filterArchive');
+    default: return t('admin.files.filterOther');
   }
 }
 
-  interface AdminNode extends Node {
+interface AdminNode extends Node {
   username?: string;
 }
 
@@ -126,17 +127,16 @@ export default function AdminFiles() {
     if (!deleteTarget) return;
     await adminApi.deleteFile(deleteTarget.id, pw);
     invalidate();
-    toast.success('文件已删除');
+    toast.success(t('admin.files.deleted'));
   };
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">文件管理</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">共 {total} 个项目</p>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('admin.files.title')}</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('admin.files.subtitle', { total })}</p>
       </div>
 
-      {/* Search + Type filters */}
       <div className="space-y-3">
         <div className="relative max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -144,12 +144,11 @@ export default function AdminFiles() {
             type="text"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="搜索文件名..."
+            placeholder={t('admin.files.searchPlaceholder')}
             className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
           />
         </div>
 
-        {/* Type filter tabs */}
         <div className="flex flex-wrap gap-1.5">
           {TYPE_TABS.map(tab => (
             <button
@@ -161,24 +160,23 @@ export default function AdminFiles() {
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 dark:bg-gray-900">
               <tr>
-                <SortTh field="name" label="文件名" visible />
-                <SortTh field="type" label="类型" visible="md" />
-                <SortTh field="userId" label="所有者" visible="md" />
-                <SortTh field="size" label="大小" visible="lg" />
-                <SortTh field="createdAt" label="上传时间" visible="xl" />
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">操作</th>
+                <SortTh field="name" label={t('admin.files.colName')} visible />
+                <SortTh field="type" label={t('admin.files.colType')} visible="md" />
+                <SortTh field="userId" label={t('admin.files.colOwner')} visible="md" />
+                <SortTh field="size" label={t('admin.files.colSize')} visible="lg" />
+                <SortTh field="createdAt" label={t('admin.files.colUploadTime')} visible="xl" />
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('admin.files.colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -196,7 +194,6 @@ export default function AdminFiles() {
                     const cat = getTypeCategory(node);
                     return (
                       <tr key={node.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        {/* Name */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -210,38 +207,33 @@ export default function AdminFiles() {
                               <span className="font-medium text-gray-800 dark:text-gray-200 truncate block max-w-[180px]">{node.name}</span>
                             </div>
                             {node.isPrivate && (
-                              <span title="隐私空间"><Shield className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" /></span>
+                              <span title={t('admin.files.tooltipPrivate')}><Shield className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" /></span>
                             )}
                           </div>
                         </td>
 
-                        {/* Type */}
                         <td className="px-4 py-3 hidden md:table-cell">
                           <span className="text-xs text-gray-500 dark:text-gray-400">{typeLabel(cat)}</span>
                         </td>
 
-                        {/* Owner */}
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs hidden md:table-cell">
                           {node.username ?? node.userId?.slice(0, 8) ?? '—'}
                         </td>
 
-                        {/* Size */}
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden lg:table-cell">
                           {node.type === 'file' ? formatBytes(node.size) : '—'}
                         </td>
 
-                        {/* Date */}
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden xl:table-cell">
                           {new Date(node.createdAt).toLocaleDateString('zh-CN')}
                         </td>
 
-                        {/* Actions */}
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end">
                             <button
                               onClick={() => setDeleteTarget(node)}
                               className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                              title="删除"
+                              title={t('admin.files.tooltipDelete')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -252,17 +244,16 @@ export default function AdminFiles() {
                   })}
               {!isLoading && files.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-400 dark:text-gray-600 text-sm dark:text-gray-500">暂无文件</td>
+                  <td colSpan={6} className="text-center py-8 text-gray-400 dark:text-gray-600 text-sm dark:text-gray-500">{t('admin.files.empty')}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30 dark:bg-gray-900">
-            <p className="text-xs text-gray-500 dark:text-gray-400">共 {total} 条，第 {page} / {totalPages} 页</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('admin.files.pagination', { total, page, totalPages })}</p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -285,12 +276,12 @@ export default function AdminFiles() {
 
       {deleteTarget && (
         <ConfirmPasswordDialog
-          title="删除文件"
+          title={t('admin.files.deleteTitle')}
           destructive
-          confirmLabel="确认删除"
+          confirmLabel={t('common.delete')}
           description={
             <>
-              确定要永久删除 <strong>{deleteTarget.name}</strong> 吗？此操作<strong>无法撤销</strong>。请输入您的管理员密码以确认。
+              {t('admin.files.deleteBody', { name: deleteTarget.name })}
             </>
           }
           onConfirm={handleDelete}
