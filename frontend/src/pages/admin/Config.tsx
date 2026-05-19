@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { t } from '../../i18n/translations';
 import {
   Mail,
   Loader2,
@@ -46,7 +47,6 @@ interface SystemConfig {
   };
 }
 
-// ── Tag Input ──────────────────────────────────────────────────
 function TagInput({
   tags,
   onChange,
@@ -108,7 +108,6 @@ function TagInput({
   );
 }
 
-// ── Section Wrapper ────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
@@ -120,7 +119,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-// ── Form Field ─────────────────────────────────────────────────
 function Field({
   label,
   hint,
@@ -145,7 +143,6 @@ function inputClass() {
   return 'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 }
 
-// ── Main Config Page ────────────────────────────────────────────
 export default function AdminConfig() {
   const { data: remoteConfig, isLoading } = useQuery<SystemConfig>({
     queryKey: ['admin', 'config'],
@@ -209,20 +206,15 @@ export default function AdminConfig() {
     setConfig(c => ({ ...c, sms: { ...c.sms, ...partial } }));
 
   const validate = (): boolean => {
-    if (config.defaultQuotaGB < 1) { toast.error('默认配额不能小于1GB'); return false; }
-    if (config.maxFoldersPerDir < 1) { toast.error('每目录最大文件夹数不能小于1'); return false; }
-    if (config.loginFailLockCount < 1) { toast.error('登录失败锁定次数不能小于1'); return false; }
-    if (config.loginLockDuration < 1) { toast.error('锁定时长不能小于1秒'); return false; }
-    if (config.shareDefaultExpireDays < 0) { toast.error('分享有效期不能为负数'); return false; }
-    if (config.smtp.port < 1 || config.smtp.port > 65535) { toast.error('SMTP端口需在1-65535范围内'); return false; }
+    if (config.defaultQuotaGB < 1) { toast.error(t('admin.config.validation.quotaMin')); return false; }
+    if (config.maxFoldersPerDir < 1) { toast.error(t('admin.config.validation.maxFoldersMin')); return false; }
+    if (config.loginFailLockCount < 1) { toast.error(t('admin.config.validation.lockCountMin')); return false; }
+    if (config.loginLockDuration < 1) { toast.error(t('admin.config.validation.lockDurationMin')); return false; }
+    if (config.shareDefaultExpireDays < 0) { toast.error(t('admin.config.validation.shareExpiryNegative')); return false; }
+    if (config.smtp.port < 1 || config.smtp.port > 65535) { toast.error(t('admin.config.validation.smtpPortRange')); return false; }
     return true;
   };
 
-  // P1-I7: system config writes (SMTP / registration / share defaults …)
-  // affect every user, so the backend gates them behind requireConfirm. The
-  // top-level Save button only opens the confirm dialog; the actual PATCH
-  // ships from inside the dialog's onConfirm so the admin password rides on
-  // the same request.
   const handleSave = () => {
     if (!validate()) return;
     setConfirmOpen(true);
@@ -232,7 +224,7 @@ export default function AdminConfig() {
     setSaving(true);
     try {
       await adminApi.updateConfig({ ...config, confirmPassword: pw });
-      toast.success('配置已保存');
+      toast.success(t('admin.config.saved'));
     } finally {
       setSaving(false);
     }
@@ -240,7 +232,7 @@ export default function AdminConfig() {
 
   const handleTestEmail = async () => {
     if (!testEmailTarget.trim()) {
-      toast.error('请输入测试邮箱地址');
+      toast.error(t('admin.config.validation.enterEmail'));
       return;
     }
     setTestingEmail(true);
@@ -248,14 +240,13 @@ export default function AdminConfig() {
       const res = await adminApi.testEmail({ to: testEmailTarget, smtpConfig: config.smtp }) as any;
       const dev = res?.devCode;
       if (dev) {
-        toast.success(`已生成测试验证码 (dev): ${dev}`, { duration: 15_000 });
+        toast.success(t('admin.config.emailSentDev', { code: dev }), { duration: 15_000 });
       } else {
-        toast.success('测试邮件已发送，请检查收件箱并输入收到的验证码');
+        toast.success(t('admin.config.emailSent'));
       }
       setEmailSent(true);
       setEmailVerifyCode('');
     } catch {
-      // interceptor
     } finally {
       setTestingEmail(false);
     }
@@ -263,17 +254,16 @@ export default function AdminConfig() {
 
   const handleVerifyEmail = async () => {
     if (!/^\d{6}$/.test(emailVerifyCode)) {
-      toast.error('请输入 6 位数字验证码');
+      toast.error(t('admin.config.validation.enterCode'));
       return;
     }
     setVerifyingEmail(true);
     try {
       await adminApi.testVerifyCode({ channel: 'email', code: emailVerifyCode });
-      toast.success('✓ 邮件通道核对成功，验证码正确');
+      toast.success(t('admin.config.emailVerified'));
       setEmailSent(false);
       setEmailVerifyCode('');
     } catch {
-      // interceptor
     } finally {
       setVerifyingEmail(false);
     }
@@ -281,24 +271,21 @@ export default function AdminConfig() {
 
   const handleTestSms = async () => {
     if (!testSmsTarget.trim()) {
-      toast.error('请输入测试手机号');
+      toast.error(t('admin.config.validation.enterPhone'));
       return;
     }
     setTestingSms(true);
     try {
-      // Backend returns `devCode` in dev / when provider=none so admin can
-      // close the verify loop even before a real gateway is wired.
       const res = await adminApi.testSms({ to: testSmsTarget }) as any;
       const dev = res?.devCode;
       if (dev) {
-        toast.success(`已生成测试验证码 (dev): ${dev}`, { duration: 15_000 });
+        toast.success(t('admin.config.emailSentDev', { code: dev }), { duration: 15_000 });
       } else {
-        toast.success('测试短信已发送，请检查手机并输入收到的验证码');
+        toast.success(t('admin.config.smsSent'));
       }
       setSmsSent(true);
       setSmsVerifyCode('');
     } catch {
-      // interceptor
     } finally {
       setTestingSms(false);
     }
@@ -306,17 +293,16 @@ export default function AdminConfig() {
 
   const handleVerifySms = async () => {
     if (!/^\d{6}$/.test(smsVerifyCode)) {
-      toast.error('请输入 6 位数字验证码');
+      toast.error(t('admin.config.validation.enterCode'));
       return;
     }
     setVerifyingSms(true);
     try {
       await adminApi.testVerifyCode({ channel: 'sms', code: smsVerifyCode });
-      toast.success('✓ 短信通道核对成功，验证码正确');
+      toast.success(t('admin.config.smsVerified'));
       setSmsSent(false);
       setSmsVerifyCode('');
     } catch {
-      // interceptor
     } finally {
       setVerifyingSms(false);
     }
@@ -330,424 +316,196 @@ export default function AdminConfig() {
     );
   }
 
+  const regModeOptions = [
+    { value: 'open', label: t('admin.config.regOpen') },
+    { value: 'invite', label: t('admin.config.regInvite') },
+    { value: 'closed', label: t('admin.config.regClosed') },
+  ];
+
+  const smsProviderOptions: { value: SmsProvider; label: string }[] = [
+    { value: 'none', label: t('admin.config.smsNone') },
+    { value: 'twilio', label: 'Twilio' },
+    { value: 'aliyun', label: t('admin.config.smsAliyun') },
+    { value: 'aws-sns', label: 'AWS SNS' },
+    { value: 'telegram-bot', label: 'Telegram Bot' },
+  ];
+
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">系统配置</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">管理全局系统设置</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('admin.config.title')}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('admin.config.subtitle')}</p>
         </div>
       </div>
 
-      {/* ── Storage & Limits ─────────────────────────────── */}
-      <Section title="存储与限制">
-        <Field label="默认配额 (GB)" hint="新用户注册时分配的默认存储空间">
-          <input
-            type="number"
-            min={1}
-            max={10000}
-            value={config.defaultQuotaGB}
-            onChange={e => set({ defaultQuotaGB: Number(e.target.value) })}
-            className={inputClass()}
-          />
+      <Section title={t('admin.config.sectionStorage')}>
+        <Field label={t('admin.config.fieldDefaultQuota')} hint={t('admin.config.hintDefaultQuota')}>
+          <input type="number" min={1} max={10000} value={config.defaultQuotaGB} onChange={e => set({ defaultQuotaGB: Number(e.target.value) })} className={inputClass()} />
         </Field>
-        <Field label="每目录最大文件夹数" hint="单个目录下允许创建的最大文件夹数量">
-          <input
-            type="number"
-            min={10}
-            max={100000}
-            value={config.maxFoldersPerDir}
-            onChange={e => set({ maxFoldersPerDir: Number(e.target.value) })}
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldMaxFolders')} hint={t('admin.config.hintMaxFolders')}>
+          <input type="number" min={10} max={100000} value={config.maxFoldersPerDir} onChange={e => set({ maxFoldersPerDir: Number(e.target.value) })} className={inputClass()} />
         </Field>
-        <Field label="文件类型黑名单" hint="禁止上传的文件扩展名（回车或逗号分隔）">
-          <TagInput
-            tags={config.fileTypeBlacklist}
-            onChange={tags => set({ fileTypeBlacklist: tags })}
-            placeholder="如: exe, bat, sh ..."
-          />
+        <Field label={t('admin.config.fieldFileBlacklist')} hint={t('admin.config.hintFileBlacklist')}>
+          <TagInput tags={config.fileTypeBlacklist} onChange={tags => set({ fileTypeBlacklist: tags })} placeholder={t('admin.config.blacklistPlaceholder')} />
         </Field>
       </Section>
 
-      {/* ── Registration ─────────────────────────────────── */}
-      <Section title="注册与访问">
-        <Field label="注册模式" hint="控制用户注册权限">
+      <Section title={t('admin.config.sectionRegistration')}>
+        <Field label={t('admin.config.fieldRegMode')} hint={t('admin.config.hintRegMode')}>
           <div className="flex gap-4 flex-wrap">
-            {[
-              { value: 'open', label: '开放注册' },
-              { value: 'invite', label: '仅邀请' },
-              { value: 'closed', label: '关闭注册' },
-            ].map(opt => (
+            {regModeOptions.map(opt => (
               <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="registrationMode"
-                  value={opt.value}
-                  checked={config.registrationMode === opt.value}
-                  onChange={() => set({ registrationMode: opt.value as SystemConfig['registrationMode'] })}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="registrationMode" value={opt.value} checked={config.registrationMode === opt.value} onChange={() => set({ registrationMode: opt.value as SystemConfig['registrationMode'] })} className="w-4 h-4 text-blue-600" />
                 <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
               </label>
             ))}
           </div>
         </Field>
-        <Field label="验证码有效期 (秒)" hint="邮件/短信验证码的有效时间">
-          <input
-            type="number"
-            min={60}
-            max={3600}
-            value={config.verificationCodeTTL}
-            onChange={e => set({ verificationCodeTTL: Number(e.target.value) })}
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldCodeTTL')} hint={t('admin.config.hintCodeTTL')}>
+          <input type="number" min={60} max={3600} value={config.verificationCodeTTL} onChange={e => set({ verificationCodeTTL: Number(e.target.value) })} className={inputClass()} />
         </Field>
       </Section>
 
-      {/* ── Security ─────────────────────────────────────── */}
-      <Section title="安全策略">
-        <Field label="登录失败锁定次数" hint="连续失败多少次后锁定账号">
-          <input
-            type="number"
-            min={3}
-            max={20}
-            value={config.loginFailLockCount}
-            onChange={e => set({ loginFailLockCount: Number(e.target.value) })}
-            className={inputClass()}
-          />
+      <Section title={t('admin.config.sectionSecurity')}>
+        <Field label={t('admin.config.fieldLoginLockCount')} hint={t('admin.config.hintLoginLockCount')}>
+          <input type="number" min={3} max={20} value={config.loginFailLockCount} onChange={e => set({ loginFailLockCount: Number(e.target.value) })} className={inputClass()} />
         </Field>
-        <Field label="锁定时长 (秒)" hint="账号被锁定后需等待的时间">
-          <input
-            type="number"
-            min={60}
-            max={86400}
-            value={config.loginLockDuration}
-            onChange={e => set({ loginLockDuration: Number(e.target.value) })}
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldLockDuration')} hint={t('admin.config.hintLockDuration')}>
+          <input type="number" min={60} max={86400} value={config.loginLockDuration} onChange={e => set({ loginLockDuration: Number(e.target.value) })} className={inputClass()} />
         </Field>
-        <Field label="分享默认有效期 (天)" hint="创建分享链接时的默认过期天数，0 表示永不过期">
-          <input
-            type="number"
-            min={0}
-            max={365}
-            value={config.shareDefaultExpireDays}
-            onChange={e => set({ shareDefaultExpireDays: Number(e.target.value) })}
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldShareExpiry')} hint={t('admin.config.hintShareExpiry')}>
+          <input type="number" min={0} max={365} value={config.shareDefaultExpireDays} onChange={e => set({ shareDefaultExpireDays: Number(e.target.value) })} className={inputClass()} />
         </Field>
       </Section>
 
-      {/* ── Cloudflare Workers ───────────────────────────── */}
-      <Section title="Cloudflare Workers">
-        <Field label="Workers URL" hint="用于文件代理下载的 Cloudflare Workers 地址">
-          <input
-            type="url"
-            value={config.cfWorkersUrl}
-            onChange={e => set({ cfWorkersUrl: e.target.value })}
-            placeholder="https://your-worker.your-subdomain.workers.dev"
-            className={inputClass()}
-          />
+      <Section title={t('admin.config.sectionWorkers')}>
+        <Field label={t('admin.config.fieldWorkersUrl')} hint={t('admin.config.hintWorkersUrl')}>
+          <input type="url" value={config.cfWorkersUrl} onChange={e => set({ cfWorkersUrl: e.target.value })} placeholder="https://your-worker.your-subdomain.workers.dev" className={inputClass()} />
         </Field>
       </Section>
 
-      {/* ── SMTP ─────────────────────────────────────────── */}
-      <Section title="SMTP 邮件配置">
-        <Field label="SMTP 主机">
-          <input
-            type="text"
-            value={config.smtp.host}
-            onChange={e => setSmtp({ host: e.target.value })}
-            placeholder="smtp.example.com"
-            className={inputClass()}
-          />
+      <Section title={t('admin.config.sectionSmtp')}>
+        <Field label={t('admin.config.fieldSmtpHost')}>
+          <input type="text" value={config.smtp.host} onChange={e => setSmtp({ host: e.target.value })} placeholder="smtp.example.com" className={inputClass()} />
         </Field>
-        <Field label="SMTP 端口">
-          <input
-            type="number"
-            min={1}
-            max={65535}
-            value={config.smtp.port}
-            onChange={e => setSmtp({ port: Number(e.target.value) })}
-            placeholder="587"
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldSmtpPort')}>
+          <input type="number" min={1} max={65535} value={config.smtp.port} onChange={e => setSmtp({ port: Number(e.target.value) })} placeholder="587" className={inputClass()} />
         </Field>
-        <Field label="SMTP 用户名">
-          <input
-            type="text"
-            value={config.smtp.user}
-            onChange={e => setSmtp({ user: e.target.value })}
-            placeholder="noreply@example.com"
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldSmtpUser')}>
+          <input type="text" value={config.smtp.user} onChange={e => setSmtp({ user: e.target.value })} placeholder="noreply@example.com" className={inputClass()} />
         </Field>
-        <Field label="SMTP 密码">
+        <Field label={t('admin.config.fieldSmtpPass')}>
           <div className="relative">
-            <input
-              type={showSmtpPass ? 'text' : 'password'}
-              value={config.smtp.pass}
-              onChange={e => setSmtp({ pass: e.target.value })}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              className={`${inputClass()} pr-10`}
-            />
-            <button
-              type="button"
-              onClick={() => setShowSmtpPass(v => !v)}
-              title={showSmtpPass ? '隐藏密码' : '显示密码'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
-            >
+            <input type={showSmtpPass ? 'text' : 'password'} value={config.smtp.pass} onChange={e => setSmtp({ pass: e.target.value })} placeholder="••••••••" autoComplete="new-password" className={`${inputClass()} pr-10`} />
+            <button type="button" onClick={() => setShowSmtpPass(v => !v)} title={showSmtpPass ? t('admin.config.hidePassword') : t('admin.config.showPassword')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200">
               {showSmtpPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </Field>
-        <Field label="发件人地址 (From)">
-          <input
-            type="email"
-            value={config.smtp.from}
-            onChange={e => setSmtp({ from: e.target.value })}
-            placeholder="TG 云盘 <noreply@example.com>"
-            className={inputClass()}
-          />
+        <Field label={t('admin.config.fieldSmtpFrom')}>
+          <input type="email" value={config.smtp.from} onChange={e => setSmtp({ from: e.target.value })} placeholder={t('admin.config.smtpFromPlaceholder')} className={inputClass()} />
         </Field>
 
-        {/* Test email — two-step: send a real 6-digit code, then admin types
-            what they received so we verify the round trip. Pre-fix the
-            button only said "邮件已发送" even when the relay had silently
-            dropped the message; now the admin must close the loop. */}
         <div className="pt-2 border-t border-gray-100 dark:border-gray-700 space-y-3">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">发送测试邮件（验证码 5 分钟内有效）</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('admin.config.testEmailTitle')}</p>
           <div className="flex gap-2">
-            <input
-              type="email"
-              value={testEmailTarget}
-              onChange={e => setTestEmailTarget(e.target.value)}
-              placeholder="输入接收测试邮件的地址"
-              className={`flex-1 ${inputClass()}`}
-            />
-            <button
-              onClick={handleTestEmail}
-              disabled={testingEmail}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
+            <input type="email" value={testEmailTarget} onChange={e => setTestEmailTarget(e.target.value)} placeholder={t('admin.config.testEmailPlaceholder')} className={`flex-1 ${inputClass()}`} />
+            <button onClick={handleTestEmail} disabled={testingEmail} className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap">
               {testingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              {emailSent ? '重新发送' : '发送测试'}
+              {emailSent ? t('admin.config.resend') : t('admin.config.sendTest')}
             </button>
           </div>
           {emailSent && (
             <div className="flex gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={emailVerifyCode}
-                onChange={e => setEmailVerifyCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="输入收到的 6 位验证码"
-                className={`flex-1 ${inputClass()}`}
-              />
-              <button
-                onClick={handleVerifyEmail}
-                disabled={verifyingEmail || emailVerifyCode.length !== 6}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
-              >
+              <input type="text" inputMode="numeric" maxLength={6} value={emailVerifyCode} onChange={e => setEmailVerifyCode(e.target.value.replace(/\D/g, ''))} placeholder={t('admin.config.verifyCodePlaceholder')} className={`flex-1 ${inputClass()}`} />
+              <button onClick={handleVerifyEmail} disabled={verifyingEmail || emailVerifyCode.length !== 6} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap">
                 {verifyingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                核对验证码
+                {t('admin.config.verifyCode')}
               </button>
             </div>
           )}
         </div>
       </Section>
 
-      {/* ── SMS Provider ─────────────────────────────────────── */}
-      <Section title="短信 SMS Provider 配置">
-        <Field
-          label="SMS Provider"
-          hint="选择短信网关。'none' 时验证码走 dev 模式（前端 toast 显示）。"
-        >
+      <Section title={t('admin.config.sectionSms')}>
+        <Field label={t('admin.config.fieldSmsProvider')} hint={t('admin.config.hintSmsProvider')}>
           <div className="flex gap-4 flex-wrap">
-            {([
-              { value: 'none', label: '不启用 (dev toast)' },
-              { value: 'twilio', label: 'Twilio' },
-              { value: 'aliyun', label: '阿里云' },
-              { value: 'aws-sns', label: 'AWS SNS' },
-              { value: 'telegram-bot', label: 'Telegram Bot' },
-            ] as { value: SmsProvider; label: string }[]).map(opt => (
+            {smsProviderOptions.map(opt => (
               <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="smsProvider"
-                  value={opt.value}
-                  checked={config.sms.provider === opt.value}
-                  onChange={() => setSms({ provider: opt.value })}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="smsProvider" value={opt.value} checked={config.sms.provider === opt.value} onChange={() => setSms({ provider: opt.value })} className="w-4 h-4 text-blue-600" />
                 <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
               </label>
             ))}
           </div>
         </Field>
 
-        {/* Twilio */}
         {config.sms.provider === 'twilio' && (
           <>
-            <Field label="Account SID" hint="Twilio 控制台 → Account Info">
-              <input
-                type="text"
-                value={config.sms.accountSid}
-                onChange={e => setSms({ accountSid: e.target.value })}
-                placeholder="AC..."
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldAccountSid')} hint={t('admin.config.hintAccountSid')}>
+              <input type="text" value={config.sms.accountSid} onChange={e => setSms({ accountSid: e.target.value })} placeholder="AC..." className={inputClass()} />
             </Field>
-            <Field label="Auth Token">
+            <Field label={t('admin.config.fieldAuthToken')}>
               <div className="relative">
-                <input
-                  type={showSmsSecret ? 'text' : 'password'}
-                  value={config.sms.authToken}
-                  onChange={e => setSms({ authToken: e.target.value })}
-                  placeholder="留空保留已配置值"
-                  autoComplete="new-password"
-                  className={`${inputClass()} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSmsSecret(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
-                >
+                <input type={showSmsSecret ? 'text' : 'password'} value={config.sms.authToken} onChange={e => setSms({ authToken: e.target.value })} placeholder={t('admin.config.keepPlaceholder')} autoComplete="new-password" className={`${inputClass()} pr-10`} />
+                <button type="button" onClick={() => setShowSmsSecret(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200">
                   {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </Field>
-            <Field label="发送号码 (From)" hint="E.164 格式，如 +15005550006">
-              <input
-                type="text"
-                value={config.sms.from}
-                onChange={e => setSms({ from: e.target.value })}
-                placeholder="+1xxxxxxxxxx"
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldFrom')} hint={t('admin.config.hintFrom')}>
+              <input type="text" value={config.sms.from} onChange={e => setSms({ from: e.target.value })} placeholder="+1xxxxxxxxxx" className={inputClass()} />
             </Field>
           </>
         )}
 
-        {/* Aliyun */}
         {config.sms.provider === 'aliyun' && (
           <>
-            <Field label="AccessKey ID">
-              <input
-                type="text"
-                value={config.sms.accessKeyId}
-                onChange={e => setSms({ accessKeyId: e.target.value })}
-                placeholder="LTAI..."
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldAccessKeyId')}>
+              <input type="text" value={config.sms.accessKeyId} onChange={e => setSms({ accessKeyId: e.target.value })} placeholder="LTAI..." className={inputClass()} />
             </Field>
-            <Field label="AccessKey Secret">
+            <Field label={t('admin.config.fieldAccessKeySecret')}>
               <div className="relative">
-                <input
-                  type={showSmsSecret ? 'text' : 'password'}
-                  value={config.sms.accessKeySecret}
-                  onChange={e => setSms({ accessKeySecret: e.target.value })}
-                  placeholder="留空保留已配置值"
-                  autoComplete="new-password"
-                  className={`${inputClass()} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSmsSecret(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
-                >
+                <input type={showSmsSecret ? 'text' : 'password'} value={config.sms.accessKeySecret} onChange={e => setSms({ accessKeySecret: e.target.value })} placeholder={t('admin.config.keepPlaceholder')} autoComplete="new-password" className={`${inputClass()} pr-10`} />
+                <button type="button" onClick={() => setShowSmsSecret(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200">
                   {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </Field>
-            <Field label="签名 SignName" hint="已备案的短信签名">
-              <input
-                type="text"
-                value={config.sms.signName}
-                onChange={e => setSms({ signName: e.target.value })}
-                placeholder="如：TG云盘"
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldSignName')} hint={t('admin.config.hintSignName')}>
+              <input type="text" value={config.sms.signName} onChange={e => setSms({ signName: e.target.value })} placeholder={t('admin.config.signNamePlaceholder')} className={inputClass()} />
             </Field>
-            <Field label="模板 ID" hint="如 SMS_xxxxxxxx，模板需含 ${code} 变量">
-              <input
-                type="text"
-                value={config.sms.templateCode}
-                onChange={e => setSms({ templateCode: e.target.value })}
-                placeholder="SMS_xxxxxxxx"
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldTemplateId')} hint={t('admin.config.hintTemplateId')}>
+              <input type="text" value={config.sms.templateCode} onChange={e => setSms({ templateCode: e.target.value })} placeholder="SMS_xxxxxxxx" className={inputClass()} />
             </Field>
           </>
         )}
 
-        {/* AWS SNS */}
         {config.sms.provider === 'aws-sns' && (
           <>
-            <Field label="AccessKey ID">
-              <input
-                type="text"
-                value={config.sms.accessKeyId}
-                onChange={e => setSms({ accessKeyId: e.target.value })}
-                placeholder="AKIA..."
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldAccessKeyId')}>
+              <input type="text" value={config.sms.accessKeyId} onChange={e => setSms({ accessKeyId: e.target.value })} placeholder="AKIA..." className={inputClass()} />
             </Field>
-            <Field label="Secret AccessKey">
+            <Field label={t('admin.config.fieldAccessKeySecret')}>
               <div className="relative">
-                <input
-                  type={showSmsSecret ? 'text' : 'password'}
-                  value={config.sms.accessKeySecret}
-                  onChange={e => setSms({ accessKeySecret: e.target.value })}
-                  placeholder="留空保留已配置值"
-                  autoComplete="new-password"
-                  className={`${inputClass()} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSmsSecret(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
-                >
+                <input type={showSmsSecret ? 'text' : 'password'} value={config.sms.accessKeySecret} onChange={e => setSms({ accessKeySecret: e.target.value })} placeholder={t('admin.config.keepPlaceholder')} autoComplete="new-password" className={`${inputClass()} pr-10`} />
+                <button type="button" onClick={() => setShowSmsSecret(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200">
                   {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </Field>
-            <Field label="Region" hint="如 us-east-1 / ap-northeast-1">
-              <input
-                type="text"
-                value={config.sms.region}
-                onChange={e => setSms({ region: e.target.value })}
-                placeholder="us-east-1"
-                className={inputClass()}
-              />
+            <Field label={t('admin.config.fieldRegion')} hint={t('admin.config.hintRegion')}>
+              <input type="text" value={config.sms.region} onChange={e => setSms({ region: e.target.value })} placeholder="us-east-1" className={inputClass()} />
             </Field>
           </>
         )}
 
-        {/* Telegram Bot */}
         {config.sms.provider === 'telegram-bot' && (
           <>
-            <Field
-              label="Bot Token"
-              hint="@BotFather 申请。用户须先 /start 该 bot 并绑定账号才能收到 OTP。"
-            >
+            <Field label={t('admin.config.fieldBotToken')} hint={t('admin.config.hintBotToken')}>
               <div className="relative">
-                <input
-                  type={showSmsSecret ? 'text' : 'password'}
-                  value={config.sms.botToken}
-                  onChange={e => setSms({ botToken: e.target.value })}
-                  placeholder="留空保留已配置值"
-                  autoComplete="new-password"
-                  className={`${inputClass()} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSmsSecret(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200"
-                >
+                <input type={showSmsSecret ? 'text' : 'password'} value={config.sms.botToken} onChange={e => setSms({ botToken: e.target.value })} placeholder={t('admin.config.keepPlaceholder')} autoComplete="new-password" className={`${inputClass()} pr-10`} />
+                <button type="button" onClick={() => setShowSmsSecret(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-200">
                   {showSmsSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -757,76 +515,46 @@ export default function AdminConfig() {
 
         {config.sms.provider === 'none' && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            未启用任何短信通道。开发环境下，所有验证码会在前端以 toast 直接显示
-            （后端 verification.service.ts L64-67）。生产环境请选择并配置真实
-            provider。
+            {t('admin.config.smsNoneHint')}
           </p>
         )}
 
-        {/* Test SMS — same two-step flow as email */}
         <div className="pt-2 border-t border-gray-100 dark:border-gray-700 space-y-3">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">发送测试短信（验证码 5 分钟内有效）</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('admin.config.testSmsTitle')}</p>
           <div className="flex gap-2">
-            <input
-              type="tel"
-              value={testSmsTarget}
-              onChange={e => setTestSmsTarget(e.target.value)}
-              placeholder="输入测试手机号（含国际区号，如 +8613800000000）"
-              className={`flex-1 ${inputClass()}`}
-            />
-            <button
-              onClick={handleTestSms}
-              disabled={testingSms}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
+            <input type="tel" value={testSmsTarget} onChange={e => setTestSmsTarget(e.target.value)} placeholder={t('admin.config.testSmsPlaceholder')} className={`flex-1 ${inputClass()}`} />
+            <button onClick={handleTestSms} disabled={testingSms} className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap">
               {testingSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              {smsSent ? '重新发送' : '发送测试'}
+              {smsSent ? t('admin.config.resend') : t('admin.config.sendTest')}
             </button>
           </div>
           {smsSent && (
             <div className="flex gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={smsVerifyCode}
-                onChange={e => setSmsVerifyCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="输入收到的 6 位验证码"
-                className={`flex-1 ${inputClass()}`}
-              />
-              <button
-                onClick={handleVerifySms}
-                disabled={verifyingSms || smsVerifyCode.length !== 6}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
-              >
+              <input type="text" inputMode="numeric" maxLength={6} value={smsVerifyCode} onChange={e => setSmsVerifyCode(e.target.value.replace(/\D/g, ''))} placeholder={t('admin.config.verifyCodePlaceholder')} className={`flex-1 ${inputClass()}`} />
+              <button onClick={handleVerifySms} disabled={verifyingSms || smsVerifyCode.length !== 6} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap">
                 {verifyingSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                核对验证码
+                {t('admin.config.verifyCode')}
               </button>
             </div>
           )}
         </div>
       </Section>
 
-      {/* Bottom save */}
       <div className="flex justify-end pb-4">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
-        >
+        <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-          保存所有配置
+          {t('admin.config.saveAll')}
         </button>
       </div>
 
       {confirmOpen && (
         <ConfirmPasswordDialog
-          title="确认系统配置变更"
-          confirmLabel="确认保存"
+          title={t('admin.config.confirmTitle')}
+          confirmLabel={t('admin.config.confirmLabel')}
           destructive
           description={
             <>
-              您正在修改全局系统配置（SMTP、注册策略、分享默认值等），变更将<strong>影响所有用户</strong>。请输入您的管理员密码以确认。
+              {t('admin.config.confirmBody')}
             </>
           }
           onConfirm={submitConfig}
