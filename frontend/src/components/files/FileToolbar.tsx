@@ -387,7 +387,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
                 disabled={creatingFolder}
               />
               <button
-                onClick={submitNewItem}
+                onMouseDown={e => { e.preventDefault(); submitNewItem(); }}
                 disabled={creatingFolder}
                 className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
