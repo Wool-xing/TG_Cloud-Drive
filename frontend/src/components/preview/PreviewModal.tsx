@@ -25,7 +25,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../../api/client';
 import { useFileStore } from '../../stores/file.store';
 import { useAuthStore } from '../../stores/auth.store';
-import { formatBytes, getSessionMEK, decryptDEK, decryptBuffer, encryptChunk, generateDEK, encryptDEK, exportDEKAsBase64 } from '../../utils/crypto';
+import { formatBytes, getSessionMEK, setSessionMEK, deriveMEK, decryptDEK, decryptBuffer, encryptChunk, generateDEK, encryptDEK, exportDEKAsBase64 } from '../../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../../utils/streaming-download';
 import RichTextEditor from './RichTextEditor';
 import SpreadsheetEditor from './SpreadsheetEditor';
@@ -452,7 +452,7 @@ async function fetchAndDecrypt(
 export default function PreviewModal({ nodes }: PreviewModalProps) {
   const queryClient = useQueryClient();
   const { previewNode, setPreview } = useFileStore();
-  const { mekDerived } = useAuthStore();
+  const { mekDerived, mekSalt } = useAuthStore();
 
   const [previewState, setPreviewState] = useState<PreviewState>({ status: 'loading' });
   const [downloadProgress, setDownloadProgress] = useState(-1);
@@ -461,6 +461,8 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [needPassword, setNeedPassword] = useState(false);
+  const [pwInput, setPwInput] = useState('');
   const savedNodeRef = useRef<Node | null>(null);
 
   const handleEdit = () => {
@@ -474,8 +476,14 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
     if (!previewNode || saving) return;
     setSaving(true);
     try {
-      const mek = getSessionMEK();
-      if (!mek || !mekDerived) { toast.error(t('preview.sessionExpired')); return; }
+      let mek = getSessionMEK();
+      if (!mek || !mekDerived) {
+        if (!mekSalt) { toast.error(t('preview.sessionExpired')); return; }
+        // MEK lost after page refresh — prompt for password to re-derive
+        setNeedPassword(true);
+        setSaving(false);
+        return;
+      }
       const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
 
       let dek: CryptoKey;
@@ -510,6 +518,25 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       queryClient.invalidateQueries({ queryKey: ['files'] });
     } catch (err: any) { toast.error(err?.message || t('preview.saveFail'));
     } finally { setSaving(false); }
+  };
+
+  const handleDeriveAndSave = async () => {
+    if (!pwInput || !mekSalt) { toast.error(t('preview.sessionExpired')); return; }
+    setSaving(true);
+    try {
+      const mek = await deriveMEK(pwInput, mekSalt);
+      setSessionMEK(mek, mekSalt);
+      useAuthStore.getState().deriveMEK(pwInput); // update mekDerived in store
+    } catch {
+      toast.error(t('login.error.wrongPassword'));
+      setSaving(false);
+      return;
+    }
+    setNeedPassword(false);
+    setPwInput('');
+    // Now retry save with MEK available
+    setSaving(false);
+    handleSave();
   };
 
   const downloadExport = async (format: 'pdf' | 'docx') => {
@@ -818,7 +845,20 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
               <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10">
                 <span className="text-xs text-white/50 font-mono">{label}</span>
                 <div className="flex-1" />
-                {editing ? (
+                {needPassword ? (
+                  <div className="flex items-center gap-2">
+                    <input type="password" value={pwInput} onChange={e => setPwInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleDeriveAndSave(); }}
+                      placeholder={t('login.password')} autoFocus
+                      className="bg-white/10 border border-white/20 text-white rounded px-3 py-1.5 text-sm w-48 focus:outline-none focus:border-blue-400" />
+                    <button onClick={() => { setNeedPassword(false); setPwInput(''); }}
+                      className="text-xs text-white/70 hover:text-white px-3 py-1 rounded-lg hover:bg-white/10">{t('common.cancel')}</button>
+                    <button onClick={handleDeriveAndSave} disabled={saving}
+                      className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium">
+                      <Save className="w-3.5 h-3.5" />{t('preview.save')}
+                    </button>
+                  </div>
+                ) : editing ? (
                   <>
                     {/* Export buttons */}
                     <button
