@@ -56,9 +56,16 @@ export class VerificationService {
     await this.repo.save(this.repo.create({ target, code, purpose, expiresAt }));
 
     if (target.includes('@')) {
-      // TODO(next-fix): mail send is also silently swallowed — same default-
-      // permissive pattern as the old redis catches. Tracked as P1-I5/邮件.
-      await this.mailService.sendVerificationCode(target, code).catch(() => {});
+      try {
+        await this.mailService.sendVerificationCode(target, code);
+      } catch (err: any) {
+        this.logger.warn(`Verification email to ${target.replace(/@.*/, '@***')} failed: ${err?.message}`);
+        return {
+          message: '验证码已生成，但邮件发送失败。请检查邮箱地址或稍后重试。',
+          ...(process.env.NODE_ENV === 'development' ? { code } : {}),
+          emailDelivered: false,
+        };
+      }
     }
 
     return {

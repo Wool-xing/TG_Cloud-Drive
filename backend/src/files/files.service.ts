@@ -116,7 +116,7 @@ export class FilesService {
       tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
       r2Key: r2Key || null,
       r2Etag: result.etag || null,
-      size: buffer.length, iv: '000000000000000000000000',
+      size: buffer.length, iv: null as any,
     }));
     await this.nodeRepo.update(node.id, { size: buffer.length });
     if (result.thumbnailFileId) {
@@ -1068,7 +1068,7 @@ export class FilesService {
       tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
       r2Key,
       r2Etag: result.etag || null,
-      size: fileBuffer.length, iv: '000000000000000000000000',
+      size: fileBuffer.length, iv: null as any,
     });
     await this.chunkRepo.save(chunk);
     await this.userRepo.increment({ id: req.userId }, 'usedBytes', fileBuffer.length);
@@ -1196,7 +1196,7 @@ export class FilesService {
         tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
         r2Key,
         r2Etag: result.etag || null,
-        size: buffer.length, iv: '000000000000000000000000',
+        size: buffer.length, iv: null as any,
       }));
       await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
 
