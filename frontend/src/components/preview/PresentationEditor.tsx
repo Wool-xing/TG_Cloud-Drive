@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, ChevronUp, ChevronDown, Type } from 'lucide-react';
+import { t } from '../../i18n/translations';
 
 interface Slide {
   title: string;
@@ -60,7 +61,7 @@ export default function PresentationEditor({ content, onChange }: Props) {
       {/* Slide list */}
       <div className="w-40 flex-shrink-0 border-r border-white/10 flex flex-col">
         <div className="flex items-center justify-between px-2 py-2 border-b border-white/10">
-          <span className="text-xs text-white/50 font-medium">幻灯片</span>
+          <span className="text-xs text-white/50 font-medium">{t('presentation.slides')}</span>
           <button onClick={addSlide} className="p-0.5 rounded text-white/50 hover:text-white hover:bg-white/10"><Plus className="w-3.5 h-3.5" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
@@ -76,7 +77,7 @@ export default function PresentationEditor({ content, onChange }: Props) {
                   <button onClick={e => { e.stopPropagation(); deleteSlide(i); }} className="p-0.5 rounded hover:bg-red-500/30 text-red-400"><Trash2 className="w-2.5 h-2.5" /></button>
                 </div>
               </div>
-              <div className="mt-1 truncate">{s.title || '(无标题)'}</div>
+              <div className="mt-1 truncate">{s.title || t('presentation.untitled')}</div>
             </div>
           ))}
         </div>
@@ -90,7 +91,7 @@ export default function PresentationEditor({ content, onChange }: Props) {
             <input
               value={slide.title}
               onChange={e => updateSlide(activeSlide, 'title', e.target.value)}
-              placeholder="点击添加标题"
+              placeholder={t('presentation.titlePlaceholder')}
               className="w-full text-3xl font-bold text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-300 dark:placeholder-gray-600"
             />
           </div>
@@ -100,13 +101,13 @@ export default function PresentationEditor({ content, onChange }: Props) {
             <textarea
               value={slide.body}
               onChange={e => updateSlide(activeSlide, 'body', e.target.value)}
-              placeholder="点击添加内容"
+              placeholder={t('presentation.contentPlaceholder')}
               className="w-full h-full text-lg text-gray-700 dark:text-gray-300 bg-transparent outline-none resize-none placeholder-gray-300 dark:placeholder-gray-600 leading-relaxed"
             />
           </div>
           {/* Slide number */}
           <div className="px-8 pb-3 flex items-center justify-between">
-            <span className="text-xs text-gray-400 flex items-center gap-1"><Type className="w-3 h-3" />演示文稿</span>
+            <span className="text-xs text-gray-400 flex items-center gap-1"><Type className="w-3 h-3" />{t('presentation.label')}</span>
             <span className="text-xs text-gray-400">{activeSlide + 1} / {slides.length}</span>
           </div>
         </div>

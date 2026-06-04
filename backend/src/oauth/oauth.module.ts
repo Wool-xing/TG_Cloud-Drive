@@ -8,11 +8,12 @@ import { OauthService } from './oauth.service';
 import { GoogleStrategy } from './google.strategy';
 import { GithubStrategy } from './github.strategy';
 import { User } from '../users/entities/user.entity';
+import { Device } from '../users/entities/device.entity';
 import { Subscription } from '../payment/entities/subscription.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Subscription]),
+    TypeOrmModule.forFeature([User, Device, Subscription]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

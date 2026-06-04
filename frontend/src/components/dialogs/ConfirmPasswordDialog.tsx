@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
 import { AlertTriangle, Eye, EyeOff, Loader2, X } from 'lucide-react';
+import { t } from '../../i18n/translations';
 
 interface ConfirmPasswordDialogProps {
   title: string;
@@ -21,7 +22,7 @@ interface ConfirmPasswordDialogProps {
 export default function ConfirmPasswordDialog({
   title,
   description,
-  confirmLabel = '确认',
+  confirmLabel = t('common.confirm'),
   destructive = false,
   onConfirm,
   onClose,
@@ -43,7 +44,7 @@ export default function ConfirmPasswordDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) {
-      setError('请输入管理员密码');
+      setError(t('admin.confirm.passwordRequired'));
       return;
     }
     setSubmitting(true);
@@ -56,15 +57,15 @@ export default function ConfirmPasswordDialog({
       const code = ax?.response?.data?.code;
       const msg = ax?.response?.data?.message;
       if (code === 'ADMIN_CONFIRM_INVALID') {
-        setError(msg ?? '管理员密码错误');
+        setError(msg ?? t('admin.confirm.invalidPassword'));
         setPassword('');
       } else if (code === 'ADMIN_CONFIRM_LOCKED') {
-        setError(msg ?? '错误过多，请 15 分钟后再试');
+        setError(msg ?? t('admin.confirm.locked'));
         setLocked(true);
       } else if (code === 'ADMIN_CONFIRM_REQUIRED') {
-        setError(msg ?? '危险操作需要再次输入管理员密码');
+        setError(msg ?? t('admin.confirm.required'));
       } else {
-        setError(msg ?? '操作失败，请稍后重试');
+        setError(msg ?? t('admin.confirm.genericError'));
       }
     } finally {
       setSubmitting(false);
@@ -110,7 +111,7 @@ export default function ConfirmPasswordDialog({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              管理员密码
+              {t('admin.confirm.passwordLabel')}
             </label>
             <div className="relative">
               <input
@@ -124,7 +125,7 @@ export default function ConfirmPasswordDialog({
                     ? 'border-red-400 focus:ring-red-300'
                     : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
                 }`}
-                placeholder="输入您的登录密码以确认"
+                placeholder={t('admin.confirm.passwordPlaceholder')}
               />
               <button
                 type="button"
@@ -144,7 +145,7 @@ export default function ConfirmPasswordDialog({
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -152,7 +153,7 @@ export default function ConfirmPasswordDialog({
               className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-colors shadow-sm ${themeBtn}`}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {locked ? '已锁定' : confirmLabel}
+              {locked ? t('admin.confirm.lockedBtn') : confirmLabel}
             </button>
           </div>
         </form>

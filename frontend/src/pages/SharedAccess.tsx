@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { sharesApi } from '../api/client';
 import { importShareDEK, decryptChunk, formatBytes } from '../utils/crypto';
 import { streamingDownload, BlobFallbackTooLargeError } from '../utils/streaming-download';
+import { t } from '../i18n/translations';
 
 // P1-F5: preview is the only path that still has to buffer the whole file
 // (Blob URL → <img>/<video>/<iframe src>). Above this size we refuse to
@@ -105,18 +106,18 @@ export default function SharedAccess() {
         setState('password');
       } else if (code === 'SHARE_PASSWORD_INVALID') {
         setState('password');
-        toast.error('密码错误，请重试');
+        toast.error(t('shareAccess.wrongPassword'));
       } else if (status === 401 || legacyPwdHit) {
         setState('password');
-        if (pwd) toast.error('密码错误，请重试');
+        if (pwd) toast.error(t('shareAccess.wrongPassword'));
       } else if (status === 404) {
-        setErrorMessage('分享链接不存在或已失效');
+        setErrorMessage(t('shareAccess.invalidLink'));
         setState('error');
       } else if (status === 410) {
-        setErrorMessage('分享链接已过期或下载次数已达上限');
+        setErrorMessage(t('shareAccess.expiredOrLimit'));
         setState('error');
       } else {
-        setErrorMessage('加载失败，请稍后重试');
+        setErrorMessage(t('shareAccess.loadFail'));
         setState('error');
       }
     }
@@ -140,7 +141,7 @@ export default function SharedAccess() {
       const chunks = info.chunks ?? [];
 
       if (!chunks.length) {
-        toast.error('无法获取文件块信息');
+        toast.error(t('shareAccess.noChunks'));
         return;
       }
 
@@ -162,7 +163,7 @@ export default function SharedAccess() {
           fetchChunk: async (i: number) => {
             const chunk = chunks[i];
             const chunkRes = await fetch(chunk.url);
-            if (!chunkRes.ok) throw new Error(`下载分片 ${i} 失败`);
+            if (!chunkRes.ok) throw new Error(t('preview.chunkDownloadFail', { i }));
             const chunkData = await chunkRes.arrayBuffer();
             const plain = dek && chunk.iv
               ? await decryptChunk(chunkData, dek, chunk.iv)
@@ -178,13 +179,13 @@ export default function SharedAccess() {
           onLargeFileFallback: () => {
             if (!warnedFallback) {
               warnedFallback = true;
-              toast('当前浏览器将在内存中缓冲完整文件，大文件可能较慢。建议使用 Chrome / Edge 获得流式下载。');
+              toast(t('preview.blobFallbackWarn'));
             }
           },
         },
       );
 
-      toast.success('下载完成');
+      toast.success(t('preview.downloadDone'));
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         // User cancelled the save dialog — silent.
@@ -195,7 +196,7 @@ export default function SharedAccess() {
         return;
       }
       console.error(err);
-      toast.error('下载失败，请重试');
+      toast.error(t('preview.downloadFail'));
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
@@ -213,7 +214,7 @@ export default function SharedAccess() {
     // so cap size and surface a clear hint instead of letting the tab OOM.
     if (shareInfo.node.size > PREVIEW_BLOB_MAX_BYTES) {
       toast.error(
-        `文件超过 ${formatBytes(PREVIEW_BLOB_MAX_BYTES)}，在线预览容易使浏览器卡顿。请直接下载后用本地播放器/查看器打开。`,
+        t('preview.tooLarge', { size: formatBytes(shareInfo.node.size), limit: formatBytes(PREVIEW_BLOB_MAX_BYTES) }),
       );
       return;
     }
@@ -259,7 +260,7 @@ export default function SharedAccess() {
       // P1-F24: on the error path the partially-built blob URL would have
       // leaked. Revoke it before bubbling up.
       if (createdUrl) URL.revokeObjectURL(createdUrl);
-      toast.error('预览失败');
+      toast.error(t('shareAccess.previewFail'));
     } finally {
       setIsDownloading(false);
     }
@@ -284,22 +285,22 @@ export default function SharedAccess() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4">
               <Cloud className="w-9 h-9 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">TG 云盘</h1>
-            <p className="text-gray-500 mt-1 text-sm dark:text-gray-400">安全文件分享</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('shareAccess.title')}</h1>
+            <p className="text-gray-500 mt-1 text-sm dark:text-gray-400">{t('shareAccess.security')}</p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 dark:bg-gray-800 dark:border-gray-700">
             <div className="flex items-center justify-center w-12 h-12 bg-amber-100 rounded-xl mx-auto mb-4">
               <Lock className="w-6 h-6 text-amber-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 text-center mb-1 dark:text-gray-100">此分享受密码保护</h2>
-            <p className="text-sm text-gray-500 text-center mb-6 dark:text-gray-400">请输入访问密码以继续</p>
+            <h2 className="text-lg font-semibold text-gray-900 text-center mb-1 dark:text-gray-100">{t('shareAccess.passwordProtected')}</h2>
+            <p className="text-sm text-gray-500 text-center mb-6 dark:text-gray-400">{t('shareAccess.enterPassword')}</p>
             <form onSubmit={handlePasswordSubmit}>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="输入密码"
+                placeholder={t("shareAccess.passwordPlaceholder")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 dark:border-gray-600"
                 autoFocus
               />
@@ -308,7 +309,7 @@ export default function SharedAccess() {
                 disabled={!password.trim()}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50"
               >
-                访问文件
+                {t('shareAccess.accessFile')}
               </button>
             </form>
           </div>
@@ -329,7 +330,7 @@ export default function SharedAccess() {
             <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-xl mx-auto mb-4">
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2 dark:text-gray-100">链接无效</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2 dark:text-gray-100">{t('shareAccess.invalidLink')}</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">{errorMessage}</p>
           </div>
         </div>
@@ -358,8 +359,8 @@ export default function SharedAccess() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4 shadow-lg">
             <Cloud className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">TG 云盘</h1>
-          <p className="text-gray-500 mt-1 text-sm dark:text-gray-400">端对端加密文件分享</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('shareAccess.title')}</h1>
+          <p className="text-gray-500 mt-1 text-sm dark:text-gray-400">{t('shareAccess.e2ee')}</p>
         </div>
 
         {/* Card */}
@@ -386,11 +387,11 @@ export default function SharedAccess() {
           <div className="px-8 py-4 border-b border-gray-100 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
               <div className="flex justify-between">
-                <dt className="text-gray-500 dark:text-gray-400">文件大小</dt>
+                <dt className="text-gray-500 dark:text-gray-400">{t('shareAccess.fileSize')}</dt>
                 <dd className="font-medium text-gray-800 dark:text-gray-100">{formatBytes(node.size)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-500 dark:text-gray-400">下载次数</dt>
+                <dt className="text-gray-500 dark:text-gray-400">{t('shareAccess.downloadCount')}</dt>
                 <dd className="font-medium text-gray-800 dark:text-gray-100">
                   {shareInfo.downloadCount}
                   {shareInfo.maxDownloads ? ` / ${shareInfo.maxDownloads}` : ''}
@@ -398,7 +399,7 @@ export default function SharedAccess() {
               </div>
               {shareInfo.expireAt && (
                 <div className="flex justify-between col-span-2">
-                  <dt className="text-gray-500 dark:text-gray-400">过期时间</dt>
+                  <dt className="text-gray-500 dark:text-gray-400">{t('shareAccess.expiry')}</dt>
                   <dd className="font-medium text-gray-800 dark:text-gray-100">
                     {new Date(shareInfo.expireAt).toLocaleDateString('zh-CN', {
                       year: 'numeric', month: 'short', day: 'numeric',
@@ -415,7 +416,7 @@ export default function SharedAccess() {
             {isDownloading && downloadProgress > 0 && (
               <div className="mb-4">
                 <div className="flex justify-between text-xs text-gray-500 mb-1 dark:text-gray-400">
-                  <span>正在下载...</span>
+                  <span>{t('shareAccess.downloading')}</span>
                   <span>{downloadProgress}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
@@ -437,7 +438,7 @@ export default function SharedAccess() {
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              {isDownloading ? '下载中...' : '下载文件'}
+              {isDownloading ? t('shareAccess.downloadingBtn') : t('shareAccess.downloadFile')}
             </button>
 
             {canPreview && (
@@ -451,7 +452,7 @@ export default function SharedAccess() {
                 ) : (
                   <Eye className="w-4 h-4" />
                 )}
-                在线预览
+                {t('shareAccess.onlinePreview')}
               </button>
             )}
           </div>
@@ -459,7 +460,7 @@ export default function SharedAccess() {
           {/* Footer */}
           <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-1.5 text-xs text-gray-400 dark:bg-gray-900 dark:text-gray-500 dark:border-gray-700">
             <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-            <span>端对端加密保护 • 文件内容仅对您可见</span>
+            <span>{t('shareAccess.e2eeFooter')}</span>
           </div>
         </div>
       </div>
@@ -503,7 +504,7 @@ export default function SharedAccess() {
               onClick={() => setShowPreview(false)}
               className="mt-4 mx-auto block px-6 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl text-sm transition-colors"
             >
-              关闭预览
+              {t('shareAccess.closePreview')}
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { t } from '../../i18n/translations';
 import {
   FolderPlus,
   Trash2,
@@ -132,19 +133,19 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
     if (!selectedArray.length) return;
     const fileNodes = nodes.filter(n => selectedArray.includes(n.id) && n.type === 'file');
     if (!fileNodes.length) {
-      toast.error('请选择文件（不支持直接下载文件夹）');
+      toast.error(t('toolbar.selectFilesFirst'));
       return;
     }
     // Memory safety: refuse batch downloads > 500MB to avoid OOM
     const MAX_BATCH_BYTES = 500 * 1024 * 1024;
     const totalSize = fileNodes.reduce((s, n) => s + Number(n.size), 0);
     if (totalSize > MAX_BATCH_BYTES) {
-      toast.error(`所选文件总大小 ${(totalSize / 1024 / 1024).toFixed(0)}MB 超过 500MB 限制，请分批下载`);
+      toast.error(t('toolbar.sizeExceeded', { size: (totalSize / 1024 / 1024).toFixed(0) }));
       return;
     }
     const mek = getSessionMEK();
     if (!mek || !mekDerived) {
-      toast.error('会话密钥已失效，请退出后重新登录');
+      toast.error(t('toolbar.sessionExpired'));
       return;
     }
     setBatchDownloading(true);
@@ -161,7 +162,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
             const c = info.chunks[i];
             if (!c.iv) continue;
             const r = await fetch(c.url);
-            if (!r.ok) throw new Error(`下载分片失败: ${node.name}`);
+            if (!r.ok) throw new Error(t('toolbar.chunkDownloadFail', { name: node.name }));
             const encrypted = await r.arrayBuffer();
             chunks.push(await decryptBuffer(encrypted, dek, c.iv));
           }
@@ -172,10 +173,10 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
           zip.file(node.name, merged);
           completed++;
         } catch {
-          toast.error(`打包 ${node.name} 失败`);
+          toast.error(t('toolbar.packFail', { name: node.name }));
         }
       }
-      if (completed === 0) { toast.error('没有可下载的文件'); return; }
+      if (completed === 0) { toast.error(t('toolbar.noDownloadableFiles')); return; }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
@@ -183,7 +184,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
       a.download = `files_${completed}.zip`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      toast.success(`已打包下载 ${completed} 个文件`);
+      toast.success(t('toolbar.packSuccess', { n: completed }));
     } finally {
       setBatchDownloading(false);
     }

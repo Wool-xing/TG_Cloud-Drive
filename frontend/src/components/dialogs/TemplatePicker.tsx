@@ -21,14 +21,6 @@ interface TemplatePickerProps {
   onSuccess: () => void;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  meeting: '会议',
-  report: '报告',
-  plan: '计划',
-  todo: '清单',
-  reading: '阅读',
-};
-
 const CATEGORY_ICONS: Record<string, string> = {
   meeting: '📋',
   report: '📊',
@@ -40,6 +32,13 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function TemplatePicker({ parentId, isPrivate, onClose, onSuccess }: TemplatePickerProps) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const categoryLabels: Record<string, string> = {
+    meeting: t('template.category.meeting'),
+    report: t('template.category.report'),
+    plan: t('template.category.plan'),
+    todo: t('template.category.todo'),
+    reading: t('template.category.reading'),
+  };
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -138,7 +137,7 @@ export default function TemplatePicker({ parentId, isPrivate, onClose, onSuccess
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{tmpl.name}</div>
                     <div className="text-xs text-gray-400 truncate">
-                      {tmpl.isSystem ? t('template.system') : t('template.my')} · {CATEGORY_LABELS[tmpl.category] || tmpl.category}
+                      {tmpl.isSystem ? t('template.system') : t('template.my')} · {categoryLabels[tmpl.category] || tmpl.category}
                     </div>
                   </div>
                   {selectedId === tmpl.id && <ChevronRight className="w-4 h-4 shrink-0" />}

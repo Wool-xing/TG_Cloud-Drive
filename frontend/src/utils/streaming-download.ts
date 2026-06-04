@@ -1,3 +1,5 @@
+import { t } from '../i18n/translations';
+
 // P1-F5 / P1-F24: streaming download helper.
 //
 // Pre-fix, both SharedAccess.handleDownload and PreviewModal's preview path
@@ -68,7 +70,7 @@ export function supportsFilePicker(): boolean {
 class BlobFallbackTooLargeError extends Error {
   constructor(public bytes: number, public cap: number) {
     super(
-      `当前浏览器不支持流式下载，文件大小 ${(bytes / (1024 ** 3)).toFixed(2)} GB 超过内存兜底上限 ${(cap / (1024 ** 3)).toFixed(2)} GB。请改用 Chrome / Edge / Opera 下载，或换更小的文件分享`,
+      t('preview.browserIncompatible', { size: (bytes / (1024 ** 3)).toFixed(2), cap: (cap / (1024 ** 3)).toFixed(2) }),
     );
     this.name = 'BlobFallbackTooLargeError';
   }

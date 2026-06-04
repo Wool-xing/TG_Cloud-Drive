@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TG Cloud Clipper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+      </svg>
+      <h1>TG Cloud Clipper</h1>
+    </div>
+
+    <div id="setup" class="section">
+      <label>Server URL</label>
+      <input type="text" id="serverUrl" placeholder="https://your-tgcloud.com" />
+
+      <label>Auth Token</label>
+      <div class="token-row">
+        <input type="password" id="token" placeholder="Paste your JWT token" />
+        <button id="saveToken" class="btn btn-sm">Save</button>
+      </div>
+      <p class="hint">Find token in TG Cloud → F12 → Application → Local Storage → accessToken</p>
+    </div>
+
+    <div id="clipSection" class="section">
+      <label>Mode</label>
+      <select id="mode">
+        <option value="fullpage">Full Page</option>
+        <option value="selection">Selection</option>
+        <option value="bookmark">Bookmark</option>
+      </select>
+
+      <label>Folder (optional)</label>
+      <input type="text" id="folder" placeholder="e.g. /clippings" />
+
+      <button id="clipBtn" class="btn btn-primary">
+        <span id="btnLabel">Clip!</span>
+        <span id="spinner" class="spinner hidden"></span>
+      </button>
+
+      <div id="status" class="status hidden"></div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

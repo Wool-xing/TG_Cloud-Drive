@@ -16,6 +16,7 @@ import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { StorageService } from '../storage/storage.service';
 import { EmbeddingService } from './embedding.service';
+import { OcrService } from '../ocr/ocr.service';
 import { REDIS_CLIENT } from '../common/redis/redis.module';
 import { comparePassword, hashPassword, generateSecureToken } from '../common/encryption';
 
@@ -35,6 +36,7 @@ export class FilesService {
     @Inject(REDIS_CLIENT) private redis: any,
     private storage: StorageService,
     private embedding: EmbeddingService,
+    private ocr: OcrService,
     private cs: ConfigService,
   ) {}
 
@@ -114,13 +116,16 @@ export class FilesService {
       tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
       r2Key: r2Key || null,
       r2Etag: result.etag || null,
-      size: buffer.length, iv: '000000000000000000000000',
+      size: buffer.length, iv: null as any,
     }));
     await this.nodeRepo.update(node.id, { size: buffer.length });
     if (result.thumbnailFileId) {
       await this.nodeRepo.update(node.id, { thumbnailFileId: result.thumbnailFileId });
     }
     await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
+    this.triggerOcrOnUpload(node.id, name).catch(err =>
+      this.logger.warn(`OCR trigger failed for ${node.id}: ${err.message}`),
+    );
     return this.safeNode(node);
   }
 
@@ -214,6 +219,10 @@ export class FilesService {
       await this.userRepo.increment({ id: userId }, 'usedBytes', totalSize);
       await this.redis.del(cacheKey).catch(() => {});
       await this.audit(userId, 'upload', nodeId, filename);
+      // Fire OCR asynchronously for image/PDF files — don't block upload response
+      this.triggerOcrOnUpload(nodeId, filename).catch(err =>
+        this.logger.warn(`OCR trigger failed for ${nodeId}: ${err.message}`),
+      );
       return { done: true, nodeId };
     }
     return { done: false, nodeId, uploaded, total: totalChunks };
@@ -613,13 +622,24 @@ export class FilesService {
       // Build a prefix-match tsquery: "report 2024" → "report:* & 2024:*"
       const tokens = sanitized.split(/\s+/).filter(t => t.length > 0).slice(0, 10);
       const tsquery = tokens.map(t => `${t}:*`).join(' & ');
+      // Search both name and OCR-extracted text
       qb.andWhere(
-        "to_tsvector('simple', n.name) @@ to_tsquery('simple', :tsquery)",
-        { tsquery },
+        new Brackets(b => {
+          b.where(
+            "to_tsvector('simple', n.name) @@ to_tsquery('simple', :tsquery)",
+            { tsquery },
+          ).orWhere(
+            "to_tsvector('simple', coalesce(n.ocr_text, '')) @@ to_tsquery('simple', :tsquery)",
+            { tsquery },
+          );
+        }),
       );
-      // Rank by relevance (higher = better match)
+      // Rank by relevance — combine name match (weighted higher) + OCR text match
       qb.addSelect(
-        "ts_rank(to_tsvector('simple', n.name), to_tsquery('simple', :tsquery))",
+        `ts_rank(
+          to_tsvector('simple', n.name) || to_tsvector('simple', coalesce(n.ocr_text, '')),
+          to_tsquery('simple', :tsquery)
+        )`,
         'search_rank',
       );
       qb.orderBy('search_rank', 'DESC');
@@ -1048,7 +1068,7 @@ export class FilesService {
       tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
       r2Key,
       r2Etag: result.etag || null,
-      size: fileBuffer.length, iv: '000000000000000000000000',
+      size: fileBuffer.length, iv: null as any,
     });
     await this.chunkRepo.save(chunk);
     await this.userRepo.increment({ id: req.userId }, 'usedBytes', fileBuffer.length);
@@ -1070,10 +1090,21 @@ export class FilesService {
       throw new BadRequestException('仅支持 HTTP/HTTPS 链接');
     }
 
-    // Block obviously internal hosts
+    // Block RFC1918 + loopback + link-local. Covers 10.0.0.0/8,
+    // 172.16.0.0/12 (172.16.x – 172.31.x), 192.168.0.0/16,
+    // 127.0.0.0/8, 169.254.0.0/16, ::1, fe80::/10.
     const hostname = parsed.hostname.toLowerCase();
-    const blocked = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '10.', '172.16.', '192.168.'];
-    if (blocked.some(b => hostname === b || hostname.startsWith(b))) {
+    const isRFC1918 =
+      hostname === 'localhost' ||
+      hostname === '0.0.0.0' ||
+      hostname === '[::1]' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('169.254.') ||
+      hostname.startsWith('fe80:') ||
+      (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)); // 172.16.0.0/12
+    if (isRFC1918) {
       throw new BadRequestException('不支持内网地址下载');
     }
 
@@ -1086,7 +1117,11 @@ export class FilesService {
 
     // Quota check — we don't know file size yet, just check headroom
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB hard limit
+    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB total limit
+    // Memory safety: the current implementation buffers the entire download in
+    // memory. Cap at 500MB to prevent OOM. Large files need a streaming upload
+    // path (tracked as follow-up).
+    const maxMemory = 500 * 1024 * 1024; // 500MB memory buffer cap
     if (user && Number(user.usedBytes) >= Number(user.quotaBytes)) {
       throw new BadRequestException('存储空间不足');
     }
@@ -1132,6 +1167,13 @@ export class FilesService {
           const { done, value } = await streamReader.read();
           if (done) break;
           totalBytes += value.length;
+          if (totalBytes > maxMemory) {
+            streamReader.cancel();
+            await this.nodeRepo.delete(node.id);
+            throw new BadRequestException(
+              `文件过大（离线下载最大支持 ${Math.round(maxMemory / 1024 / 1024)}MB），大文件请使用直链下载工具`,
+            );
+          }
           if (totalBytes > maxSize) {
             streamReader.cancel();
             await this.nodeRepo.delete(node.id);
@@ -1142,6 +1184,12 @@ export class FilesService {
       } else {
         // Fallback: buffer the whole response (Node.js fetch body is already a readable stream)
         const buf = Buffer.from(await response.arrayBuffer());
+        if (buf.length > maxMemory) {
+          await this.nodeRepo.delete(node.id);
+          throw new BadRequestException(
+            `文件过大（离线下载最大支持 ${Math.round(maxMemory / 1024 / 1024)}MB），大文件请使用直链下载工具`,
+          );
+        }
         chunks.push(buf);
         totalBytes = buf.length;
       }
@@ -1165,7 +1213,7 @@ export class FilesService {
         tgMessageId: result.providerMeta ? parseInt(result.providerMeta, 10) : null,
         r2Key,
         r2Etag: result.etag || null,
-        size: buffer.length, iv: '000000000000000000000000',
+        size: buffer.length, iv: null as any,
       }));
       await this.userRepo.increment({ id: userId }, 'usedBytes', buffer.length);
 
@@ -1287,7 +1335,78 @@ export class FilesService {
     await this.versionRepo.save(version);
   }
 
+  async getSyncDiff(userId: string, since: string) {
+    const sinceDate = new Date(since);
+    if (isNaN(sinceDate.getTime())) throw new BadRequestException('Invalid "since" date');
+
+    const nodes = await this.nodeRepo.find({
+      where: { userId, deletedAt: undefined as any },
+      select: ['id', 'name', 'type', 'size', 'mimeType', 'parentId', 'isPrivate', 'isStarred', 'createdAt', 'updatedAt'],
+      order: { updatedAt: 'ASC' },
+    });
+
+    const deleted = await this.nodeRepo
+      .createQueryBuilder('n')
+      .where('n.user_id = :userId', { userId })
+      .andWhere('n.deleted_at IS NOT NULL')
+      .andWhere('n.deleted_at >= :since', { since: sinceDate })
+      .select(['n.id', 'n.name', 'n.deleted_at'])
+      .getMany();
+
+    const created = nodes.filter(n => new Date(n.createdAt) >= sinceDate);
+    const modified = nodes.filter(n =>
+      new Date(n.updatedAt) >= sinceDate && new Date(n.createdAt) < sinceDate,
+    );
+
+    return {
+      since: sinceDate.toISOString(),
+      created: created.map(n => this.safeNode(n)),
+      modified: modified.map(n => this.safeNode(n)),
+      deleted: deleted.map(n => ({ id: n.id, name: n.name })),
+      total: nodes.length,
+    };
+  }
+
   private async audit(userId: string, action: string, nodeId: string, nodeName: string) {
     await this.auditRepo.save(this.auditRepo.create({ userId, action, nodeId, nodeName })).catch(() => {});
+  }
+
+  private async triggerOcrOnUpload(nodeId: string, filename: string) {
+    const node = await this.nodeRepo.findOne({ where: { id: nodeId }, select: ['id', 'mimeType', 'ocrText'] });
+    if (!node || node.ocrText) return; // already has OCR text, skip
+
+    const mimeType = node.mimeType ?? '';
+    if (!this.ocr.isSupported(mimeType)) return;
+
+    try {
+      const chunks = await this.chunkRepo.find({
+        where: { nodeId },
+        select: ['tgFileId', 'r2Key', 'storageBackend', 'chunkIndex'],
+        order: { chunkIndex: 'ASC' },
+      });
+      if (!chunks.length) return;
+
+      // Assemble file buffer from chunks
+      const buffers: Buffer[] = [];
+      for (const c of chunks) {
+        const backend = (c.storageBackend || 'telegram') as 'telegram' | 'r2';
+        const ref = backend === 'r2' ? c.r2Key! : c.tgFileId!;
+        const url = await this.storage.getUrl(backend, ref);
+        const res = await fetch(url);
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          buffers.push(buf);
+        }
+      }
+      const fullBuffer = Buffer.concat(buffers);
+
+      const result = await this.ocr.extractText(fullBuffer, mimeType);
+      if (result.text.length > 0) {
+        await this.nodeRepo.update(nodeId, { ocrText: result.text.slice(0, 10000) });
+        this.logger.log(`OCR stored for ${nodeId} (${filename}), ${result.text.length} chars, confidence=${result.confidence.toFixed(1)}%`);
+      }
+    } catch (err: any) {
+      this.logger.warn(`OCR failed for ${nodeId} (${filename}): ${err.message}`);
+    }
   }
 }

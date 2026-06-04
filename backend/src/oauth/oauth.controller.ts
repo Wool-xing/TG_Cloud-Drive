@@ -1,12 +1,25 @@
 import { Controller, Get, Post, UseGuards, Req, Res, Delete, Body } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { OauthService } from './oauth.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { REFRESH_COOKIE_NAME, refreshCookieOptions } from '../common/cookie.constants';
 
 @Controller('api/oauth')
 export class OauthController {
-  constructor(private readonly oauthService: OauthService) {}
+  constructor(
+    private readonly oauthService: OauthService,
+    private readonly cs: ConfigService,
+  ) {}
+
+  private get frontendUrl(): string {
+    return this.cs.get<string>('APP_URL', 'http://localhost:2222');
+  }
+
+  private get isProduction(): boolean {
+    return this.cs.get<string>('NODE_ENV') === 'production';
+  }
 
   // ── Google ───────────────────────────────────────────────────────────
 
@@ -20,9 +33,11 @@ export class OauthController {
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req: any, @Res() res: Response) {
     const user = await this.oauthService.findOrCreateUser(req.user);
-    const tokens = this.oauthService.generateTokens(user);
-    const frontendUrl = process.env.APP_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/login?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`);
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const ua = req.headers?.['user-agent'] || '';
+    const tokens = await this.oauthService.generateTokens(user, ip, ua);
+    res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, refreshCookieOptions(this.isProduction, true));
+    res.redirect(`${this.frontendUrl}/login?accessToken=${tokens.accessToken}`);
   }
 
   // ── GitHub ───────────────────────────────────────────────────────────
@@ -37,9 +52,11 @@ export class OauthController {
   @UseGuards(AuthGuard('github'))
   async githubCallback(@Req() req: any, @Res() res: Response) {
     const user = await this.oauthService.findOrCreateUser(req.user);
-    const tokens = this.oauthService.generateTokens(user);
-    const frontendUrl = process.env.APP_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/login?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`);
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const ua = req.headers?.['user-agent'] || '';
+    const tokens = await this.oauthService.generateTokens(user, ip, ua);
+    res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, refreshCookieOptions(this.isProduction, true));
+    res.redirect(`${this.frontendUrl}/login?accessToken=${tokens.accessToken}`);
   }
 
   // ── Account linking (requires existing session) ──────────────────────

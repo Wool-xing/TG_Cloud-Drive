@@ -15,11 +15,13 @@ import { NoteTemplate } from './entities/note-template.entity';
 import { User } from '../users/entities/user.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { TelegramModule } from '../telegram/telegram.module';
+import { OcrModule } from '../ocr/ocr.module';
 import { TemplateService } from './template.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Node, FileChunk, NodeKey, NodeVersion, FileRequest, Tag, NoteTemplate, User, AuditLog]),
+    OcrModule,
   ],
   controllers: [FilesController, FileRequestController],
   providers: [FilesService, ExportService, EmbeddingService, TemplateService],

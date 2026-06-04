@@ -1,0 +1,46 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui-org/nicegui-release/main/tauri.conf.json",
+  "productName": "TG Cloud Desktop",
+  "version": "1.0.0",
+  "identifier": "com.tgpan.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "TG Cloud Desktop",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "tooltip": "TG Cloud — Syncing",
+      "menuOnLeftClick": false
+    },
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https: http://localhost:*; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "plugins": {
+    "fs": {
+      "scope": {
+        "allow": ["$HOME/**", "$APPDATA/**", "$DOCUMENT/**", "$DESKTOP/**"]
+      }
+    },
+    "dialog": {},
+    "notification": {
+      "all": true
+    },
+    "shell": {
+      "open": true
+    }
+  }
+}

@@ -52,6 +52,7 @@ export class SharesController {
    * Optional query param `password` for password-protected shares.
    */
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('access/:token')
   @ApiOperation({ summary: '访问分享链接（公开）' })
   @ApiQuery({ name: 'password', required: false, description: '分享密码（如有）' })

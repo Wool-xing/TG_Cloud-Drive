@@ -19,6 +19,7 @@ import { filesApi } from '../api/client';
 import { useFileStore } from '../stores/file.store';
 import { Node } from '../types';
 import { formatBytes } from '../utils/crypto';
+import { t } from '../i18n/translations';
 import FileContextMenu from '../components/files/FileContextMenu';
 import PreviewModal from '../components/preview/PreviewModal';
 
@@ -51,10 +52,10 @@ function getMimeCategory(node: Node): 'image' | 'video' | 'audio' | 'document' |
 }
 
 function getTypeLabel(node: Node): string {
-  if (node.type === 'folder') return '文件夹';
+  if (node.type === 'folder') return t('filelist.folder');
   const labels = {
-    image: '图片', video: '视频', audio: '音频',
-    document: '文档', archive: '压缩包', other: '其他',
+    image: t('filelist.image'), video: t('filelist.video'), audio: t('filelist.audio'),
+    document: t('topbar.filter.document'), archive: t('filelist.archive'), other: t('topbar.filter.other'),
   };
   return labels[getMimeCategory(node)];
 }
@@ -77,12 +78,12 @@ function formatDate(dateStr: string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins} 分钟前`;
+  if (mins < 1) return t('time.justNow');
+  if (mins < 60) return t('time.minsAgo', { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('time.hoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} 天前`;
+  if (days < 7) return t('time.daysAgo', { n: days });
   return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
@@ -119,7 +120,7 @@ export default function Recent() {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-red-500 gap-2">
         <AlertTriangle className="w-10 h-10" />
-        <p>加载失败，请刷新重试</p>
+        <p>{t('drive.loadError')}</p>
       </div>
     );
   }
@@ -130,9 +131,9 @@ export default function Recent() {
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 dark:border-gray-700">
         <Clock className="w-5 h-5 text-blue-500 shrink-0" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
-          最近访问
+          {t('recent.title')}
           {filteredNodes.length > 0 && (
-            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({filteredNodes.length} 个项目)</span>
+            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({t('toolbar.count', { n: filteredNodes.length })})</span>
           )}
         </span>
       </div>
@@ -147,17 +148,17 @@ export default function Recent() {
             <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
               <Clock className="w-10 h-10 text-blue-300" />
             </div>
-            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">暂无最近文件</p>
-            <p className="text-sm text-center max-w-xs">上传或操作文件后，最近使用的文件将显示在这里</p>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">{t('recent.empty')}</p>
+            <p className="text-sm text-center max-w-xs">{t('recent.emptyHint')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">名称</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">类型</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">大小</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">修改时间</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('filelist.colName')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">{t('filelist.colType')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">{t('filelist.colSize')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">{t('filelist.colModified')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 dark:divide-gray-700">

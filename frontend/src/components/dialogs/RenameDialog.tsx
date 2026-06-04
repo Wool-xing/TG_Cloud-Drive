@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
 import { Node } from '../../types';
+import { t } from '../../i18n/translations';
 
 interface RenameDialogProps {
   node: Node;
@@ -17,7 +18,6 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Select filename without extension on open
     const input = inputRef.current;
     if (!input) return;
     input.focus();
@@ -33,7 +33,6 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
     }
   }, [node]);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -45,15 +44,15 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
   const validate = (): boolean => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError('名称不能为空');
+      setError(t('rename.errorEmpty'));
       return false;
     }
     if (trimmed.length > 500) {
-      setError('名称最多 500 个字符');
+      setError(t('rename.errorTooLong'));
       return false;
     }
     if (trimmed === node.name) {
-      setError('名称未更改');
+      setError(t('rename.errorUnchanged'));
       return false;
     }
     setError('');
@@ -66,7 +65,7 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
     setSubmitting(true);
     try {
       await filesApi.rename(node.id, name.trim());
-      toast.success('重命名成功');
+      toast.success(t('rename.success'));
       onSuccess();
     } catch {
       // handled by interceptor
@@ -81,9 +80,8 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">重命名</h2>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('rename.title')}</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-colors dark:text-gray-500"
@@ -92,11 +90,10 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
           </button>
         </div>
 
-        {/* Body */}
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              {node.type === 'folder' ? '文件夹名称' : '文件名称'}
+              {node.type === 'folder' ? t('rename.folderLabel') : t('rename.fileLabel')}
             </label>
             <input
               ref={inputRef}
@@ -115,21 +112,20 @@ export default function RenameDialog({ node, onClose, onSuccess }: RenameDialogP
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 text-right">{name.length}/500</p>
           </div>
 
-          {/* Footer */}
           <div className="flex justify-end gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors dark:border-gray-700"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
             >
-              {submitting ? '保存中…' : '确定'}
+              {submitting ? t('rename.saving') : t('common.confirm')}
             </button>
           </div>
         </form>

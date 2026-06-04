@@ -227,7 +227,7 @@ export default function Drive({ isPrivate = false }: DriveProps) {
       await filesApi.delete(ids);
       queryClient.invalidateQueries({ queryKey: ['files'] });
       clearSelection();
-      toast.success(`已删除 ${ids.length} 个文件`);
+      toast.success(t('drive.deletedN', { n: ids.length }));
     } catch {
       // error toast handled by interceptor
     }

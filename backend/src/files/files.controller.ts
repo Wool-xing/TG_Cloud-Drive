@@ -122,14 +122,21 @@ export class FilesController {
     return this.filesService.getDownloadInfo(userId, nodeId, password);
   }
 
-  /** @deprecated P1-B14 — use POST /files/download/:nodeId with body instead. */
+  /** @deprecated P1-B14 — use POST /files/download/:nodeId with body instead.
+   *  Password in URL query leaks to nginx logs / browser history / referrer.
+   *  This route remains only for backward compatibility; new clients MUST use
+   *  the POST variant. Remove after one release cycle. */
   @Get('download/:nodeId')
-  getDownloadInfo(
+  @HttpCode(308)
+  getDownloadInfoLegacy(
     @CurrentUser('id') userId: string,
     @Param('nodeId') nodeId: string,
     @Query('password') password: string,
+    @Res() res: Response,
   ) {
-    return this.filesService.getDownloadInfo(userId, nodeId, password);
+    // Issue permanent redirect so browsers + caches stop using the GET endpoint.
+    // Password (if any) is NOT forwarded — clients re-send via POST body.
+    res.redirect(308, `/api/files/download/${nodeId}`);
   }
 
   @Patch(':nodeId/rename')
@@ -441,5 +448,14 @@ export class FilesController {
       'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
     });
     res.send(buffer);
+  }
+
+  @Throttle({ default: { ttl: 30000, limit: 10 } })
+  @Get('sync/diff')
+  async syncDiff(
+    @CurrentUser('id') userId: string,
+    @Query('since') since: string,
+  ) {
+    return this.filesService.getSyncDiff(userId, since);
   }
 }

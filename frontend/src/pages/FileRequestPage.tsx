@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Upload, Loader2, CheckCircle, AlertTriangle, File } from 'lucide-react';
+import { t } from '../i18n/translations';
 import axios from 'axios';
 
 export default function FileRequestPage() {
@@ -17,7 +18,7 @@ export default function FileRequestPage() {
         const res = await axios.get(`/api/file-request/${token}`);
         setInfo(res.data);
       } catch (err: any) {
-        setError(err?.response?.data?.message ?? '链接无效或已过期');
+        setError(err?.response?.data?.message ?? t('shareAccess.invalidLink'));
       } finally {
         setLoading(false);
       }
@@ -27,7 +28,7 @@ export default function FileRequestPage() {
   const handleUpload = useCallback(async (files: FileList) => {
     if (!info || uploading) return;
     const remaining = info.maxFiles - info.uploadCount;
-    if (remaining <= 0) { setError('已达到上传数量上限'); return; }
+    if (remaining <= 0) { setError(t('fileRequestPage.uploadLimitReached')); return; }
     setUploading(true);
     for (let i = 0; i < Math.min(files.length, remaining); i++) {
       const file = files[i];
@@ -38,7 +39,6 @@ export default function FileRequestPage() {
         setDone(prev => [...prev, file.name]);
         setInfo(prev => prev ? { ...prev, uploadCount: prev.uploadCount + 1 } : prev);
       } catch {
-        // continue with next file
       }
     }
     setUploading(false);
@@ -68,10 +68,10 @@ export default function FileRequestPage() {
       <header className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center gap-3">
         <Upload className="w-5 h-5 text-green-500" />
         <div>
-          <h1 className="text-base font-semibold text-gray-800 dark:text-gray-100">文件上传</h1>
+          <h1 className="text-base font-semibold text-gray-800 dark:text-gray-100">{t('fileRequestPage.title')}</h1>
           {info && (
             <p className="text-xs text-gray-400">
-              已上传 {info.uploadCount}/{info.maxFiles} · 剩余 {info.maxFiles - info.uploadCount} 个
+              {t('fileRequestPage.progress', { done: info.uploadCount, max: info.maxFiles, remaining: info.maxFiles - info.uploadCount })}
             </p>
           )}
         </div>
@@ -80,7 +80,7 @@ export default function FileRequestPage() {
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         {done.length > 0 && (
           <div className="mb-6 w-full max-w-md space-y-2">
-            <p className="text-sm font-medium text-green-600">已上传 {done.length} 个文件：</p>
+            <p className="text-sm font-medium text-green-600">{t('fileRequestPage.doneFiles', { n: done.length })}</p>
             <div className="max-h-48 overflow-y-auto space-y-1">
               {done.map((name, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -103,14 +103,14 @@ export default function FileRequestPage() {
           {uploading ? (
             <>
               <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">上传中…</p>
+              <p className="text-sm text-gray-500">{t('fileRequestPage.uploading')}</p>
             </>
           ) : (
             <>
               <Upload className="w-10 h-10 text-gray-400" />
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">点击或拖拽文件到此处</p>
-                <p className="text-xs text-gray-400 mt-1">单文件最大 500MB</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('fileRequestPage.dropHint')}</p>
+                <p className="text-xs text-gray-400 mt-1">{t('fileRequestPage.maxSize')}</p>
               </div>
             </>
           )}

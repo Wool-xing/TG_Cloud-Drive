@@ -2,7 +2,7 @@ export default () => ({
   PORT: parseInt(process.env.PORT, 10) || 3000,
   NODE_ENV: process.env.NODE_ENV || 'development',
   // APP_URL dev fallback only; production requires explicit value via validateEnvOrExit().
-  APP_URL: process.env.APP_URL || 'http://localhost:5173',
+  APP_URL: process.env.APP_URL || 'http://localhost:2222',
 
   DATABASE_URL: process.env.DATABASE_URL,
   DATABASE_SSL: process.env.DATABASE_SSL || 'false',

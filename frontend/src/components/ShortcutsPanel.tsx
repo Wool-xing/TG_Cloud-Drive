@@ -1,31 +1,11 @@
 import { useEffect } from 'react';
 import { X, Keyboard } from 'lucide-react';
+import { t } from '../i18n/translations';
 
 interface Shortcut {
   keys: string[];
   label: string;
 }
-
-const SHORTCUTS: Shortcut[][] = [
-  [
-    { keys: ['?'], label: '显示键盘快捷键' },
-    { keys: ['Esc'], label: '取消选择 / 关闭菜单' },
-    { keys: ['Ctrl', 'A'], label: '全选当前目录文件' },
-    { keys: ['Delete'], label: '删除选中文件' },
-  ],
-  [
-    { keys: ['Ctrl', 'Click'], label: '多选切换' },
-    { keys: ['Shift', 'Click'], label: '范围选择' },
-    { keys: ['Enter'], label: '打开文件夹 / 预览文件' },
-    { keys: ['Ctrl', 'F'], label: '聚焦搜索框' },
-  ],
-  [
-    { keys: ['→'], label: '进入选中文件夹 (光标键)' },
-    { keys: ['←'], label: '返回上级目录 (光标键)' },
-    { keys: ['Ctrl', 'D'], label: '下载选中文件' },
-    { keys: ['F2'], label: '重命名选中文件' },
-  ],
-];
 
 function Kbd({ children }: { children: string }) {
   return (
@@ -41,6 +21,27 @@ interface Props {
 }
 
 export default function ShortcutsPanel({ open, onClose }: Props) {
+  const groups: Shortcut[][] = [
+    [
+      { keys: ['?'], label: t('shortcuts.showHelp') },
+      { keys: ['Esc'], label: t('shortcuts.deselect') },
+      { keys: ['Ctrl', 'A'], label: t('shortcuts.selectAll') },
+      { keys: ['Delete'], label: t('shortcuts.deleteSelected') },
+    ],
+    [
+      { keys: ['Ctrl', 'Click'], label: t('shortcuts.multiSelect') },
+      { keys: ['Shift', 'Click'], label: t('shortcuts.rangeSelect') },
+      { keys: ['Enter'], label: t('shortcuts.openPreview') },
+      { keys: ['Ctrl', 'F'], label: t('shortcuts.focusSearch') },
+    ],
+    [
+      { keys: ['→'], label: t('shortcuts.enterFolder') },
+      { keys: ['←'], label: t('shortcuts.backFolder') },
+      { keys: ['Ctrl', 'D'], label: t('shortcuts.downloadFile') },
+      { keys: ['F2'], label: t('shortcuts.renameFile') },
+    ],
+  ];
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -61,7 +62,7 @@ export default function ShortcutsPanel({ open, onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Keyboard className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">键盘快捷键</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('shortcuts.title')}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-colors">
             <X className="w-5 h-5" />
@@ -69,7 +70,7 @@ export default function ShortcutsPanel({ open, onClose }: Props) {
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {SHORTCUTS.map((group, gi) => (
+          {groups.map((group, gi) => (
             <div key={gi} className="space-y-2">
               {group.map((s, si) => (
                 <div key={si} className="flex items-center justify-between">
@@ -89,7 +90,7 @@ export default function ShortcutsPanel({ open, onClose }: Props) {
         </div>
 
         <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
-          按 <Kbd>Esc</Kbd> 或点击遮罩关闭
+          {t('shortcuts.closeHint', { esc: 'Esc' })}
         </div>
       </div>
     </div>
