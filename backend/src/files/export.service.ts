@@ -55,12 +55,15 @@ export class ExportService {
 
     const exportName = name.replace(/\.[^.]+$/, '') + '.pdf';
 
-    // Wrap in print-optimized HTML
+    // Wrap in print-optimized HTML. Escape title to prevent injection.
+    // Content is already application-generated (markdown → html, or rich text),
+    // but the filename comes from user input and goes into <title>.
+    const safeName = name.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c] || c);
     const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>${name}</title>
+<title>${safeName}</title>
 <style>
   @page { size: A4; margin: 2cm; }
   body { font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif; font-size: 12pt; line-height: 1.8; color: #333; }
