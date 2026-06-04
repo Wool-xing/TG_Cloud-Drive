@@ -230,7 +230,11 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
                 <Lock className="w-2.5 h-2.5 text-gray-500 absolute -bottom-0.5 -right-0.5 dark:text-gray-400" />
               )}
             </div>
-            <span className="truncate font-medium text-gray-800 dark:text-gray-100">{node.name}</span>
+            <span
+              className="truncate font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); if (node.type === 'folder') navigate(node.id, node.name); else { clearSelection(); setPreview(node); }}}
+              title={node.type === 'folder' ? '进入文件夹' : '打开文件'}
+            >{node.name}</span>
             {node.tags?.slice(0, 2).map((t: any) => (
               <span key={t.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex-shrink-0 max-w-[80px] truncate"
                 style={t.color ? { backgroundColor: t.color + '20', color: t.color } : {}}>
