@@ -4,21 +4,25 @@ import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { OauthService } from './oauth.service';
 import { User } from '../users/entities/user.entity';
+import { Device } from '../users/entities/device.entity';
 import { Subscription } from '../payment/entities/subscription.entity';
 
 describe('OauthService', () => {
   let service: OauthService;
   let userRepo: any;
+  let deviceRepo: any;
   let jwtService: JwtService;
 
   beforeEach(async () => {
     userRepo = { findOne: jest.fn(), create: jest.fn(), save: jest.fn(), update: jest.fn() };
+    deviceRepo = { create: jest.fn().mockReturnValue({ id: 'dev-1' }), save: jest.fn(), update: jest.fn() };
     const subRepo = { create: jest.fn(), save: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OauthService,
         { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: getRepositoryToken(Device), useValue: deviceRepo },
         { provide: getRepositoryToken(Subscription), useValue: subRepo },
         { provide: JwtService, useValue: { sign: jest.fn().mockReturnValue('jwt-token') } },
         { provide: ConfigService, useValue: { get: jest.fn((k: string) => k === 'JWT_REFRESH_SECRET' ? 'refresh-secret' : null) } },
@@ -30,11 +34,14 @@ describe('OauthService', () => {
   });
 
   describe('generateTokens', () => {
-    it('generates access + refresh tokens', () => {
-      const user = { id: 'u1', username: 'alice', role: 'user' } as User;
-      const tokens = service.generateTokens(user);
+    it('creates device + signs access + refresh tokens', async () => {
+      const user = { id: 'u1', role: 'user' } as User;
+      const tokens = await service.generateTokens(user, '1.2.3.4', 'Mozilla/5.0');
       expect(tokens.accessToken).toBe('jwt-token');
       expect(tokens.refreshToken).toBe('jwt-token');
+      expect(deviceRepo.create).toHaveBeenCalledTimes(1);
+      expect(deviceRepo.save).toHaveBeenCalledTimes(1);
+      expect(deviceRepo.update).toHaveBeenCalledWith('dev-1', expect.objectContaining({ refreshTokenHash: expect.any(String) }));
       expect(jwtService.sign).toHaveBeenCalledTimes(2);
     });
   });

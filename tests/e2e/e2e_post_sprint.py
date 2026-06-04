@@ -82,30 +82,27 @@ def login(page, ctx):
         raise RuntimeError(f"login failed: {resp.status} {body}")
     data = body["data"]
     access = data["accessToken"]
-    refresh = data["refreshToken"]
     user = data["user"]
     mek_salt = data["mekSalt"]
 
     # Visit any page first so localStorage is bound to https://localhost origin
     page.goto(f"{BASE_URL}/login", wait_until="domcontentloaded")
-    # Inject auth state. The frontend's auth.store hydrates from localStorage
-    # via zustand persist middleware (if used) — otherwise we have to seed via
-    # the store itself. The accessToken interceptor reads from localStorage so
-    # writing it there is enough for HTTP-level auth on the next page load.
+    # Inject auth state. Refresh token is now in an HttpOnly rt cookie set by
+    # the backend — we don't touch it here. accessToken + zustand persist is
+    # enough for API-level auth on the next page load.
     page.evaluate(
-        """([access, refresh, user, mekSalt]) => {
+        """([access, user, mekSalt]) => {
             localStorage.setItem('accessToken', access);
-            localStorage.setItem('refreshToken', refresh);
             // zustand persist key is "auth" with partialize: user / accessToken
-            // / refreshToken / mekSalt. mekDerived stays false (we don't have
-            // a session MEK that the bundled getSessionMEK() can reach anyway).
+            // / mekSalt. mekDerived stays false (we don't have a session MEK
+            // that the bundled getSessionMEK() can reach anyway).
             const persisted = {
-                state: { user, accessToken: access, refreshToken: refresh, mekSalt },
+                state: { user, accessToken: access, mekSalt },
                 version: 0
             };
             localStorage.setItem('auth', JSON.stringify(persisted));
         }""",
-        [access, refresh, user, mek_salt],
+        [access, user, mek_salt],
     )
     # Derive MEK in page context using the same crypto.ts logic. We can't
     # import the bundled module directly, so re-implement deriveMEK inline

@@ -3,7 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import { User } from '../users/entities/user.entity';
+import { Device } from '../users/entities/device.entity';
 import { Subscription, planQuotaBytes } from '../payment/entities/subscription.entity';
 import { generateSalt } from '../common/encryption';
 
@@ -23,6 +25,7 @@ export class OauthService {
 
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Device) private deviceRepo: Repository<Device>,
     @InjectRepository(Subscription) private subRepo: Repository<Subscription>,
     private jwtService: JwtService,
     private cs: ConfigService,
@@ -78,15 +81,53 @@ export class OauthService {
     return user;
   }
 
-  /** Generate JWT tokens for the authenticated user */
-  generateTokens(user: User) {
-    const payload = { sub: user.id, username: user.username, role: user.role };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '2h' });
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.cs.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: '30d',
+  /**
+   * Generate JWT tokens + create a Device record for the authenticated user.
+   * Mirrors auth.service.issueTokens() so the /auth/refresh endpoint can
+   * validate OAuth-issued refresh tokens (requires `type: 'refresh'` + deviceId).
+   */
+  async generateTokens(user: User, ip: string, ua: string) {
+    const device = this.deviceRepo.create({
+      userId: user.id,
+      refreshTokenHash: '',
+      ipAddress: ip,
+      userAgent: ua,
+      deviceName: this.parseDeviceName(ua),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
+    await this.deviceRepo.save(device);
+
+    const refreshSecret = this.cs.get<string>('JWT_REFRESH_SECRET');
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, deviceId: device.id, type: 'refresh' },
+      { secret: refreshSecret, expiresIn: '30d' },
+    );
+    const tokenHash = this.hashRefreshToken(refreshToken, refreshSecret!);
+    await this.deviceRepo.update(device.id, { refreshTokenHash: tokenHash });
+
+    const accessToken = this.jwtService.sign(
+      { sub: user.id, role: user.role, deviceId: device.id },
+      { expiresIn: '2h' },
+    );
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Hash a refresh token for at-rest storage. Mirrors
+   * auth.service.hashRefreshToken — HMAC-SHA256 with the refresh secret as pepper.
+   */
+  private hashRefreshToken(token: string, secret: string): string {
+    return crypto.createHmac('sha256', secret).update(token).digest('hex');
+  }
+
+  /** Simple UA → device label. Mirrors auth.service.parseDeviceName. */
+  private parseDeviceName(ua: string): string {
+    if (!ua) return '未知设备';
+    if (/mobile/i.test(ua)) return '移动端';
+    if (/windows/i.test(ua)) return 'Windows';
+    if (/mac/i.test(ua)) return 'macOS';
+    if (/linux/i.test(ua)) return 'Linux';
+    return '浏览器';
   }
 
   /**

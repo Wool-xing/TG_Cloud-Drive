@@ -101,7 +101,7 @@ export function validateEnvOrExit(): void {
     }
   }
 
-  // APP_URL: dev allows the configuration.ts default (http://localhost:5173);
+  // APP_URL: dev allows the configuration.ts default (http://localhost:2222);
   // production MUST be a real domain — otherwise CORS rejects the real frontend
   // and email/share links point at localhost (broken for end users).
   const isProduction = process.env.NODE_ENV === 'production';

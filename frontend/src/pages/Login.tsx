@@ -216,16 +216,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
 
-  // Handle OAuth callback: backend redirects to /login?accessToken=...&refreshToken=...
+  // Handle OAuth callback: backend redirects to /login?accessToken=... and
+  // sets the refresh token as an HttpOnly cookie (no longer in URL).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const at = params.get('accessToken');
-    const rt = params.get('refreshToken');
-    if (at && rt) {
-      // Store tokens and redirect to home (no MEK for OAuth users)
+    if (at) {
+      // Store access token; refresh token is already in the rt cookie.
       localStorage.setItem('accessToken', at);
-      localStorage.setItem('refreshToken', rt);
-      // Clean up URL
+      // Clean up URL — remove the access token from history / referrer.
       window.history.replaceState({}, '', '/login');
       toast.success(t('login.oauthSuccess'));
       navigate('/');
@@ -239,8 +238,8 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const res = await authApi.login({ identifier: identifier.trim(), password }) as any;
-      setAuth(res.user, res.accessToken, res.refreshToken, res.mekSalt, rememberMe);
+      const res = await authApi.login({ identifier: identifier.trim(), password, rememberMe }) as any;
+      setAuth(res.user, res.accessToken, res.mekSalt, rememberMe);
       await deriveMEK(password);
       // P1-UX: tell the browser explicitly to remember this credential pair.
       // Pre-fix the call was gated on rememberMe — but rememberMe is about

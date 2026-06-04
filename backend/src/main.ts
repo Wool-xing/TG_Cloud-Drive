@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -42,7 +43,7 @@ async function bootstrap() {
   }
 
   const port = configService.get<number>('PORT', 3000);
-  const frontendUrl = configService.get<string>('APP_URL', 'http://localhost:5173');
+  const frontendUrl = configService.get<string>('APP_URL', 'http://localhost:2222');
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());
@@ -51,9 +52,12 @@ async function bootstrap() {
   // hostile origins like `https://evil.com.localhost:1234` due to missing `^http:` anchor and
   // would let any local app abuse credentials=true. Dev: keep localhost convenience but
   // anchor strictly to `http://localhost:<port>`.
+  // Normalize to strip trailing slash so `https://example.com/` and
+  // `https://example.com` both match. CORS comparison is string-equality.
+  const normalizedFrontendUrl = frontendUrl.replace(/\/+$/, '');
   const corsOrigins: (string | RegExp)[] = isProduction
-    ? [frontendUrl]
-    : [frontendUrl, /^http:\/\/localhost:\d+$/];
+    ? [normalizedFrontendUrl]
+    : [normalizedFrontendUrl, /^http:\/\/localhost:\d+$/];
   app.enableCors({
     origin: corsOrigins,
     credentials: true,

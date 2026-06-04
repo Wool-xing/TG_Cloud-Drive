@@ -6,7 +6,6 @@ use crate::AppState;
 pub struct LoginResult {
     pub user: serde_json::Value,
     pub access_token: String,
-    pub refresh_token: String,
     pub mek_salt: String,
 }
 

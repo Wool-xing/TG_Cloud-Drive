@@ -21,7 +21,7 @@ make certs-dev     # Generate self-signed TLS cert for local dev
 
 # ── Local dev (after `make dev` starts postgres+redis) ──
 cd backend && npm install && npm run start:dev   # Backend on :3000, Swagger at /api/docs
-cd frontend && npm install && npm run dev         # Frontend on :5173
+cd frontend && npm install && npm run dev         # Frontend on :2222
 
 # ── Worker ──
 make worker-deploy       # Deploy Cloudflare Worker
