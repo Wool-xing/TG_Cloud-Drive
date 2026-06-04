@@ -111,40 +111,48 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
   } = useFileStore();
 
   const lastClickedRef = useRef<string | null>(null);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleRowClick = (e: React.MouseEvent, node: Node) => {
-    e.preventDefault();
+  const handleRowMouseDown = (e: React.MouseEvent, node: Node) => {
+    // Right click → context menu
+    if (e.button === 2) return;
+
     const ids = nodes.map((n) => n.id);
 
     if (e.shiftKey && lastClickedRef.current) {
+      e.preventDefault();
       const fromIdx = ids.indexOf(lastClickedRef.current);
       const toIdx = ids.indexOf(node.id);
       if (fromIdx !== -1 && toIdx !== -1) {
-        const rangeIds = ids.slice(
-          Math.min(fromIdx, toIdx),
-          Math.max(fromIdx, toIdx) + 1,
-        );
-        selectNode(node.id, false, rangeIds);
-        return;
+        selectNode(node.id, false, ids.slice(Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx) + 1));
       }
+      return;
     }
 
     if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
       selectNode(node.id, true);
       return;
     }
 
+    // Detect double-click via timer
+    if (clickTimerRef.current && lastClickedRef.current === node.id) {
+      // Double click detected
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      if (node.type === 'folder') {
+        navigate(node.id, node.name);
+      } else {
+        clearSelection();
+        setPreview(node);
+      }
+      return;
+    }
+
+    // Single click: select
     selectNode(node.id, false);
     lastClickedRef.current = node.id;
-  };
-
-  const handleRowDoubleClick = (node: Node) => {
-    if (node.type === 'folder') {
-      navigate(node.id, node.name);
-    } else {
-      clearSelection();
-      setPreview(node);
-    }
+    clickTimerRef.current = setTimeout(() => { clickTimerRef.current = null; }, 300);
   };
 
   const handleContextMenu = (e: React.MouseEvent, node: Node) => {
@@ -198,8 +206,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
             : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
         }`}
         style={{ height: ROW_HEIGHT }}
-        onClick={(e) => handleRowClick(e, node)}
-        onDoubleClick={() => handleRowDoubleClick(node)}
+        onMouseDown={(e) => handleRowMouseDown(e, node)}
         onContextMenu={(e) => handleContextMenu(e, node)}
       >
         <div className="px-4">

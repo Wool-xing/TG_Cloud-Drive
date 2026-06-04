@@ -878,8 +878,8 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                     </button>
                   </>
                 ) : (
-                  <button onClick={handleEdit} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors font-medium border border-white/10">
-                    <Edit3 className="w-3.5 h-3.5" />{t('preview.edit')}
+                  <button onClick={handleEdit} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium text-sm shadow-lg shadow-blue-600/20">
+                    <Edit3 className="w-4 h-4" />{t('preview.edit')}
                   </button>
                 )}
               </div>
