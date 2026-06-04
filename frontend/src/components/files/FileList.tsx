@@ -129,15 +129,20 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
       }
     }
 
+    if (e.ctrlKey || e.metaKey) {
+      selectNode(node.id, true);
+      return;
+    }
+
+    selectNode(node.id, false);
     lastClickedRef.current = node.id;
-    // Always toggle selection (checkbox-style behavior)
-    selectNode(node.id, true);
   };
 
   const handleRowDoubleClick = (node: Node) => {
     if (node.type === 'folder') {
       navigate(node.id, node.name);
     } else {
+      clearSelection();
       setPreview(node);
     }
   };
