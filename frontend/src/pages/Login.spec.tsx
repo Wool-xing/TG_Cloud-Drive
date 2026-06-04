@@ -82,28 +82,28 @@ describe('Login page', () => {
   it('calls authApi.login on form submit with correct payload', async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({
-      accessToken: 'at', refreshToken: 'rt', user: { id: '1', username: 'admin' }, mekSalt: 'salt',
+      accessToken: 'at', user: { id: '1', username: 'admin' }, mekSalt: 'salt',
     });
     renderLogin();
     await user.type(screen.getByPlaceholderText('请输入用户名、手机号或邮箱'), 'admin');
     await user.type(screen.getByPlaceholderText('请输入密码'), 'myPassword');
     await user.click(screen.getByText('登 录'));
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith({ identifier: 'admin', password: 'myPassword' });
+      expect(mockLogin).toHaveBeenCalledWith({ identifier: 'admin', password: 'myPassword', rememberMe: false });
     });
   });
 
   it('calls setAuth + deriveMEK after successful login', async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({
-      accessToken: 'at', refreshToken: 'rt', user: { id: 'u1', username: 'admin' }, mekSalt: 'salt',
+      accessToken: 'at', user: { id: 'u1', username: 'admin' }, mekSalt: 'salt',
     });
     renderLogin();
     await user.type(screen.getByPlaceholderText('请输入用户名、手机号或邮箱'), 'admin');
     await user.type(screen.getByPlaceholderText('请输入密码'), 'pw');
     await user.click(screen.getByText('登 录'));
     await waitFor(() => {
-      expect(mockSetAuth).toHaveBeenCalledWith({ id: 'u1', username: 'admin' }, 'at', 'rt', 'salt', false);
+      expect(mockSetAuth).toHaveBeenCalledWith({ id: 'u1', username: 'admin' }, 'at', 'salt', false);
       expect(mockDeriveMEK).toHaveBeenCalledWith('pw');
     });
   });

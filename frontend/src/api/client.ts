@@ -60,10 +60,12 @@ api.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) throw new Error('no refresh token');
-        const res = await api.post('/auth/refresh', { refreshToken });
-        const newToken = (res as any).accessToken || (res as any).data?.accessToken;
+        // Refresh token now lives in an HttpOnly cookie (rt). withCredentials
+        // is set on the axios instance, so the browser ships it on this POST.
+        // No body required.
+        const res = await api.post('/auth/refresh', {});
+        const newToken = (res as any).accessToken;
+        if (!newToken) throw new Error('token refresh failed');
         localStorage.setItem('accessToken', newToken);
         refreshQueue.forEach(cb => cb(newToken));
         refreshQueue = [];
@@ -71,7 +73,6 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(error);
       } finally {

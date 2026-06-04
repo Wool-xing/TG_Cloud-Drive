@@ -49,7 +49,9 @@ prod: ## 一键启动所有生产容器（含构建，需先填好 .env）
 	@until docker compose exec -T postgres pg_isready -U tgpan -d tgpan >/dev/null 2>&1; do sleep 2; done
 	@echo "同步 Postgres 内部密码到 .env（防止重复部署密码不匹配）..."
 	@DB_PASS_VAL=$$(grep '^DB_PASS=' .env | cut -d= -f2-); \
-		docker compose exec -T postgres psql -U tgpan -d tgpan -c "ALTER USER tgpan PASSWORD '$$DB_PASS_VAL';" >/dev/null 2>&1 || \
+		docker compose exec -T postgres psql -U tgpan -d tgpan \
+			-v new_pass="$$DB_PASS_VAL" \
+			-c "ALTER USER tgpan PASSWORD :'new_pass';" >/dev/null 2>&1 || \
 		(echo "❌ Postgres 密码同步失败" && exit 1)
 	@docker compose restart backend >/dev/null 2>&1 || true
 	@echo "等待 backend 就绪..."
@@ -103,16 +105,22 @@ clean: ## 停止容器并删除数据卷（⚠️ 会清空数据库）
 # ─── 数据库 ──────────────────────────────────────────────────────────────────
 
 seed: ## 初始化数据库（创建管理员账号；admin 已存在则跳过，密码不更新）
+	@docker compose exec -T backend test -f dist/database/seed.js || \
+		(echo "❌ backend 容器内未找到 dist/database/seed.js — 后端镜像未构建或构建失败。请运行 'docker compose up -d --build backend' 重新构建后再试" && exit 1)
 	docker compose exec -T backend node dist/database/seed.js
 
 reset-admin: ## 重置 admin 密码为当前 .env 的 ADMIN_INITIAL_PASSWORD（首次跑可跳；重跑 quickstart 后必须跑此）
 	@DB_PASS_VAL=$$(grep '^DB_PASS=' .env | cut -d= -f2-); \
-		docker compose exec -T postgres psql -U tgpan -d tgpan -c "ALTER USER tgpan PASSWORD '$$DB_PASS_VAL';" >/dev/null 2>&1 || true
+		docker compose exec -T postgres psql -U tgpan -d tgpan \
+			-v new_pass="$$DB_PASS_VAL" \
+			-c "ALTER USER tgpan PASSWORD :'new_pass';" >/dev/null 2>&1 || true
 	@ADMIN_PASS=$$(grep '^ADMIN_INITIAL_PASSWORD=' .env | cut -d= -f2-); \
 		ADMIN_USER=$$(grep '^ADMIN_USERNAME=' .env | cut -d= -f2-); \
 		[ -z "$$ADMIN_PASS" ] && { echo "❌ .env 缺 ADMIN_INITIAL_PASSWORD"; exit 1; } || true; \
-		HASH=$$(docker compose exec -T backend node -e "require('bcrypt').hash('$$ADMIN_PASS',12).then(h=>process.stdout.write(h))"); \
-		docker compose exec -T postgres psql -U tgpan -d tgpan -c "UPDATE users SET password_hash='$$HASH' WHERE username='$$ADMIN_USER';" >/dev/null 2>&1 && \
+		HASH=$$(docker compose exec -T -e ADMIN_PASS="$$ADMIN_PASS" backend node -e "require('bcrypt').hash(process.env.ADMIN_PASS,12).then(h=>process.stdout.write(h))"); \
+		docker compose exec -T postgres psql -U tgpan -d tgpan \
+			-v hash="$$HASH" -v uname="$$ADMIN_USER" \
+			-c "UPDATE users SET password_hash=:'hash' WHERE username=:'uname';" >/dev/null 2>&1 && \
 		echo "✅ admin 密码已同步到 .env 的 ADMIN_INITIAL_PASSWORD" || \
 		{ echo "❌ 密码同步失败"; exit 1; }
 	@echo "⚠️  注意：如该 admin 之前上传过加密文件，由于密码改变 MEK 派生失效，旧文件无法解密。"
