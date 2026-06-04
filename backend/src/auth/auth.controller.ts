@@ -67,7 +67,12 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.logout(deviceId);
-    res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+      path: REFRESH_COOKIE_PATH,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+    });
     return result;
   }
 
@@ -78,7 +83,12 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.logoutAll(userId);
-    res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+      path: REFRESH_COOKIE_PATH,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+    });
     return result;
   }
 
