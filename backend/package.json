@@ -58,7 +58,6 @@
     "stripe": "^22.1.1",
     "tesseract.js": "^5.1.1",
     "typeorm": "^0.3.20",
-    "uuid": "^9.0.0",
     "xml2js": "^0.6.2",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.30"
