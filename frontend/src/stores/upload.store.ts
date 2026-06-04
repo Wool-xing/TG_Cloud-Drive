@@ -4,6 +4,7 @@ import { UploadTask } from '../types';
 import { filesApi } from '../api/client';
 import { generateDEK, encryptDEK, encryptChunk, computeFileHash, getSessionMEK, exportDEKAsBase64 } from '../utils/crypto';
 import toast from 'react-hot-toast';
+import { t } from '../i18n/translations';
 
 const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_CONCURRENT = 3;
@@ -178,7 +179,7 @@ async function processTask(taskId: string, set: any, get: any) {
     // Pairs with backend uploadChunk encryptedDek check.
     const mek = getSessionMEK();
     if (!mek) {
-      throw new Error('会话密钥已失效，请退出后重新登录以解锁加密上传（明文上传已被禁用）');
+      throw new Error(t('upload.sessionExpired'));
     }
 
     // P1-F9: derive (or reuse) the DEK + envelope material. On a fresh task we
@@ -299,7 +300,7 @@ async function processTask(taskId: string, set: any, get: any) {
     }
 
     updateTask({ status: 'done', progress: 100 });
-    toast.success(`${task.file.name} 上传完成`);
+    toast.success(t('upload.completed', { name: task.file.name }));
     __dekCache__.delete(taskId);
     // P1-F15 followup: File objects themselves are lightweight OS handles —
     // the actual memory pressure came from per-chunk ArrayBuffers, which are
@@ -313,12 +314,12 @@ async function processTask(taskId: string, set: any, get: any) {
       // already deleted it on its path.
       return;
     }
-    const msg = err?.response?.data?.message || err?.message || '上传失败';
+    const msg = err?.response?.data?.message || err?.message || t('upload.failed');
     set((s: any) => ({
       tasks: s.tasks.map((t: UploadTask) => t.id === taskId ? { ...t, status: 'error', error: msg } : t),
     }));
     __dekCache__.delete(taskId);
-    toast.error(`上传失败: ${msg}`);
+    toast.error(t('upload.failedWithMsg', { msg }));
   } finally {
     releaseSlot();
   }

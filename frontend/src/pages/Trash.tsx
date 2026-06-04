@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { filesApi } from '../api/client';
 import { Node } from '../types';
 import { formatBytes } from '../utils/crypto';
+import { t } from '../i18n/translations';
 
 const TRASH_RETENTION_DAYS = 30;
 
@@ -74,7 +75,7 @@ function ConfirmModal({
         {needsInput && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
-              {inputLabel ?? `请输入"${confirmWord}"以继续`}
+              {inputLabel ?? t('trash.confirmWordLabel')}
             </label>
             <input
               type="text"
@@ -91,7 +92,7 @@ function ConfirmModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors dark:bg-gray-700 dark:text-gray-300"
           >
-            取消
+            {t('trash.cancel')}
           </button>
           <button
             onClick={() => { if (canConfirm) onConfirm(); }}
@@ -160,7 +161,7 @@ export default function Trash() {
       await filesApi.restore(ids);
       setSelectedIds(new Set());
       invalidate();
-      toast.success(`已还原 ${ids.length} 个文件`);
+      toast.success(t('trash.restoredN', { n: ids.length }));
     } catch {
       // handled by interceptor
     } finally {
@@ -178,7 +179,7 @@ export default function Trash() {
         return next;
       });
       invalidate();
-      toast.success(`已永久删除 ${ids.length} 个文件`);
+      toast.success(t('trash.permanentDeleted', { n: ids.length }));
     } catch {
       // handled by interceptor
     } finally {
@@ -195,7 +196,7 @@ export default function Trash() {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-red-500 gap-2">
         <AlertTriangle className="w-10 h-10" />
-        <p>加载回收站失败，请刷新重试</p>
+        <p>{t('trash.loadError')}</p>
       </div>
     );
   }
@@ -205,15 +206,21 @@ export default function Trash() {
       {/* Retention banner */}
       <div className="mx-4 mt-4 mb-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200">
         <Info className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-        <span>回收站中的文件将在 <strong>30天</strong> 后自动永久删除{nodes.length > 0 && <>，当前占用 <strong>{formatBytes(nodes.reduce((s, n) => s + (n.type === 'file' ? n.size : 0), 0))}</strong></>}，请及时处理重要文件。</span>
+        <span>
+          {(() => {
+            const totalSize = nodes.reduce((s, n) => s + (n.type === 'file' ? n.size : 0), 0);
+            const costInfo = nodes.length > 0 ? t('trash.retentionCost', { size: formatBytes(totalSize) }) : '';
+            return t('trash.retention', { costInfo });
+          })()}
+        </span>
       </div>
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700">
         <span className="text-sm font-medium text-gray-700 mr-2 dark:text-gray-300">
-          回收站
+          {t('trash.title')}
           {nodes.length > 0 && (
-            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({nodes.length} 个文件)</span>
+            <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({t('trash.count', { n: nodes.length })})</span>
           )}
         </span>
 
@@ -221,14 +228,14 @@ export default function Trash() {
 
         {someSelected && (
           <>
-            <span className="text-xs text-gray-500 mr-1 dark:text-gray-400">已选 {selectedIds.size} 项</span>
+            <span className="text-xs text-gray-500 mr-1 dark:text-gray-400">{t('trash.selected', { n: selectedIds.size })}</span>
             <button
               onClick={handleRestore}
               disabled={isActing}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors disabled:opacity-50"
             >
               {isActing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-              还原选中
+              {t('trash.restoreSelected')}
             </button>
             <button
               onClick={() => setModal({ type: 'permanentDelete', ids: Array.from(selectedIds) })}
@@ -236,7 +243,7 @@ export default function Trash() {
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
             >
               <Trash2 className="w-4 h-4" />
-              永久删除选中
+              {t('trash.permanentDeleteSelected')}
             </button>
           </>
         )}
@@ -248,7 +255,7 @@ export default function Trash() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 border border-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
           >
             <Trash2 className="w-4 h-4" />
-            清空回收站
+            {t('trash.emptyTrash')}
           </button>
         )}
       </div>
@@ -264,8 +271,8 @@ export default function Trash() {
             <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center dark:bg-gray-700">
               <Trash2 className="w-10 h-10 text-gray-300" />
             </div>
-            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">回收站为空</p>
-            <p className="text-sm">已删除的文件会出现在这里</p>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">{t('trash.empty')}</p>
+            <p className="text-sm">{t('trash.emptyHint')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -280,12 +287,12 @@ export default function Trash() {
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer dark:border-gray-600"
                   />
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">名称</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell dark:text-gray-400">原始位置</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell dark:text-gray-400">删除时间</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">剩余天数</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell dark:text-gray-400">大小</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">操作</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">{t('trash.column.name')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell dark:text-gray-400">{t('trash.column.originalPath')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell dark:text-gray-400">{t('trash.column.deletedAt')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">{t('trash.column.remainingDays')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell dark:text-gray-400">{t('trash.column.size')}</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">{t('trash.column.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -314,7 +321,7 @@ export default function Trash() {
                     </td>
                     <td className="px-4 py-3 text-gray-500 hidden md:table-cell dark:text-gray-400">
                       <span className="text-xs truncate max-w-[160px] block">
-                        {node.parentId ? `/${node.parentId}` : '/根目录'}
+                        {node.parentId ? `/${node.parentId}` : t('trash.rootDir')}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell dark:text-gray-400">
@@ -325,7 +332,7 @@ export default function Trash() {
                         const days = remainingDays(node.deletedAt);
                         return (
                           <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${countdownBadge(days)}`}>
-                            {days === 0 ? '即将删除' : `${days} 天`}
+                            {days === 0 ? t('trash.soonDeleted') : t('trash.days', { n: days })}
                           </span>
                         );
                       })()}
@@ -340,21 +347,21 @@ export default function Trash() {
                             setRestoringIds(prev => new Set(prev).add(node.id));
                             filesApi.restore([node.id]).then(() => {
                               invalidate();
-                              toast.success('已还原');
+                              toast.success(t('trash.restored'));
                             }).finally(() => {
                               setRestoringIds(prev => { const n = new Set(prev); n.delete(node.id); return n; });
                             });
                           }}
                           disabled={restoringIds.has(node.id)}
                           className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
-                          title="还原"
+                          title={t('trash.restore')}
                         >
                           {restoringIds.has(node.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={() => setModal({ type: 'permanentDelete', ids: [node.id] })}
                           className="p-1.5 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
-                          title="永久删除"
+                          title={t('trash.permanentDeleteBtn')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -371,9 +378,9 @@ export default function Trash() {
       {/* Modals */}
       {modal?.type === 'permanentDelete' && (
         <ConfirmModal
-          title="永久删除"
-          message={`确定要永久删除选中的 ${modal.ids.length} 个文件吗？此操作不可撤销。`}
-          confirmLabel="永久删除"
+          title={t('trash.permanentDelete')}
+          message={t('trash.permanentDeleteConfirm', { n: modal.ids.length })}
+          confirmLabel={t('trash.permanentDeleteBtn')}
           danger
           onConfirm={() => handlePermanentDelete(modal.ids)}
           onClose={() => setModal(null)}
@@ -382,11 +389,11 @@ export default function Trash() {
 
       {modal?.type === 'emptyTrash' && (
         <ConfirmModal
-          title="清空回收站"
-          message={`此操作将永久删除回收站中的全部 ${nodes.length} 个文件，无法恢复。`}
-          inputLabel={`请输入"确认"以继续`}
-          confirmWord="确认"
-          confirmLabel="清空回收站"
+          title={t('trash.emptyTrash')}
+          message={t('trash.emptyTrashConfirm', { n: nodes.length })}
+          inputLabel={t('trash.confirmWordLabel', { word: t('trash.confirmWord') })}
+          confirmWord={t('trash.confirmWord')}
+          confirmLabel={t('trash.emptyTrash')}
           danger
           onConfirm={handleEmptyTrash}
           onClose={() => setModal(null)}

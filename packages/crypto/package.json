@@ -1,0 +1,10 @@
+{
+  "name": "@tgpan/crypto",
+  "version": "1.0.0",
+  "description": "Shared E2E encryption utilities for TG Cloud Drive — browser + Node.js",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "license": "MIT",
+  "sideEffects": false
+}

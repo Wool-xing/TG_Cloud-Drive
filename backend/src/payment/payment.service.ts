@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-const Stripe = require('stripe');
+import Stripe from 'stripe';
 import { User } from '../users/entities/user.entity';
 import { Subscription, PlanTier, PLAN_CONFIG, planQuotaBytes } from './entities/subscription.entity';
 

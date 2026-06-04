@@ -96,22 +96,17 @@ export class TelegramStorageProvider implements StorageProvider {
   }
 
   async getUrl(key: string): Promise<string> {
-    if (!this.workersUrl && !this.devDirectFallback) {
-      throw new ServiceUnavailableException('Telegram 下载未配置');
+    // Always require CF_WORKERS_URL for client-facing download URLs.
+    // Direct Telegram file URLs embed the bot token — leaking it to any
+    // browser DevTools / proxy / referrer. Even in dev mode, the Worker
+    // should be deployed (or use `wrangler dev`) to keep the token
+    // server-side only.
+    if (!this.workersUrl) {
+      throw new ServiceUnavailableException(
+        '下载服务未配置（CF_WORKERS_URL 缺失）。请部署 Cloudflare Worker 以安全代理文件下载。',
+      );
     }
-
-    if (this.workersUrl) {
-      return `${this.workersUrl}/file/${encodeURIComponent(key)}`;
-    }
-
-    const res = await this.fetchWithRetry(
-      `https://api.telegram.org/bot${this.token}/getFile?file_id=${key}`,
-      { headers: { 'Content-Type': 'application/json' } },
-      READ_TIMEOUT_MS,
-    );
-    const json = await res.json() as any;
-    if (!json.ok) throw new InternalServerErrorException('获取文件路径失败');
-    return `https://api.telegram.org/file/bot${this.token}/${json.result.file_path}`;
+    return `${this.workersUrl}/file/${encodeURIComponent(key)}`;
   }
 
   async delete(_key: string, meta?: string): Promise<void> {

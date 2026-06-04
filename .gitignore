@@ -48,6 +48,12 @@ node_modules/
 backend/dist/
 frontend/dist/
 
+# Tesseract OCR language data (downloaded at runtime / test time)
+*.traineddata
+
+# Test coverage
+coverage/
+
 # Cloudflare Wrangler local state (contains preview tokens, KV cache)
 .wrangler/
 

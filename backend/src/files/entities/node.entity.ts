@@ -64,6 +64,9 @@ export class Node {
   @Column({ name: 'note', type: 'text', nullable: true })
   note: string;
 
+  @Column({ name: 'ocr_text', type: 'text', nullable: true, select: false })
+  ocrText: string;
+
   /** PostgreSQL full-text search vector — auto-populated via trigger */
   @Index('idx_nodes_search', { synchronize: false }) // created via raw SQL
   @Column({ name: 'search_vector', type: 'tsvector', nullable: true, select: false })

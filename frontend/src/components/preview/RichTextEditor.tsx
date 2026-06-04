@@ -19,6 +19,7 @@ import {
   AlignCenter, AlignRight, AlignJustify, Link as LinkIcon, ImageIcon,
   Table as TableIcon, Minus, Palette, Highlighter,
 } from 'lucide-react';
+import { t } from '../../i18n/translations';
 
 const COLORS = ['#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#cc0000', '#e06666', '#f6b26b', '#ffd966', '#93c47d', '#6d9eeb', '#8e7cc3', '#ffffff', '#efefef', '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#c9daf8', '#d9d2e9'];
 
@@ -32,7 +33,7 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Placeholder.configure({ placeholder: placeholder || '开始输入…' }),
+      Placeholder.configure({ placeholder: placeholder || t('editor.placeholder') }),
       Table.configure({ resizable: true }),
       TableRow, TableCell, TableHeader,
       TextStyle, Color, Highlight.configure({ multicolor: true }),
@@ -63,11 +64,11 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
   const setHighlight = (color: string) => editor.chain().focus().toggleHighlight({ color }).run();
   const addTable = () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   const addLink = () => {
-    const url = window.prompt('输入链接地址');
+    const url = window.prompt(t('editor.linkPrompt'));
     if (url) editor.chain().focus().setLink({ href: url }).run();
   };
   const addImage = () => {
-    const url = window.prompt('输入图片地址');
+    const url = window.prompt(t('editor.imagePrompt'));
     if (url) editor.chain().focus().setImage({ src: url }).run();
   };
 
@@ -75,29 +76,29 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center gap-0.5 px-3 py-1.5 bg-white/5 border-b border-white/10 flex-shrink-0 overflow-x-auto flex-wrap">
-        <Btn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="加粗"><Bold className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="斜体"><Italic className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="下划线"><UnderlineIcon className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="删除线"><Strikethrough className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title={t('editor.bold')}><Bold className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title={t('editor.italic')}><Italic className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title={t('editor.underline')}><UnderlineIcon className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title={t('editor.strikethrough')}><Strikethrough className="w-3.5 h-3.5" /></Btn>
         <span className="w-px h-5 bg-white/10 mx-1" />
-        <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="标题1"><Heading1 className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="标题2"><Heading2 className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="标题3"><Heading3 className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title={t('editor.heading1')}><Heading1 className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title={t('editor.heading2')}><Heading2 className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title={t('editor.heading3')}><Heading3 className="w-3.5 h-3.5" /></Btn>
         <span className="w-px h-5 bg-white/10 mx-1" />
-        <Btn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="左对齐"><AlignLeft className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="居中"><AlignCenter className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="右对齐"><AlignRight className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title="两端对齐"><AlignJustify className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title={t('editor.alignLeft')}><AlignLeft className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title={t('editor.alignCenter')}><AlignCenter className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title={t('editor.alignRight')}><AlignRight className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title={t('editor.alignJustify')}><AlignJustify className="w-3.5 h-3.5" /></Btn>
         <span className="w-px h-5 bg-white/10 mx-1" />
-        <Btn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="无序列表"><List className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="有序列表"><ListOrdered className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="引用"><Quote className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="代码块"><Code className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title={t('editor.bulletList')}><List className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title={t('editor.orderedList')}><ListOrdered className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title={t('editor.blockquote')}><Quote className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title={t('editor.codeBlock')}><Code className="w-3.5 h-3.5" /></Btn>
         <span className="w-px h-5 bg-white/10 mx-1" />
-        <Btn onClick={addTable} active={editor.isActive('table')} title="插入表格"><TableIcon className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={addLink} active={editor.isActive('link')} title="插入链接"><LinkIcon className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={addImage} active={false} title="插入图片"><ImageIcon className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="分割线"><Minus className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={addTable} active={editor.isActive('table')} title={t('editor.insertTable')}><TableIcon className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={addLink} active={editor.isActive('link')} title={t('editor.insertLink')}><LinkIcon className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={addImage} active={false} title={t('editor.insertImage')}><ImageIcon className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title={t('editor.horizontalRule')}><Minus className="w-3.5 h-3.5" /></Btn>
         <span className="w-px h-5 bg-white/10 mx-1" />
         <div className="relative group">
           <button type="button" className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"><Palette className="w-3.5 h-3.5" /></button>
@@ -116,8 +117,8 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
           </div>
         </div>
         <span className="flex-1" />
-        <Btn onClick={() => editor.chain().focus().undo().run()} active={false} title="撤销"><Undo className="w-3.5 h-3.5" /></Btn>
-        <Btn onClick={() => editor.chain().focus().redo().run()} active={false} title="重做"><Redo className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().undo().run()} active={false} title={t('editor.undo')}><Undo className="w-3.5 h-3.5" /></Btn>
+        <Btn onClick={() => editor.chain().focus().redo().run()} active={false} title={t('editor.redo')}><Redo className="w-3.5 h-3.5" /></Btn>
       </div>
       {/* Content */}
       <div className="flex-1 overflow-auto bg-gray-950">

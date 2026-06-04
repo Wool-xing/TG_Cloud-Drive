@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Backend (NestJS) ────────────────────────────────────────────────────
+  backend:
+    name: Backend — typecheck · test · build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+
+  # ── Frontend (React + Vite) ─────────────────────────────────────────────
+  frontend:
+    name: Frontend — typecheck · test · build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+
+  # ── Worker (Cloudflare) ─────────────────────────────────────────────────
+  worker:
+    name: Worker — typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  # ── Security audit ──────────────────────────────────────────────────────
+  audit:
+    name: Security — npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Audit backend
+        run: cd backend && npm ci && npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Audit frontend
+        run: cd frontend && npm ci && npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Audit worker
+        run: cd worker && npm ci && npm audit --audit-level=high
+        continue-on-error: true

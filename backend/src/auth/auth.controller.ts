@@ -8,6 +8,7 @@ import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, refreshCookieOptions } from '../common/cookie.constants';
 
 @ApiTags('认证')
 @Controller('auth')
@@ -29,14 +30,18 @@ export class AuthController {
     const ip = req.ip || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || '';
     const result = await this.authService.login(dto, ip, ua);
-    return result;
+    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, refreshCookieOptions(process.env.NODE_ENV === 'production', dto.rememberMe));
+    // Strip refreshToken from body — clients receive it only via the HttpOnly cookie.
+    const { refreshToken: _drop, ...safe } = result;
+    return safe;
   }
 
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(200)
-  refresh(@Body('refreshToken') token: string, @Req() req: Request) {
+  refresh(@Req() req: Request) {
+    const token = (req as any).cookies?.[REFRESH_COOKIE_NAME];
     const ip = req.ip || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || '';
     return this.authService.refresh(token, ip, ua);
@@ -57,14 +62,34 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(200)
-  logout(@CurrentUser('deviceId') deviceId: string) {
-    return this.authService.logout(deviceId);
+  async logout(
+    @CurrentUser('deviceId') deviceId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.logout(deviceId);
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+      path: REFRESH_COOKIE_PATH,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+    });
+    return result;
   }
 
   @Post('logout-all')
   @HttpCode(200)
-  logoutAll(@CurrentUser('id') userId: string) {
-    return this.authService.logoutAll(userId);
+  async logoutAll(
+    @CurrentUser('id') userId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.logoutAll(userId);
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+      path: REFRESH_COOKIE_PATH,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+    });
+    return result;
   }
 
   @Get('me')

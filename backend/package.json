@@ -8,7 +8,10 @@
     "start:debug": "nest start --debug --watch",
     "migration:generate": "typeorm migration:generate -d dist/database/data-source.js",
     "migration:run": "typeorm migration:run -d dist/database/data-source.js",
-    "migration:revert": "typeorm migration:revert -d dist/database/data-source.js"
+    "migration:revert": "typeorm migration:revert -d dist/database/data-source.js",
+    "test": "jest --no-coverage",
+    "test:watch": "jest --watch --no-coverage",
+    "test:cov": "jest --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
@@ -20,12 +23,14 @@
     "@nestjs/mapped-types": "^2.1.1",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.21",
+    "@nestjs/platform-ws": "^11.1.21",
     "@nestjs/swagger": "^11.4.3",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.1",
     "@sentry/nestjs": "^10.53.1",
     "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.17",
+    "@types/ws": "^8.18.1",
     "@types/xml2js": "^0.4.14",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
@@ -44,15 +49,18 @@
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.11.3",
     "posthog-node": "^5.34.2",
     "reflect-metadata": "^0.2.1",
     "resend": "^6.12.3",
     "rxjs": "^7.8.1",
     "stripe": "^22.1.1",
+    "tesseract.js": "^5.1.1",
     "typeorm": "^0.3.20",
-    "uuid": "^9.0.0",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.30"
   },
   "overrides": {
     "lodash": "^4.17.21",
@@ -68,13 +76,18 @@
     "@nestjs/testing": "^11.1.21",
     "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.7",
+    "@types/jest": "^30.0.0",
     "@types/mime-types": "^2.1.4",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.11.30",
     "@types/node-fetch": "^2.6.11",
     "@types/nodemailer": "^6.4.14",
     "@types/passport-jwt": "^4.0.1",
+    "@types/supertest": "^7.2.0",
     "@types/uuid": "^9.0.8",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
     "typescript": "^5.3.3"
   }
 }

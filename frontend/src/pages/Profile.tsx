@@ -24,6 +24,7 @@ import toast from 'react-hot-toast';
 import { usersApi } from '../api/client';
 import { useAuthStore } from '../stores/auth.store';
 import { formatBytes } from '../utils/crypto';
+import { t } from '../i18n/translations';
 
 // P1-F1: hoisted out of SecurityTab. Pre-fix this component was defined
 // inside the function body, so React saw a fresh function identity on every
@@ -110,11 +111,11 @@ function LetterAvatar({ name, size = 'lg' }: { name: string; size?: 'sm' | 'lg' 
 
 // ── Tabs ───────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'profile', label: '基本信息', icon: <User className="w-4 h-4" /> },
-  { id: 'security', label: '安全设置', icon: <Shield className="w-4 h-4" /> },
-  { id: 'devices', label: '登录设备', icon: <Monitor className="w-4 h-4" /> },
-  { id: 'logs', label: '操作日志', icon: <ClipboardList className="w-4 h-4" /> },
-  { id: 'storage', label: '存储统计', icon: <BarChart2 className="w-4 h-4" /> },
+  { id: 'profile', label: t('profile.tabs.basic'), icon: <User className="w-4 h-4" /> },
+  { id: 'security', label: t('profile.tabs.security'), icon: <Shield className="w-4 h-4" /> },
+  { id: 'devices', label: t('profile.tabs.devices'), icon: <Monitor className="w-4 h-4" /> },
+  { id: 'logs', label: t('profile.tabs.logs'), icon: <ClipboardList className="w-4 h-4" /> },
+  { id: 'storage', label: t('profile.tabs.storage'), icon: <BarChart2 className="w-4 h-4" /> },
 ];
 
 // ── Profile Tab ────────────────────────────────────────────────
@@ -154,7 +155,7 @@ function ProfileTab() {
     try {
       const res = await usersApi.updateProfile({ username }) as any;
       setUser(res ?? { ...user!, username });
-      toast.success('个人信息已更新');
+      toast.success(t('profile.saved'));
     } catch {
       // interceptor
     } finally {
@@ -190,7 +191,7 @@ function ProfileTab() {
           <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium ${
             user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
           }`}>
-            {user.role === 'admin' ? '管理员' : '用户'}
+            {user.role === 'admin' ? t('profile.role.admin') : t('profile.role.user')}
           </span>
         </div>
       </div>
@@ -198,24 +199,24 @@ function ProfileTab() {
       {/* Form */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">用户名</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('profile.username')}</label>
           <input
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            placeholder="登录用户名"
+            placeholder={t('profile.placeholderUsername')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600"
           />
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">修改后需重新登录</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('profile.usernameChangeHint')}</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">邮箱</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('profile.email')}</label>
           <div className="flex items-center gap-2">
             <input
               type="email"
               value={boundEmail ?? ''}
               readOnly
-              placeholder="未绑定邮箱"
+              placeholder={t('profile.placeholderEmail')}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300"
             />
             <button
@@ -223,21 +224,21 @@ function ProfileTab() {
               onClick={() => setEmailDialogOpen(true)}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
             >
-              {boundEmail ? '更换邮箱' : '绑定邮箱'}
+              {boundEmail ? t('profile.boundEmail') : t('profile.bindEmail')}
             </button>
           </div>
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-            {boundEmail ? '修改密码时将收到邮箱验证码' : '绑定邮箱后修改密码需邮箱二次验证（更安全）'}
+            {boundEmail ? t('profile.emailBoundHint') : t('profile.emailNotBoundHint')}
           </p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">手机号</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('profile.phone')}</label>
           <div className="flex items-center gap-2">
             <input
               type="tel"
               value={boundPhone ?? ''}
               readOnly
-              placeholder="未绑定手机号"
+              placeholder={t('profile.placeholderPhone')}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300"
             />
             <button
@@ -245,15 +246,15 @@ function ProfileTab() {
               onClick={() => setPhoneDialogOpen(true)}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
             >
-              {hasPhone ? '更换手机号' : '绑定手机号'}
+              {hasPhone ? t('profile.boundPhone') : t('profile.bindPhone')}
             </button>
           </div>
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-            {hasPhone ? '当前已绑定手机号' : '可作为登录与找回密码的备用方式'}
+            {hasPhone ? t('profile.phoneBoundHint') : t('profile.phoneNotBoundHint')}
           </p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">存储使用</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('profile.storageUsed')}</label>
           <div className="flex items-center gap-3">
             <div className="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
               <div
@@ -273,7 +274,7 @@ function ProfileTab() {
           className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
         >
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-          保存修改
+          {t('profile.save')}
         </button>
       </div>
 
@@ -336,17 +337,17 @@ function BindPhoneDialog(props: {
 
   const handleSend = async () => {
     if (!validPhone) {
-      toast.error('手机号格式不正确');
+      toast.error(t('bindPhone.error.invalidPhone'));
       return;
     }
     if (currentPhone && currentPhone === phone) {
-      toast.error('与当前手机号相同');
+      toast.error(t('bindPhone.error.samePhone'));
       return;
     }
     setSending(true);
     try {
       await usersApi.sendBindPhoneCode(phone);
-      toast.success('验证码已发送');
+      toast.success(t('bindPhone.codeSent'));
       setCountdown(60);
     } catch {
       // interceptor
@@ -359,7 +360,7 @@ function BindPhoneDialog(props: {
     setSendingOld(true);
     try {
       await usersApi.sendBindPhoneOldCode();
-      toast.success('已发送到当前手机号');
+      toast.success(t('bindPhone.sentToCurrent'));
       setOldCountdown(60);
     } catch {
       // interceptor
@@ -372,7 +373,7 @@ function BindPhoneDialog(props: {
     e.preventDefault();
     if (!validPhone || code.length !== 6) return;
     if (needOldCode && oldCode.length !== 6) {
-      toast.error('请填写旧手机号验证码');
+      toast.error(t('bindPhone.error.oldCodeRequired'));
       return;
     }
     setSubmitting(true);
@@ -382,7 +383,7 @@ function BindPhoneDialog(props: {
         code,
         ...(needOldCode ? { oldPhoneCode: oldCode } : {}),
       });
-      toast.success(currentPhone ? '手机号更换成功' : '手机号绑定成功');
+      toast.success(currentPhone ? t('bindPhone.success') : t('bindPhone.successNew'));
       onBound(phone);
     } catch {
       // interceptor
@@ -395,23 +396,23 @@ function BindPhoneDialog(props: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md mx-4 rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
         <h3 className="text-base font-semibold text-gray-900 mb-4 dark:text-gray-100">
-          {currentPhone ? '更换手机号' : '绑定手机号'}
+          {currentPhone ? t('bindPhone.title') : t('bindPhone.titleNew')}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">新手机号</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('bindPhone.newPhone')}</label>
             <input
               type="tel"
               inputMode="numeric"
               value={phone}
               onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
               autoComplete="tel"
-              placeholder="11 位中国大陆手机号"
+              placeholder={t('bindPhone.placeholderPhone')}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">短信验证码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('bindPhone.code')}</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -420,7 +421,7 @@ function BindPhoneDialog(props: {
                 maxLength={6}
                 value={code}
                 onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="6 位数字验证码"
+                placeholder={t('security.placeholderEmailCode')}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
               />
               <button
@@ -430,18 +431,18 @@ function BindPhoneDialog(props: {
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
               >
                 {sending && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
-                {countdown > 0 ? `${countdown}s 后重发` : '发送验证码'}
+                {countdown > 0 ? t('security.resendAfter', { s: countdown }) : t('bindPhone.sendCode')}
               </button>
             </div>
           </div>
           {probeFailed && (
             <p className="text-xs text-red-600 dark:text-red-400">
-              账号资料加载失败，无法确定是否需要旧手机号验证。请关闭重试。
+              {t('bindPhone.probeFailed')}
             </p>
           )}
           {needOldCode && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">旧手机号验证码</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('bindPhone.oldCode')}</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -450,7 +451,7 @@ function BindPhoneDialog(props: {
                   maxLength={6}
                   value={oldCode}
                   onChange={e => setOldCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="6 位数字验证码"
+                  placeholder={t('security.placeholderEmailCode')}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 />
                 <button
@@ -460,10 +461,10 @@ function BindPhoneDialog(props: {
                   className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
                 >
                   {sendingOld && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
-                  {oldCountdown > 0 ? `${oldCountdown}s 后重发` : '发送到当前手机号'}
+                  {oldCountdown > 0 ? t('security.resendAfter', { s: oldCountdown }) : t('bindPhone.sendToCurrent')}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {currentPhone}（双重验证防接管）</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('bindPhone.doubleAuthHint', {phone: currentPhone ?? ''})}</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
@@ -472,7 +473,7 @@ function BindPhoneDialog(props: {
               onClick={onCancel}
               className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg dark:text-gray-300 dark:hover:bg-gray-700"
             >
-              取消
+              {t('bindPhone.cancel')}
             </button>
             <button
               type="submit"
@@ -486,7 +487,7 @@ function BindPhoneDialog(props: {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              确认{currentPhone ? '更换' : '绑定'}
+              {currentPhone ? t('bindPhone.confirm') : t('bindPhone.confirmNew')}
             </button>
           </div>
         </form>
@@ -536,17 +537,17 @@ function BindEmailDialog(props: {
 
   const handleSend = async () => {
     if (!validEmail) {
-      toast.error('邮箱格式不正确');
+      toast.error(t('bindEmail.error.invalidEmail'));
       return;
     }
     if (currentEmail && currentEmail === email) {
-      toast.error('与当前邮箱相同');
+      toast.error(t('bindEmail.error.sameEmail'));
       return;
     }
     setSending(true);
     try {
       await usersApi.sendBindEmailCode(email);
-      toast.success('验证码已发送');
+      toast.success(t('bindEmail.codeSent'));
       setCountdown(60);
     } catch {
       // interceptor
@@ -559,7 +560,7 @@ function BindEmailDialog(props: {
     setSendingOld(true);
     try {
       await usersApi.sendBindEmailOldCode();
-      toast.success('已发送到当前邮箱');
+      toast.success(t('bindEmail.sentToCurrent'));
       setOldCountdown(60);
     } catch {
       // interceptor
@@ -572,7 +573,7 @@ function BindEmailDialog(props: {
     e.preventDefault();
     if (!validEmail || code.length !== 6) return;
     if (needOldCode && oldCode.length !== 6) {
-      toast.error('请填写旧邮箱验证码');
+      toast.error(t('bindEmail.error.oldCodeRequired'));
       return;
     }
     setSubmitting(true);
@@ -582,7 +583,7 @@ function BindEmailDialog(props: {
         code,
         ...(needOldCode ? { oldEmailCode: oldCode } : {}),
       });
-      toast.success(currentEmail ? '邮箱更换成功' : '邮箱绑定成功');
+      toast.success(currentEmail ? t('bindEmail.success') : t('bindEmail.successNew'));
       onBound(email);
     } catch {
       // interceptor
@@ -595,11 +596,11 @@ function BindEmailDialog(props: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md mx-4 rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
         <h3 className="text-base font-semibold text-gray-900 mb-4 dark:text-gray-100">
-          {currentEmail ? '更换邮箱' : '绑定邮箱'}
+          {currentEmail ? t('bindEmail.title') : t('bindEmail.titleNew')}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">新邮箱</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('bindEmail.newEmail')}</label>
             <input
               type="email"
               value={email}
@@ -610,7 +611,7 @@ function BindEmailDialog(props: {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">邮箱验证码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('bindEmail.code')}</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -619,7 +620,7 @@ function BindEmailDialog(props: {
                 maxLength={6}
                 value={code}
                 onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="6 位数字验证码"
+                placeholder={t('security.placeholderEmailCode')}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
               />
               <button
@@ -629,18 +630,18 @@ function BindEmailDialog(props: {
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
               >
                 {sending && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
-                {countdown > 0 ? `${countdown}s 后重发` : '发送验证码'}
+                {countdown > 0 ? t('security.resendAfter', { s: countdown }) : t('bindEmail.sendCode')}
               </button>
             </div>
           </div>
           {probeFailed && (
             <p className="text-xs text-red-600 dark:text-red-400">
-              账号资料加载失败，无法确定是否需要旧邮箱验证。请关闭重试。
+              {t('bindEmail.probeFailed')}
             </p>
           )}
           {needOldCode && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">旧邮箱验证码</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('bindEmail.oldCode')}</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -649,7 +650,7 @@ function BindEmailDialog(props: {
                   maxLength={6}
                   value={oldCode}
                   onChange={e => setOldCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="6 位数字验证码"
+                  placeholder={t('security.placeholderEmailCode')}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 />
                 <button
@@ -659,10 +660,10 @@ function BindEmailDialog(props: {
                   className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
                 >
                   {sendingOld && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
-                  {oldCountdown > 0 ? `${oldCountdown}s 后重发` : '发送到当前邮箱'}
+                  {oldCountdown > 0 ? t('security.resendAfter', { s: oldCountdown }) : t('bindEmail.sendToCurrent')}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">将发送到 {currentEmail}（双重验证防接管）</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('bindEmail.doubleAuthHint', {email: currentEmail ?? ''})}</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
@@ -671,7 +672,7 @@ function BindEmailDialog(props: {
               onClick={onCancel}
               className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg dark:text-gray-300 dark:hover:bg-gray-700"
             >
-              取消
+              {t('bindEmail.cancel')}
             </button>
             <button
               type="submit"
@@ -685,7 +686,7 @@ function BindEmailDialog(props: {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              确认{currentEmail ? '更换' : '绑定'}
+              {currentEmail ? t('bindEmail.confirm') : t('bindEmail.confirmNew')}
             </button>
           </div>
         </form>
@@ -757,7 +758,7 @@ function SecurityTab() {
     setOtpSending(true);
     try {
       await usersApi.sendChangePasswordCode();
-      toast.success('验证码已发送到邮箱');
+      toast.success(t('security.codeSentToEmail'));
       setOtpCountdown(60);
     } catch {
       // interceptor
@@ -769,19 +770,19 @@ function SecurityTab() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pwForm.newPassword !== pwForm.confirm) {
-      toast.error('两次密码输入不一致');
+      toast.error(t('security.error.passwordMismatch'));
       return;
     }
     if (pwForm.newPassword.length < 8) {
-      toast.error('新密码至少 8 位');
+      toast.error(t('security.error.newPasswordTooShort'));
       return;
     }
     if (emailProbeStatus === 'error') {
-      toast.error('账号资料加载失败，请刷新页面后重试');
+      toast.error(t('security.error.probeFailed'));
       return;
     }
     if (hasEmail && !pwForm.emailCode) {
-      toast.error('请填写邮箱验证码');
+      toast.error(t('security.error.emailCodeRequired'));
       return;
     }
     setPwSaving(true);
@@ -791,7 +792,7 @@ function SecurityTab() {
         newPassword: pwForm.newPassword,
         ...(hasEmail ? { emailCode: pwForm.emailCode } : {}),
       });
-      toast.success('密码修改成功，请重新登录');
+      toast.success(t('security.passwordChanged'));
       setPwForm({ oldPassword: '', newPassword: '', confirm: '', emailCode: '' });
     } catch {
       // interceptor
@@ -803,11 +804,11 @@ function SecurityTab() {
   const handleSetupPrivateSpace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (ppForm.newPassword !== ppForm.confirm) {
-      toast.error('两次密码输入不一致');
+      toast.error(t('security.error.passwordMismatch'));
       return;
     }
     if (hasPrivateSpace && !ppForm.currentPassword) {
-      toast.error('请输入当前隐私空间密码');
+      toast.error(t('security.error.currentPrivatePwRequired'));
       return;
     }
     setPpSaving(true);
@@ -816,7 +817,7 @@ function SecurityTab() {
         password: ppForm.newPassword,
         ...(hasPrivateSpace ? { currentPassword: ppForm.currentPassword } : {}),
       });
-      toast.success(hasPrivateSpace ? '隐私空间密码已更新' : '隐私空间密码设置成功');
+      toast.success(hasPrivateSpace ? t('security.privatePwUpdated') : t('security.privatePwSet'));
       setPpForm({ currentPassword: '', newPassword: '', confirm: '' });
       setHasPrivateSpace(true);
       if (user) setUser({ ...user, hasPrivateSpace: true });
@@ -831,7 +832,7 @@ function SecurityTab() {
     setNotifSaving(true);
     try {
       await usersApi.updateProfile({ notifications: notifs });
-      toast.success('通知设置已保存');
+      toast.success(t('security.notifsSaved'));
     } catch {
       // interceptor
     } finally {
@@ -845,7 +846,7 @@ function SecurityTab() {
     <div className="space-y-8 max-w-lg">
       {/* Change Password */}
       <section>
-        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">修改登录密码</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">{t('security.changePassword')}</h3>
         <form onSubmit={handleChangePassword} className="space-y-4">
           {/* P1-UX: input hints live in the placeholder, label stays a short
               noun. Pre-fix the password rule ("至少 8 位") was glued to the
@@ -854,28 +855,28 @@ function SecurityTab() {
               placeholder. Pattern aligned across SecurityTab: label = noun,
               placeholder = constraint hint. */}
           <PwInput
-            label="当前密码"
+            label={t('security.currentPassword')}
             value={pwForm.oldPassword}
             show={showPw.old}
-            placeholder="输入您当前的登录密码"
+            placeholder={t('security.placeholderCurrentPw')}
             autoComplete="current-password"
             onChange={v => setPwForm(f => ({ ...f, oldPassword: v }))}
             onToggle={() => setShowPw(s => ({ ...s, old: !s.old }))}
           />
           <PwInput
-            label="新密码"
+            label={t('security.newPassword')}
             value={pwForm.newPassword}
             show={showPw.new}
-            placeholder="至少 8 位，建议含字母与数字"
+            placeholder={t('security.placeholderNewPw')}
             autoComplete="new-password"
             onChange={v => setPwForm(f => ({ ...f, newPassword: v }))}
             onToggle={() => setShowPw(s => ({ ...s, new: !s.new }))}
           />
           <PwInput
-            label="确认新密码"
+            label={t('security.confirmNewPassword')}
             value={pwForm.confirm}
             show={showPw.confirm}
-            placeholder="再次输入新密码"
+            placeholder={t('security.placeholderConfirmPw')}
             autoComplete="new-password"
             onChange={v => setPwForm(f => ({ ...f, confirm: v }))}
             onToggle={() => setShowPw(s => ({ ...s, confirm: !s.confirm }))}
@@ -885,7 +886,7 @@ function SecurityTab() {
               is hidden for email-less accounts purely for UX. */}
           {emailProbeStatus === 'ok' && hasEmail && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">邮箱验证码</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('security.emailCode')}</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -894,7 +895,7 @@ function SecurityTab() {
                   maxLength={6}
                   value={pwForm.emailCode}
                   onChange={e => setPwForm(f => ({ ...f, emailCode: e.target.value.replace(/\D/g, '') }))}
-                  placeholder="6 位数字验证码"
+                  placeholder={t('security.placeholderEmailCode')}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 />
                 <button
@@ -904,19 +905,19 @@ function SecurityTab() {
                   className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 whitespace-nowrap"
                 >
                   {otpSending && <Loader2 className="w-4 h-4 animate-spin inline mr-1" />}
-                  {otpCountdown > 0 ? `${otpCountdown}s 后重发` : '发送验证码'}
+                  {otpCountdown > 0 ? t('security.resendAfter', { s: otpCountdown }) : t('security.sendCode')}
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                {boundEmail ? `将发送到 ${boundEmail}` : '将发送到已绑定邮箱'}
+                {boundEmail ? t('security.codeSentTo', { email: boundEmail! }) : t('security.codeSentToBound')}
               </p>
             </div>
           )}
           {emailProbeStatus === 'ok' && !hasEmail && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">提示：账号未绑定邮箱，本次修改不要求邮箱验证码。建议尽快绑定邮箱以提升账号安全。</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">{t('security.emailNotBoundWarning')}</p>
           )}
           {emailProbeStatus === 'error' && (
-            <p className="text-xs text-red-600 dark:text-red-400">账号资料加载失败，无法判断是否需要邮箱验证码。请刷新页面后重试。</p>
+            <p className="text-xs text-red-600 dark:text-red-400">{t('security.probeFailed')}</p>
           )}
           <button
             type="submit"
@@ -930,18 +931,18 @@ function SecurityTab() {
             className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             {pwSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            修改密码
+            {t('security.changePasswordBtn')}
           </button>
         </form>
       </section>
 
       {/* Private Space Password */}
       <section id="private-space" className="scroll-mt-4">
-        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">隐私空间密码</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">{t('security.privateSpaceTitle')}</h3>
         <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">
           {hasPrivateSpace === true
-            ? '隐私空间密码用于加密访问私密文件夹。修改需要输入当前隐私空间密码。'
-            : '隐私空间密码用于加密访问私密文件夹，独立于登录密码。'}
+            ? t('security.privateSpaceDescExisting')
+            : t('security.privateSpaceDesc')}
         </p>
         <form onSubmit={handleSetupPrivateSpace} className="space-y-4">
           {/* Current private-space password — only when one is already set.
@@ -949,14 +950,14 @@ function SecurityTab() {
               on === true so we don't briefly flash the field. */}
           {hasPrivateSpace === true && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">当前隐私空间密码</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('security.currentPrivatePw')}</label>
               <div className="relative">
                 <input
                   type={showPpCurrent ? 'text' : 'password'}
                   value={ppForm.currentPassword}
                   onChange={e => setPpForm(f => ({ ...f, currentPassword: e.target.value }))}
                   className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="输入当前隐私空间密码"
+                  placeholder={t('security.placeholderCurrentPrivatePw')}
                   autoComplete="current-password"
                 />
                 <button
@@ -971,25 +972,25 @@ function SecurityTab() {
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
-              {hasPrivateSpace === true ? '新隐私空间密码' : '隐私空间密码'}
+              {hasPrivateSpace === true ? t('security.newPrivatePw') : t('security.privateSpacePw')}
             </label>
             <input
               type="password"
               value={ppForm.newPassword}
               onChange={e => setPpForm(f => ({ ...f, newPassword: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="至少 8 位，需同时包含字母与数字"
+              placeholder={t('security.placeholderNewPrivatePw')}
               autoComplete="new-password"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">确认密码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{t('security.confirmPrivatePw')}</label>
             <input
               type="password"
               value={ppForm.confirm}
               onChange={e => setPpForm(f => ({ ...f, confirm: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="再次输入隐私空间密码"
+              placeholder={t('security.placeholderConfirmPrivatePw')}
               autoComplete="new-password"
             />
           </div>
@@ -1004,18 +1005,18 @@ function SecurityTab() {
             className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             {ppSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {hasPrivateSpace === true ? '修改密码' : '设置密码'}
+            {hasPrivateSpace === true ? t('security.changePrivatePw') : t('security.setPrivatePw')}
           </button>
         </form>
       </section>
 
       {/* Notification Settings */}
       <section>
-        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">通知设置</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 dark:text-gray-100 dark:border-gray-700">{t('security.notifTitle')}</h3>
         <div className="space-y-3">
           {[
-            { key: 'shareAccess', label: '有人访问我的分享链接时通知我', icon: <Bell className="w-4 h-4 text-blue-500" /> },
-            { key: 'foreignLogin', label: '异地登录时通知我', icon: <AlertTriangle className="w-4 h-4 text-orange-500" /> },
+            { key: 'shareAccess', label: t('security.notif.shareAccess'), icon: <Bell className="w-4 h-4 text-blue-500" /> },
+            { key: 'foreignLogin', label: t('security.notif.foreignLogin'), icon: <AlertTriangle className="w-4 h-4 text-orange-500" /> },
           ].map(({ key, label, icon }) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer group">
               <div className="w-5 flex-shrink-0">{icon}</div>
@@ -1041,7 +1042,7 @@ function SecurityTab() {
           className="mt-4 flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
         >
           {notifSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-          保存设置
+          {t('security.saveNotifs')}
         </button>
       </section>
     </div>
@@ -1062,7 +1063,7 @@ function DevicesTab() {
     try {
       await usersApi.revokeDevice(deviceId);
       refetch();
-      toast.success('设备已下线');
+      toast.success(t('devices.revoked'));
     } catch {
       // interceptor
     }
@@ -1072,7 +1073,7 @@ function DevicesTab() {
 
   return (
     <div className="space-y-3 max-w-2xl">
-      <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">以下设备当前已登录您的账号。如有陌生设备，请立即下线并修改密码。</p>
+      <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">{t('devices.desc')}</p>
       {devices.map(device => (
         <div
           key={device.id}
@@ -1087,13 +1088,13 @@ function DevicesTab() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-medium text-gray-800 text-sm truncate dark:text-gray-100">{device.deviceName ?? '未知设备'}</p>
+              <p className="font-medium text-gray-800 text-sm truncate dark:text-gray-100">{device.deviceName ?? t('devices.unknown')}</p>
               {device.isCurrent && (
-                <span className="px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded font-medium">当前设备</span>
+                <span className="px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded font-medium">{t('devices.current')}</span>
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5 dark:text-gray-400">
-              IP: {device.ipAddress ?? '—'} &nbsp;·&nbsp; 最后活跃: {formatDate(device.lastActiveAt)}
+              IP: {device.ipAddress ?? '—'} &nbsp;·&nbsp; {t('devices.lastActive')}: {formatDate(device.lastActiveAt)}
             </p>
           </div>
           {!device.isCurrent && (
@@ -1102,13 +1103,13 @@ function DevicesTab() {
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors flex-shrink-0"
             >
               <LogOut className="w-4 h-4" />
-              下线
+              {t('devices.revoke')}
             </button>
           )}
         </div>
       ))}
       {devices.length === 0 && (
-        <p className="text-center text-gray-400 py-10 dark:text-gray-500">暂无登录设备</p>
+        <p className="text-center text-gray-400 py-10 dark:text-gray-500">{t('devices.empty')}</p>
       )}
     </div>
   );
@@ -1191,16 +1192,16 @@ function AuditLogsTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">操作</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell dark:text-gray-400">文件</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell dark:text-gray-400">IP 地址</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">时间</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">{t('logs.column.action')}</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell dark:text-gray-400">{t('logs.column.file')}</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell dark:text-gray-400">{t('logs.column.ip')}</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">{t('logs.column.time')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-500">暂无操作记录</td>
+                <td colSpan={4} className="text-center py-8 text-gray-400 dark:text-gray-500">{t('logs.empty')}</td>
               </tr>
             ) : (
               // P1-UX: rows expand on click to show full audit detail
@@ -1244,27 +1245,27 @@ function AuditLogsTab() {
                     <tr key={`${log.id}-detail`} className="bg-gray-50 dark:bg-gray-900/60">
                       <td colSpan={4} className="px-4 py-3">
                         <dl className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-xs">
-                          <dt className="text-gray-500 dark:text-gray-400">操作代码</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.actionCode')}</dt>
                           <dd className="font-mono text-gray-700 dark:text-gray-200 break-all">{log.action}</dd>
 
-                          <dt className="text-gray-500 dark:text-gray-400">完整时间</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.fullTime')}</dt>
                           <dd className="text-gray-700 dark:text-gray-200">{new Date(log.createdAt).toLocaleString('zh-CN', { hour12: false })}</dd>
 
-                          <dt className="text-gray-500 dark:text-gray-400">完整 IP</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.fullIp')}</dt>
                           <dd className="font-mono text-gray-700 dark:text-gray-200 break-all">{log.ipAddress ?? '—'}</dd>
 
-                          <dt className="text-gray-500 dark:text-gray-400">客户端</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.client')}</dt>
                           <dd className="text-gray-700 dark:text-gray-200 break-all">{log.userAgent ?? '—'}</dd>
 
-                          <dt className="text-gray-500 dark:text-gray-400">关联文件名</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.relatedFile')}</dt>
                           <dd className="text-gray-700 dark:text-gray-200 break-all">{log.nodeName ?? '—'}</dd>
 
-                          <dt className="text-gray-500 dark:text-gray-400">文件 ID</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.fileId')}</dt>
                           <dd className="font-mono text-gray-700 dark:text-gray-200 break-all">{log.nodeId ?? '—'}</dd>
 
                           {log.metadata && Object.keys(log.metadata).length > 0 && (
                             <>
-                              <dt className="text-gray-500 dark:text-gray-400">附加信息</dt>
+                              <dt className="text-gray-500 dark:text-gray-400">{t('logs.detail.metadata')}</dt>
                               <dd className="font-mono text-gray-700 dark:text-gray-200 break-all whitespace-pre-wrap">
                                 {JSON.stringify(log.metadata, null, 2)}
                               </dd>
@@ -1284,7 +1285,7 @@ function AuditLogsTab() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400">共 {total} 条记录</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t('logs.totalRecords', { n: total })}</p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -1334,10 +1335,10 @@ function StorageTab() {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700">
         <div className="flex items-end justify-between mb-3">
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">已使用存储</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('storage.used')}</p>
             <p className="text-2xl font-bold text-gray-900 mt-1 dark:text-gray-100">{formatBytes(stats.usedBytes)}</p>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">共 {formatBytes(stats.quotaBytes)}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t('storage.total', { size: formatBytes(stats.quotaBytes) })}</p>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-700">
           <div
@@ -1345,13 +1346,13 @@ function StorageTab() {
             style={{ width: `${usedPct}%` }}
           />
         </div>
-        <p className="text-xs text-gray-400 mt-1.5 text-right dark:text-gray-500">{usedPct.toFixed(1)}% 已使用</p>
+        <p className="text-xs text-gray-400 mt-1.5 text-right dark:text-gray-500">{t('storage.usedPct', { pct: usedPct.toFixed(1) })}</p>
       </div>
 
       {/* By type bars */}
       {stats.byType && stats.byType.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4 dark:text-gray-100">按类型分布</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4 dark:text-gray-100">{t('storage.byType')}</h3>
           <div className="space-y-3">
             {stats.byType.map((item, idx) => {
               const pct = stats.usedBytes > 0 ? (item.bytes / stats.usedBytes) * 100 : 0;

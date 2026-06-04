@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { t } from '../i18n/translations';
 
 const api = axios.create({
   baseURL: '/api',
@@ -30,7 +31,7 @@ api.interceptors.response.use(
       typeof (body as any).code === 'string' &&
       /^\d{6}$/.test((body as any).code)
     ) {
-      toast.success(`开发模式验证码: ${(body as any).code}`, { duration: 15_000 });
+      toast.success(t('common.devCode', { code: (body as any).code }), { duration: 15_000 });
     }
     return body;
   },
@@ -59,10 +60,12 @@ api.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) throw new Error('no refresh token');
-        const res = await api.post('/auth/refresh', { refreshToken });
-        const newToken = (res as any).accessToken || (res as any).data?.accessToken;
+        // Refresh token now lives in an HttpOnly cookie (rt). withCredentials
+        // is set on the axios instance, so the browser ships it on this POST.
+        // No body required.
+        const res = await api.post('/auth/refresh', {});
+        const newToken = (res as any).accessToken;
+        if (!newToken) throw new Error('token refresh failed');
         localStorage.setItem('accessToken', newToken);
         refreshQueue.forEach(cb => cb(newToken));
         refreshQueue = [];
@@ -70,14 +73,13 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(error);
       } finally {
         isRefreshing = false;
       }
     }
-    const msg = error.response?.data?.message || error.message || '请求失败';
+    const msg = error.response?.data?.message || error.message || t('common.requestFailed');
     // P1-I7: admin MFA errors are surfaced by ConfirmPasswordDialog inline
     // (with code-specific text). Don't double up with a global toast.
     const code = error.response?.data?.code as string | undefined;

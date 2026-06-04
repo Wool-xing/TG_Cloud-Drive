@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Bold, Italic, Plus, Trash2, Table as TableIcon } from 'lucide-react';
+import { t } from '../../i18n/translations';
 
 interface CellData {
   value: string;
@@ -97,13 +98,13 @@ export default function SpreadsheetEditor({ content, onChange }: Props) {
         {editCell && (
           <>
             <span className="text-xs text-white/40 font-mono mr-2">{COL_LABELS[editCell.c]}{editCell.r + 1}</span>
-            <button onClick={() => toggleBold(editCell.r, editCell.c)} className={`p-1 rounded ${selectedCell?.bold ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white'}`} title="加粗"><Bold className="w-3 h-3" /></button>
-            <button onClick={() => toggleItalic(editCell.r, editCell.c)} className={`p-1 rounded ${selectedCell?.italic ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white'}`} title="斜体"><Italic className="w-3 h-3" /></button>
+            <button onClick={() => toggleBold(editCell.r, editCell.c)} className={`p-1 rounded ${selectedCell?.bold ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white'}`} title={t('editor.bold')}><Bold className="w-3 h-3" /></button>
+            <button onClick={() => toggleItalic(editCell.r, editCell.c)} className={`p-1 rounded ${selectedCell?.italic ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white'}`} title={t('editor.italic')}><Italic className="w-3 h-3" /></button>
           </>
         )}
         <span className="flex-1" />
-        <button onClick={addRow} className="p-1 rounded text-white/50 hover:text-white hover:bg-white/10" title="加行"><Plus className="w-3.5 h-3.5" /></button>
-        {editCell && <button onClick={() => deleteRow(editCell.r)} className="p-1 rounded text-white/50 hover:text-red-400 hover:bg-white/10" title="删行"><Trash2 className="w-3.5 h-3.5" /></button>}
+        <button onClick={addRow} className="p-1 rounded text-white/50 hover:text-white hover:bg-white/10" title={t('spreadsheet.addRow')}><Plus className="w-3.5 h-3.5" /></button>
+        {editCell && <button onClick={() => deleteRow(editCell.r)} className="p-1 rounded text-white/50 hover:text-red-400 hover:bg-white/10" title={t('spreadsheet.deleteRow')}><Trash2 className="w-3.5 h-3.5" /></button>}
       </div>
       {/* Grid */}
       <div className="flex-1 overflow-auto">

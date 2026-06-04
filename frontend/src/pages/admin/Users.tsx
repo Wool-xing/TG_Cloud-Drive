@@ -1,5 +1,6 @@
 import { useState, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { t } from '../../i18n/translations';
 import {
   Search,
   Plus,
@@ -27,7 +28,6 @@ interface AdminUser extends User {
   status: 'active' | 'disabled';
 }
 
-// ── Edit User Modal ─────────────────────────────────────────────
 function EditModal({
   user,
   onClose,
@@ -55,14 +55,11 @@ function EditModal({
     quotaBytes: Math.max(1, form.quotaGB) * (1024 ** 3),
   });
 
-  // P1-I7: role / status changes are high-risk on the backend
-  // (admin.service.ts#updateUser gates them behind requireConfirm). Other
-  // edits — rename / quota — stay low-friction.
   const needsConfirm = () => form.role !== user.role || form.status !== (user.status ?? 'active');
 
   const handleSave = async () => {
     if (form.quotaGB < 1) {
-      toast.error('存储配额不能小于1GB');
+      toast.error(t('admin.users.quotaMin'));
       return;
     }
     if (needsConfirm()) {
@@ -72,10 +69,9 @@ function EditModal({
     setSaving(true);
     try {
       await adminApi.updateUser(user.id, buildDto());
-      toast.success('用户信息已更新');
+      toast.success(t('admin.users.updated'));
       onSuccess();
     } catch {
-      // interceptor
     } finally {
       setSaving(false);
     }
@@ -88,12 +84,12 @@ function EditModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">编辑用户 — {user.username}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('admin.users.editTitle', { name: user.username })}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><X className="w-5 h-5 text-gray-400 dark:text-gray-500" /></button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">用户名</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldUsername')}</label>
             <input
               type="text"
               value={form.username}
@@ -102,29 +98,29 @@ function EditModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">角色</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldRole')}</label>
             <select
               value={form.role}
               onChange={e => setForm(f => ({ ...f, role: e.target.value as 'user' | 'admin' }))}
               className={inputCls}
             >
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
+              <option value="user">{t('admin.users.roleUser')}</option>
+              <option value="admin">{t('admin.users.roleAdmin')}</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">状态</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldStatus')}</label>
             <select
               value={form.status}
               onChange={e => setForm(f => ({ ...f, status: e.target.value as 'active' | 'disabled' }))}
               className={inputCls}
             >
-              <option value="active">正常</option>
-              <option value="disabled">封禁</option>
+              <option value="active">{t('admin.users.statusActive')}</option>
+              <option value="disabled">{t('admin.users.statusDisabled')}</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">存储配额 (GB)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldQuota')}</label>
             <input
               type="number"
               min={1}
@@ -136,31 +132,31 @@ function EditModal({
           </div>
         </div>
         <div className="flex gap-3 justify-end mt-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">{t('common.cancel')}</button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            保存
+            {t('common.save') || t('admin.users.save')}
           </button>
         </div>
       </div>
     </div>
     {confirmPending && (
       <ConfirmPasswordDialog
-        title="确认权限变更"
+        title={t('admin.users.confirmRoleTitle')}
         description={
           <>
-            您正在修改 <strong>{user.username}</strong> 的角色或状态。该操作可能影响账号访问权限，需再次输入您的管理员密码确认。
+            {t('admin.users.confirmRoleBody', { name: user.username })}
           </>
         }
-        confirmLabel="确认修改"
+        confirmLabel={t('admin.users.confirmRoleBtn')}
         destructive
         onConfirm={async (pw) => {
           await adminApi.updateUser(user.id, { ...confirmPending.dto, confirmPassword: pw });
-          toast.success('用户信息已更新');
+          toast.success(t('admin.users.updated'));
           onSuccess();
         }}
         onClose={() => setConfirmPending(null)}
@@ -170,7 +166,6 @@ function EditModal({
   );
 }
 
-// ── Create User Modal ───────────────────────────────────────────
 function CreateModal({
   onClose,
   onSuccess,
@@ -189,16 +184,15 @@ function CreateModal({
 
   const handleCreate = async () => {
     if (!form.username || !form.password) {
-      toast.error('用户名和密码必填');
+      toast.error(t('admin.users.usernamePasswordRequired'));
       return;
     }
     setSaving(true);
     try {
       await adminApi.createUser(form);
-      toast.success('用户创建成功');
+      toast.success(t('admin.users.created'));
       onSuccess();
     } catch {
-      // interceptor
     } finally {
       setSaving(false);
     }
@@ -210,28 +204,28 @@ function CreateModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">创建用户</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('admin.users.createTitle')}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><X className="w-5 h-5 text-gray-400 dark:text-gray-500" /></button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">用户名 *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldUsernameReq')}</label>
             <input
               type="text"
               value={form.username}
               onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-              placeholder="仅限字母、数字、下划线"
+              placeholder={t('admin.users.usernamePlaceholder')}
               className={inputCls}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">密码 *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldPassword')}</label>
             <div className="relative">
               <input
                 type={showPw ? 'text' : 'password'}
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                placeholder="至少 8 位"
+                placeholder={t('admin.users.passwordPlaceholder')}
                 className={`${inputCls} pr-10`}
               />
               <button
@@ -244,7 +238,7 @@ function CreateModal({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">邮箱（可选）</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldEmail')}</label>
             <input
               type="email"
               value={form.email}
@@ -254,26 +248,26 @@ function CreateModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">角色</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('admin.users.fieldRole')}</label>
             <select
               value={form.role}
               onChange={e => setForm(f => ({ ...f, role: e.target.value as 'user' | 'admin' }))}
               className={inputCls}
             >
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
+              <option value="user">{t('admin.users.roleUser')}</option>
+              <option value="admin">{t('admin.users.roleAdmin')}</option>
             </select>
           </div>
         </div>
         <div className="flex gap-3 justify-end mt-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">{t('common.cancel')}</button>
           <button
             onClick={handleCreate}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            创建
+            {t('admin.users.create')}
           </button>
         </div>
       </div>
@@ -281,7 +275,6 @@ function CreateModal({
   );
 }
 
-// ── Main Users Page ─────────────────────────────────────────────
 interface ConfirmAction {
   title: string;
   description: ReactNode;
@@ -313,61 +306,57 @@ export default function AdminUsers() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
 
-  // P1-I7: every high-risk admin action funnels through ConfirmPasswordDialog.
-  // The backend (requireConfirm) verifies the password before any state change,
-  // so a stolen access token alone cannot delete users / force-logout / toggle
-  // status — the operator must still know the admin's own password.
   const handleForceLogout = (user: AdminUser) => {
     setConfirmAction({
-      title: '强制下线',
+      title: t('admin.users.forceLogoutTitle'),
       destructive: false,
-      confirmLabel: '强制下线',
+      confirmLabel: t('admin.users.forceLogoutTitle'),
       description: (
         <>
-          将立即终止用户 <strong>{user.username}</strong> 的全部活跃会话。请输入您的管理员密码以确认。
+          {t('admin.users.forceLogoutBody', { name: user.username })}
         </>
       ),
       run: async (pw) => {
         await adminApi.forceLogout(user.id, pw);
-        toast.success(`已强制下线用户 ${user.username}`);
+        toast.success(t('admin.users.forceLogoutDone', { name: user.username }));
       },
     });
   };
 
   const handleDelete = (user: AdminUser) => {
     setConfirmAction({
-      title: '删除用户',
+      title: t('admin.users.deleteUserTitle'),
       destructive: true,
-      confirmLabel: '确认删除',
+      confirmLabel: t('common.delete'),
       description: (
         <>
-          确定要删除用户 <strong>{user.username}</strong> 吗？此操作将同时删除该用户的所有文件，<strong>无法撤销</strong>。请输入您的管理员密码以确认。
+          {t('admin.users.deleteUserBody', { name: user.username })}
         </>
       ),
       run: async (pw) => {
         await adminApi.deleteUser(user.id, pw);
         invalidate();
-        toast.success('用户已删除');
+        toast.success(t('admin.users.deleted'));
       },
     });
   };
 
   const handleToggleStatus = (user: AdminUser) => {
     const newStatus = user.status === 'active' ? 'disabled' : 'active';
-    const verb = newStatus === 'active' ? '解除封禁' : '封禁';
+    const action = newStatus === 'active' ? t('admin.users.unban') : t('admin.users.ban');
     setConfirmAction({
-      title: `${verb}用户`,
+      title: t('admin.users.banTitle', { action }),
       destructive: newStatus === 'disabled',
-      confirmLabel: `确认${verb}`,
+      confirmLabel: t('common.confirm') + action,
       description: (
         <>
-          您正在{verb} <strong>{user.username}</strong>。该操作会立即影响其登录与访问能力，请输入您的管理员密码以确认。
+          {t('admin.users.banBody', { action, name: user.username })}
         </>
       ),
       run: async (pw) => {
         await adminApi.updateUser(user.id, { status: newStatus, confirmPassword: pw });
         invalidate();
-        toast.success(newStatus === 'active' ? '已解除封禁' : '已封禁用户');
+        toast.success(newStatus === 'active' ? t('admin.users.unbanDone') : t('admin.users.banDone'));
       },
     });
   };
@@ -376,15 +365,15 @@ export default function AdminUsers() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">用户管理</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">共 {total} 位用户</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('admin.users.title')}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('admin.users.subtitle', { total })}</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
-          创建用户
+          {t('admin.users.createUser')}
         </button>
       </div>
 
@@ -395,7 +384,7 @@ export default function AdminUsers() {
           type="text"
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1); }}
-          placeholder="搜索用户名或昵称..."
+          placeholder={t('admin.users.searchPlaceholder')}
           className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>
@@ -406,12 +395,12 @@ export default function AdminUsers() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">用户名</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">角色</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">状态</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">存储使用</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden xl:table-cell">注册时间</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">操作</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('admin.users.colUsername')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">{t('admin.users.colRole')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('admin.users.colStatus')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">{t('admin.users.colStorage')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden xl:table-cell">{t('admin.users.colRegistered')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('admin.users.colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -429,7 +418,6 @@ export default function AdminUsers() {
                     const usedPct = user.quotaBytes > 0 ? Math.min(100, (user.usedBytes / user.quotaBytes) * 100) : 0;
                     return (
                       <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        {/* Username */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
@@ -444,18 +432,16 @@ export default function AdminUsers() {
                           </div>
                         </td>
 
-                        {/* Role */}
                         <td className="px-4 py-3 hidden md:table-cell">
                           <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${
                             user.role === 'admin'
                               ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400'
                               : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
                           }`}>
-                            {user.role === 'admin' ? '管理员' : '用户'}
+                            {user.role === 'admin' ? t('admin.users.roleAdmin') : t('admin.users.roleUser')}
                           </span>
                         </td>
 
-                        {/* Status */}
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleToggleStatus(user)}
@@ -465,11 +451,10 @@ export default function AdminUsers() {
                                 : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/60'
                             }`}
                           >
-                            {user.status === 'active' ? '正常' : '封禁'}
+                            {user.status === 'active' ? t('admin.users.statusActive') : t('admin.users.statusDisabled')}
                           </button>
                         </td>
 
-                        {/* Storage */}
                         <td className="px-4 py-3 hidden lg:table-cell">
                           <div className="flex items-center gap-2 min-w-[120px]">
                             <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
@@ -484,32 +469,30 @@ export default function AdminUsers() {
                           </div>
                         </td>
 
-                        {/* Created */}
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden xl:table-cell">
                           {new Date(user.createdAt).toLocaleDateString('zh-CN')}
                         </td>
 
-                        {/* Actions */}
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => setEditUser(user)}
                               className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                              title="编辑"
+                              title={t('admin.users.tooltipEdit')}
                             >
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleForceLogout(user)}
                               className="p-1.5 rounded-lg text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors"
-                              title="强制下线"
+                              title={t('admin.users.tooltipForceLogout')}
                             >
                               <LogOut className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(user)}
                               className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                              title="删除"
+                              title={t('admin.users.tooltipDelete')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -522,10 +505,9 @@ export default function AdminUsers() {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30 dark:bg-gray-900">
-            <p className="text-xs text-gray-500 dark:text-gray-400">共 {total} 条，第 {page} / {totalPages} 页</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('admin.users.pagination', { total, page, totalPages })}</p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -546,7 +528,6 @@ export default function AdminUsers() {
         )}
       </div>
 
-      {/* Modals */}
       {editUser && (
         <EditModal
           user={editUser}

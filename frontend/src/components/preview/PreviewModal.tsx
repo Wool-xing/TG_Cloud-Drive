@@ -31,6 +31,7 @@ import RichTextEditor from './RichTextEditor';
 import SpreadsheetEditor from './SpreadsheetEditor';
 import PresentationEditor from './PresentationEditor';
 import { Node, DownloadInfo } from '../../types';
+import { t } from '../../i18n/translations';
 
 // P1-F24: preview path has to buffer into a Blob URL for <img>/<video>/<pdf>.
 // Above this size we refuse and tell the user to download instead — the
@@ -183,16 +184,16 @@ function ImageViewer({ blobUrl, name }: { blobUrl: string; name: string }) {
       />
       {/* Zoom controls */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur rounded-full px-3 py-1.5">
-        <button onClick={() => zoomTo(transform.scale * 0.7)} className="p-1 text-white/80 hover:text-white" title="缩小">
+        <button onClick={() => zoomTo(transform.scale * 0.7)} className="p-1 text-white/80 hover:text-white" title={t("preview.zoomOut")}>
           <ZoomOut className="w-4 h-4" />
         </button>
         <span className="text-xs text-white/70 min-w-[3rem] text-center">
           {Math.round(transform.scale * 100)}%
         </span>
-        <button onClick={() => zoomTo(transform.scale * 1.4)} className="p-1 text-white/80 hover:text-white" title="放大">
+        <button onClick={() => zoomTo(transform.scale * 1.4)} className="p-1 text-white/80 hover:text-white" title={t("preview.zoomIn")}>
           <ZoomIn className="w-4 h-4" />
         </button>
-        <button onClick={() => setTransform({ scale: 1, x: 0, y: 0 })} className="p-1 text-white/80 hover:text-white" title="重置">
+        <button onClick={() => setTransform({ scale: 1, x: 0, y: 0 })} className="p-1 text-white/80 hover:text-white" title={t("preview.reset")}>
           <RotateCw className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -416,10 +417,10 @@ async function fetchAndDecrypt(
   for (let i = 0; i < info.chunks.length; i++) {
     const chunk = info.chunks[i];
     if (!chunk.iv) {
-      throw new Error(`分片 ${i} 缺少 IV，可能是 A1 修复前上传的历史损坏文件`);
+      throw new Error(t('preview.chunkNoIV', { i }));
     }
     const res = await fetch(chunk.url);
-    if (!res.ok) throw new Error(`下载分片 ${i} 失败`);
+    if (!res.ok) throw new Error(t('preview.chunkDownloadFail', { i }));
     const encryptedData = await res.arrayBuffer();
     const decrypted = await decryptBuffer(encryptedData, dek, chunk.iv);
     chunks.push(decrypted);
@@ -474,7 +475,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
     setSaving(true);
     try {
       const mek = getSessionMEK();
-      if (!mek || !mekDerived) { toast.error('会话密钥已失效'); return; }
+      if (!mek || !mekDerived) { toast.error(t('preview.sessionExpired')); return; }
       const info = await filesApi.getDownloadInfo(previewNode.id) as unknown as DownloadInfo;
 
       let dek: CryptoKey;
@@ -505,9 +506,9 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
 
       setPreviewState({ status: 'text', content: editText, mimeType: previewNode.mimeType || 'text/plain' });
       setEditing(false);
-      toast.success('已保存');
+      toast.success(t('preview.saved'));
       queryClient.invalidateQueries({ queryKey: ['files'] });
-    } catch (err: any) { toast.error(err?.message || '保存失败');
+    } catch (err: any) { toast.error(err?.message || t('preview.saveFail'));
     } finally { setSaving(false); }
   };
 
@@ -531,7 +532,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
       a.download = previewNode.name.replace(/\.[^.]+$/, '') + '.' + format;
       a.click();
       URL.revokeObjectURL(url);
-    } catch { toast.error('导出失败'); }
+    } catch { toast.error(t('preview.exportFail')); }
   };
 
   const [downloadInfo, setDownloadInfo] = useState<DownloadInfo | null>(null);
@@ -593,13 +594,13 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           blobUrlRef.current = result.blobUrl;
           setPreviewState({ status: 'ready', blobUrl: result.blobUrl, mimeType: result.mimeType });
         } else {
-          setPreviewState({ status: 'error', message: '无法预览此文件' });
+          setPreviewState({ status: 'error', message: t('preview.cantPreview') });
         }
       } catch (err: any) {
-        const msg = err?.response?.data?.message ?? err?.message ?? '加载失败';
-        if (msg.includes('lock') || msg.includes('密码') || err?.response?.status === 403) {
+        const msg = err?.response?.data?.message ?? err?.message ?? t('preview.loadError');
+        if (msg.includes('lock') || msg.includes('密码') || msg.toLowerCase().includes('password') || err?.response?.status === 403) {
           setNeedsLockPassword(true);
-          setPreviewState({ status: 'error', message: '此文件已锁定，请输入密码' });
+          setPreviewState({ status: 'error', message: t('preview.locked') });
         } else {
           setPreviewState({ status: 'error', message: msg });
         }
@@ -683,7 +684,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         if (directUrl) {
           window.open(directUrl, '_blank');
         } else {
-          toast.error('无法获取下载链接');
+          toast.error(t('preview.noDownloadUrl'));
         }
         return;
       }
@@ -697,9 +698,9 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           count: info.chunks.length,
           fetchChunk: async (i: number) => {
             const chunk = info.chunks[i];
-            if (!chunk.iv) throw new Error(`分片 ${i} 缺少 IV，可能是历史损坏文件`);
+            if (!chunk.iv) throw new Error(t('preview.chunkNoIV', { i }));
             const res = await fetch(chunk.url);
-            if (!res.ok) throw new Error(`下载分片 ${i} 失败`);
+            if (!res.ok) throw new Error(t('preview.chunkDownloadFail', { i }));
             const encrypted = await res.arrayBuffer();
             const plain = await decryptBuffer(encrypted, dek, chunk.iv);
             return new Uint8Array(plain);
@@ -713,20 +714,20 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           onLargeFileFallback: () => {
             if (!warnedFallback) {
               warnedFallback = true;
-              toast('当前浏览器将在内存中缓冲完整文件，大文件可能较慢。建议使用 Chrome / Edge 获得流式下载。');
+              toast(t('preview.blobFallbackWarn'));
             }
           },
         },
       );
       setDownloadProgress(-1);
-      toast.success('下载完成');
+      toast.success(t('preview.downloadDone'));
     } catch (err: any) {
       if (err?.name === 'AbortError') return; // user cancelled save dialog
       if (err instanceof BlobFallbackTooLargeError) {
         toast.error(err.message);
         return;
       }
-      toast.error('下载失败');
+      toast.error(t('preview.downloadFail'));
     }
   };
 
@@ -736,7 +737,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         return (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 dark:text-gray-500">
             <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-            <p className="text-sm">正在加载预览…</p>
+            <p className="text-sm">{t('preview.loading')}</p>
           </div>
         );
 
@@ -758,14 +759,14 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                   type="password"
                   value={lockPassword}
                   onChange={(e) => setLockPassword(e.target.value)}
-                  placeholder="输入文件锁定密码"
+                  placeholder={t('preview.lockPlaceholder')}
                   className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
                 />
                 <button
                   type="submit"
                   className="px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
                 >
-                  解锁并预览
+                  {t('preview.unlockAndPreview')}
                 </button>
               </form>
             )}
@@ -777,16 +778,14 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 px-8 text-center dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
             <p className="text-sm">
-              文件大小 {formatBytes(previewState.size)} 超过在线预览上限 {formatBytes(PREVIEW_BLOB_MAX_BYTES)}。
-              <br />
-              直接下载后用本地播放器/查看器打开，体验更顺。
+              {t('preview.tooLarge', { size: formatBytes(previewState.size), limit: formatBytes(PREVIEW_BLOB_MAX_BYTES) })}
             </p>
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
             >
               <Download className="w-4 h-4" />
-              下载文件
+              {t('preview.downloadFile')}
             </button>
           </div>
         );
@@ -795,13 +794,13 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         return (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
-            <p className="text-sm">此文件无加密，可直接下载</p>
+            <p className="text-sm">{t('preview.unencrypted')}</p>
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
             >
               <Download className="w-4 h-4" />
-              下载文件
+              {t('preview.downloadFile')}
             </button>
           </div>
         );
@@ -825,22 +824,22 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                     <button
                       onClick={() => downloadExport('pdf')}
                       className="flex items-center gap-1 text-xs text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors"
-                      title="导出 PDF"
+                      title={t('preview.exportPdf')}
                     ><FileText className="w-3 h-3" /> PDF</button>
                     <button
                       onClick={() => downloadExport('docx')}
                       className="flex items-center gap-1 text-xs text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors"
-                      title="导出 Word"
+                      title={t('preview.exportWord')}
                     ><FileDown className="w-3 h-3" /> Word</button>
                     <span className="w-px h-4 bg-white/10" />
-                    <button onClick={() => setEditing(false)} className="text-xs text-white/70 hover:text-white px-3 py-1 rounded-lg hover:bg-white/10 transition-colors">取消</button>
+                    <button onClick={() => setEditing(false)} className="text-xs text-white/70 hover:text-white px-3 py-1 rounded-lg hover:bg-white/10 transition-colors">{t('common.cancel')}</button>
                     <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium">
-                      <Save className="w-3.5 h-3.5" />{saving ? '保存中…' : '保存'}
+                      <Save className="w-3.5 h-3.5" />{saving ? t('preview.saving') : t('preview.save')}
                     </button>
                   </>
                 ) : (
                   <button onClick={handleEdit} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors font-medium border border-white/10">
-                    <Edit3 className="w-3.5 h-3.5" />编辑
+                    <Edit3 className="w-3.5 h-3.5" />{t('preview.edit')}
                   </button>
                 )}
               </div>
@@ -853,7 +852,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
                 ) : isSlide ? (
                   <PresentationEditor content={editText} onChange={setEditText} />
                 ) : (
-                  <RichTextEditor content={editText} onChange={setEditText} placeholder="开始编辑文档…" />
+                  <RichTextEditor content={editText} onChange={setEditText} placeholder={t('editor.placeholder')} />
                 )
               ) : (
                 isCode ? (
@@ -895,13 +894,13 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         return (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-gray-400 dark:text-gray-500">
             <File className="w-14 h-14 text-gray-300" />
-            <p className="text-sm">此格式暂不支持在线预览</p>
+            <p className="text-sm">{t('preview.unsupported')}</p>
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
             >
               <Download className="w-4 h-4" />
-              下载文件
+              {t('preview.downloadFile')}
             </button>
           </div>
         );
@@ -951,7 +950,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
             >
               <Download className="w-4 h-4" />
-              下载
+              {t('preview.download')}
             </button>
           ) : null}
           <button
@@ -970,7 +969,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           <button
             onClick={() => setPreview(nodes[currentIndex - 1])}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
-            aria-label="上一个"
+            aria-label={t('preview.prev')}
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
@@ -986,7 +985,7 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
           <button
             onClick={() => setPreview(nodes[currentIndex + 1])}
             className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
-            aria-label="下一个"
+            aria-label={t('preview.next')}
           >
             <ChevronRight className="w-6 h-6" />
           </button>
