@@ -3,11 +3,12 @@ import { ConfigModule } from '@nestjs/config';
 import { StorageService } from './storage.service';
 import { R2StorageProvider } from './r2-storage.provider';
 import { TelegramStorageProvider } from './telegram-storage.provider';
+import { LocalStorageProvider } from './local-storage.provider';
 
 @Global()
 @Module({
   imports: [ConfigModule],
-  providers: [R2StorageProvider, TelegramStorageProvider, StorageService],
+  providers: [R2StorageProvider, TelegramStorageProvider, LocalStorageProvider, StorageService],
   exports: [StorageService],
 })
 export class StorageModule {}

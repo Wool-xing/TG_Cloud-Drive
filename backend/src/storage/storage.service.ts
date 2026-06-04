@@ -1,9 +1,10 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { R2StorageProvider } from './r2-storage.provider';
 import { TelegramStorageProvider } from './telegram-storage.provider';
+import { LocalStorageProvider } from './local-storage.provider';
 import { UploadResult } from './storage-provider.interface';
 
-export type StorageBackend = 'r2' | 'telegram';
+export type StorageBackend = 'r2' | 'telegram' | 'local';
 
 @Injectable()
 export class StorageService {
@@ -13,9 +14,11 @@ export class StorageService {
   constructor(
     private r2: R2StorageProvider,
     private telegram: TelegramStorageProvider,
+    private local: LocalStorageProvider,
   ) {
-    // R2 is primary if configured, else fall back to Telegram
-    this.primary = r2.isEnabled() ? 'r2' : 'telegram';
+    // R2 > Telegram > Local (dev fallback)
+    if (r2.isEnabled()) this.primary = 'r2';
+    else this.primary = 'local'; // Always use local when no R2 (Telegram blocked)
     this.logger.log(`Storage primary: ${this.primary}`);
   }
 
@@ -26,7 +29,9 @@ export class StorageService {
 
   /** Force a specific backend (for migration, testing) */
   private provider(name: StorageBackend) {
-    return name === 'r2' ? this.r2 : this.telegram;
+    if (name === 'r2') return this.r2;
+    if (name === 'local') return this.local;
+    return this.telegram;
   }
 
   /**

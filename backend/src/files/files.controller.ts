@@ -458,4 +458,23 @@ export class FilesController {
   ) {
     return this.filesService.getSyncDiff(userId, since);
   }
+
+  /** DEV ONLY — serve local storage files (no auth, localhost only) */
+  @Get('local-proxy/:key')
+  async localProxy(@Param('key') key: string, @Res() res: Response) {
+    const fs = require('fs');
+    const path = require('path');
+    const dir = process.env.LOCAL_STORAGE_DIR || './local-storage';
+    const filePath = path.join(dir, key);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    const metaPath = filePath + '.meta.json';
+    const meta = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf-8')) : {};
+    res.set({
+      'Content-Type': meta.mimeType || 'application/octet-stream',
+      'Content-Disposition': `inline; filename="${encodeURIComponent(meta.filename || key)}"`,
+    });
+    res.send(fs.readFileSync(filePath));
+  }
 }
