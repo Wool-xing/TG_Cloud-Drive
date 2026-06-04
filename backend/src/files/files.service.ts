@@ -1117,7 +1117,11 @@ export class FilesService {
 
     // Quota check — we don't know file size yet, just check headroom
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB hard limit
+    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB total limit
+    // Memory safety: the current implementation buffers the entire download in
+    // memory. Cap at 500MB to prevent OOM. Large files need a streaming upload
+    // path (tracked as follow-up).
+    const maxMemory = 500 * 1024 * 1024; // 500MB memory buffer cap
     if (user && Number(user.usedBytes) >= Number(user.quotaBytes)) {
       throw new BadRequestException('存储空间不足');
     }
@@ -1163,6 +1167,13 @@ export class FilesService {
           const { done, value } = await streamReader.read();
           if (done) break;
           totalBytes += value.length;
+          if (totalBytes > maxMemory) {
+            streamReader.cancel();
+            await this.nodeRepo.delete(node.id);
+            throw new BadRequestException(
+              `文件过大（离线下载最大支持 ${Math.round(maxMemory / 1024 / 1024)}MB），大文件请使用直链下载工具`,
+            );
+          }
           if (totalBytes > maxSize) {
             streamReader.cancel();
             await this.nodeRepo.delete(node.id);
@@ -1173,6 +1184,12 @@ export class FilesService {
       } else {
         // Fallback: buffer the whole response (Node.js fetch body is already a readable stream)
         const buf = Buffer.from(await response.arrayBuffer());
+        if (buf.length > maxMemory) {
+          await this.nodeRepo.delete(node.id);
+          throw new BadRequestException(
+            `文件过大（离线下载最大支持 ${Math.round(maxMemory / 1024 / 1024)}MB），大文件请使用直链下载工具`,
+          );
+        }
         chunks.push(buf);
         totalBytes = buf.length;
       }
