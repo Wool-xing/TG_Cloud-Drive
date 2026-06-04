@@ -236,7 +236,7 @@ export default function FileList({ nodes, isLoading }: FileListProps) {
           </span>
         </div>
         <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
-          {node.type === 'folder' ? '—' : node.size === 0 ? <span className="text-blue-500 dark:text-blue-400">{t('filelist.empty')}</span> : formatBytes(node.size)}
+          {node.type === 'folder' ? '—' : formatBytes(node.size)}
         </div>
         <div className="px-4 text-sm text-gray-500 dark:text-gray-400 truncate">
           {formatDate(node.createdAt)}
