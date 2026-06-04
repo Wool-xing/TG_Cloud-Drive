@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Node, NodeType } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
 import { NodeKey } from '../files/entities/node-key.entity';
-import { User } from '../users/entities/user.entity';
+import { User, UserStatus } from '../users/entities/user.entity';
 import { StorageService } from '../storage/storage.service';
 
 @Injectable()
@@ -30,17 +30,64 @@ export class WebdavService {
     if (header.startsWith('Bearer ')) {
       try {
         const payload = this.jwtService.verify(header.slice(7));
-        const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-        if (user) return user;
-      } catch {}
+        const user = await this.userRepo.findOne({
+          where: { id: payload.sub, deletedAt: IsNull() },
+        });
+        if (user) {
+          if (user.status === UserStatus.DISABLED) {
+            throw new UnauthorizedException('Account disabled');
+          }
+          return user;
+        }
+      } catch (err: any) {
+        // JWT expired/invalid/disabled — log at debug and fall through.
+        // Do NOT fall through to Basic auth: an expired access token is not
+        // a prompt to try a different auth method (the client sent Bearer).
+        if (err instanceof UnauthorizedException) throw err;
+        this.logger.warn(`WebDAV Bearer auth failed: ${err?.message ?? 'unknown'}`);
+        throw new UnauthorizedException();
+      }
     }
     if (header.startsWith('Basic ')) {
-      const [username, password] = Buffer.from(header.slice(6), 'base64').toString().split(':');
-      const user = await this.userRepo.findOne({ where: { username } });
-      if (user) {
-        const valid = await bcrypt.compare(password, user.passwordHash || '');
-        if (valid) return user;
+      const [rawUser, rawPass] = Buffer.from(header.slice(6), 'base64').toString().split(':');
+      const username = rawUser || '';
+      const password = rawPass || '';
+      if (!username) throw new UnauthorizedException();
+
+      const user = await this.userRepo.findOne({
+        where: { username, deletedAt: IsNull() },
+      });
+      if (!user) throw new UnauthorizedException();
+
+      // Mirror auth.service brute-force protection: check lockout first,
+      // then validate password, then increment failure counter on mismatch.
+      if (user.status === UserStatus.DISABLED) {
+        throw new UnauthorizedException('Account disabled');
       }
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        throw new UnauthorizedException('Account locked');
+      }
+
+      const valid = await bcrypt.compare(password, user.passwordHash || '');
+      if (valid) {
+        // Reset failed attempts on success
+        if (user.loginAttempts > 0) {
+          await this.userRepo.update(user.id, { loginAttempts: 0, lockedUntil: null });
+        }
+        return user;
+      }
+
+      // Failed Basic auth — increment brute-force counter (mirrors auth.service)
+      const maxAttempts = 5;
+      const lockMins = 15;
+      const attempts = (user.loginAttempts || 0) + 1;
+      const update: Partial<User> = { loginAttempts: attempts };
+      if (attempts >= maxAttempts) {
+        update.lockedUntil = new Date(Date.now() + lockMins * 60 * 1000);
+        update.loginAttempts = 0;
+      }
+      await this.userRepo.update(user.id, update).catch(() => {});
+      throw new UnauthorizedException();
     }
     throw new UnauthorizedException();
   }

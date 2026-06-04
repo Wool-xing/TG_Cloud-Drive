@@ -28,7 +28,8 @@ describe('API E2E', () => {
 
   it('admin login → folder → document → list', async () => {
     // 1. Login
-    const login = await api('POST', '/api/auth/login', { identifier: 'admin', password: 'REDACTED_PASSWORD' });
+    const testPw = process.env.E2E_ADMIN_PASSWORD || 'Admin@123456';
+    const login = await api('POST', '/api/auth/login', { identifier: 'admin', password: testPw });
     if (login.status === 429) { console.warn('Throttled — skip auth test'); return; }
     expect(login.body.ok).toBe(true);
     adminToken = login.body.data.accessToken;

@@ -1090,10 +1090,21 @@ export class FilesService {
       throw new BadRequestException('仅支持 HTTP/HTTPS 链接');
     }
 
-    // Block obviously internal hosts
+    // Block RFC1918 + loopback + link-local. Covers 10.0.0.0/8,
+    // 172.16.0.0/12 (172.16.x – 172.31.x), 192.168.0.0/16,
+    // 127.0.0.0/8, 169.254.0.0/16, ::1, fe80::/10.
     const hostname = parsed.hostname.toLowerCase();
-    const blocked = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '10.', '172.16.', '192.168.'];
-    if (blocked.some(b => hostname === b || hostname.startsWith(b))) {
+    const isRFC1918 =
+      hostname === 'localhost' ||
+      hostname === '0.0.0.0' ||
+      hostname === '[::1]' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('169.254.') ||
+      hostname.startsWith('fe80:') ||
+      (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)); // 172.16.0.0/12
+    if (isRFC1918) {
       throw new BadRequestException('不支持内网地址下载');
     }
 
