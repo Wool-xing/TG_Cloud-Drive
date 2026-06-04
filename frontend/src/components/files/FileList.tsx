@@ -58,10 +58,11 @@ function formatDate(dateStr: string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const day = 86_400_000;
-  if (diff < day) return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  if (diff < 7 * day)
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
+  const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  if (diff < day) return `今天 ${time}`;
+  const datePart = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  if (diff < 365 * day) return `${datePart} ${time}`;
+  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) + ` ${time}`;
 }
 
 function getTypeBadge(node: Node): string {
