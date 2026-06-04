@@ -55,6 +55,7 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
     currentParentId,
     isPrivate,
     clearSelection,
+    setPreview,
   } = useFileStore();
 
   const [newFolderMode, setNewFolderMode] = useState(false);
@@ -102,8 +103,11 @@ export default function FileToolbar({ nodes, isLoading }: FileToolbarProps) {
         toast.success(t('toolbar.createdFolder', { name }));
       } else {
         const finalName = name.endsWith(createExt) ? name : name + createExt;
-        await filesApi.createDocument({ name: finalName, parentId: currentParentId, mimeType: createMime, private: isPrivate });
+        const created = await filesApi.createDocument({ name: finalName, parentId: currentParentId, mimeType: createMime, private: isPrivate }) as any;
+        const node = created?.data || created;
         toast.success(t('toolbar.createdFile', { name: finalName }));
+        // Auto-open editor for the new file
+        if (node?.id) setPreview(node);
       }
       invalidateFiles();
       setNewFolderMode(false);

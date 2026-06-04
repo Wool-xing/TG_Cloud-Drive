@@ -3,6 +3,7 @@ import { X, FileText, Search, ChevronRight } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { filesApi } from '../../api/client';
+import { useFileStore } from '../../stores/file.store';
 import { useI18n } from '../../i18n/context';
 
 interface NoteTemplate {
@@ -71,15 +72,18 @@ export default function TemplatePicker({ parentId, isPrivate, onClose, onSuccess
       // Backend expects base64-encoded content. Use TextEncoder for UTF-8 safety.
       const bytes = new TextEncoder().encode(selected.content);
       const contentBase64 = btoa(String.fromCharCode(...bytes));
-      await filesApi.createDocument({
+      const created = await filesApi.createDocument({
         name: `${selected.name}.md`,
         parentId,
         mimeType: 'text/markdown',
         content: contentBase64,
         private: isPrivate,
-      });
+      }) as any;
       toast.success(t('template.created', { name: selected.name }));
       queryClient.invalidateQueries({ queryKey: ['files'] });
+      // Auto-open editor for the new file
+      const node = created?.data || created;
+      if (node?.id) useFileStore.getState().setPreview(node);
       onSuccess();
       onClose();
     } catch {
