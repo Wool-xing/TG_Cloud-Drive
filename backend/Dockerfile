@@ -34,6 +34,9 @@ COPY --from=builder --chown=appuser:appgroup /app/dist          ./dist
 COPY --from=builder --chown=appuser:appgroup /app/node_modules  ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app/package.json  ./package.json
 
+# Dev-only local storage dir
+RUN mkdir -p /app/local-storage && chown appuser:appgroup /app/local-storage
+
 # Runtime environment
 ENV NODE_ENV=production \
     PORT=3000

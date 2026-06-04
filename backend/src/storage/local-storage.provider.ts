@@ -22,8 +22,14 @@ export class LocalStorageProvider implements StorageProvider {
 
   constructor(private cs: ConfigService) {
     this.dir = cs.get<string>('LOCAL_STORAGE_DIR', './local-storage');
-    if (!fs.existsSync(this.dir)) {
-      fs.mkdirSync(this.dir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.dir)) {
+        fs.mkdirSync(this.dir, { recursive: true });
+      }
+    } catch {
+      // Fallback to /tmp if working dir not writable (Docker non-root)
+      this.dir = '/tmp/local-storage';
+      if (!fs.existsSync(this.dir)) fs.mkdirSync(this.dir, { recursive: true });
     }
     this.logger.warn(`⚠️  LOCAL STORAGE ACTIVE (DEV ONLY) — files stored in ${path.resolve(this.dir)}`);
   }
