@@ -153,6 +153,6 @@ worker-deploy: ## 部署 Cloudflare Worker（需先 cd worker && npm install）
 
 worker-secrets: ## 配置 Worker Secrets（交互式）
 	@echo "依次设置 Worker Secrets："
-	cd worker && npx wrangler secret put TELEGRAM_BOT_TOKEN
-	cd worker && npx wrangler secret put TELEGRAM_CHAT_ID
+	cd worker && npx wrangler secret put TG_BOT_TOKEN
+	cd worker && npx wrangler secret put TG_CHANNEL_ID
 	cd worker && npx wrangler secret put CF_WORKERS_SECRET
