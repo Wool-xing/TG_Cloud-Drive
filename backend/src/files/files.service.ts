@@ -93,6 +93,9 @@ export class FilesService {
   }
 
   async createDocument(userId: string, name: string, parentId: string, mimeType: string, contentBase64?: string, isPrivate = false) {
+    // Strip null bytes from string inputs to prevent Postgres UTF-8 encoding errors.
+    name = (name ?? '').replace(/\x00/g, '');
+    mimeType = (mimeType ?? '').replace(/\x00/g, '');
     await this.validateParent(userId, parentId, isPrivate);
     await this.checkDuplicate(userId, parentId, name, isPrivate);
 
