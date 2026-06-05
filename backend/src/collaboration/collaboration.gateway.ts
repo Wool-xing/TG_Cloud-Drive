@@ -55,11 +55,23 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
     @MessageBody() payload: { token: string; docId: string },
   ) {
     try {
+      // Validate docId is a UUID before any Redis key construction (security gate)
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.docId)) {
+        client.close(4000, 'Invalid docId format');
+        return;
+      }
       const user = await this.collab.verifyToken(payload.token);
       if (!user) { client.close(4001, 'Unauthorized'); return; }
 
       const hasAccess = await this.collab.canAccessDoc(user.userId, payload.docId);
       if (!hasAccess) { client.close(4003, 'Forbidden'); return; }
+
+      // If client is re-authenticating for a different document, leave the old room
+      // first to prevent Redis counter drift and room-map leaks.
+      const oldSess = this.getSession(client);
+      if (oldSess && oldSess.docId !== payload.docId) {
+        this.leaveRoom(oldSess.docId, client);
+      }
 
       this.setSession(client, { userId: user.userId, docId: payload.docId, instanceId: this.instanceId });
       this.joinRoom(payload.docId, client);
@@ -99,16 +111,20 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
       this.subscribeRedis(docId);
     }
     this.rooms.get(docId)!.add(client);
-    // Track peer count in Redis so getCollaborators() reads live count
-    this.redis.incr(`collab:peers:${docId}`).catch(() => {});
+    // Track peer count in Redis so getCollaborators() reads live count.
+    // Set a 1-hour TTL on first incr to prevent stale keys after crashes.
+    this.redis.incr(`collab:peers:${docId}`).then((c: number) => {
+      if (c === 1) this.redis.expire(`collab:peers:${docId}`, 3600).catch(() => {});
+    }).catch((e: any) => this.logger.warn(`Redis incr failed for ${docId}: ${e.message}`));
   }
 
   private leaveRoom(docId: string, client: WebSocket) {
     const room = this.rooms.get(docId);
     if (room) {
       room.delete(client);
-      // Decrement peer count. Redis key will expire naturally.
-      this.redis.decr(`collab:peers:${docId}`).catch(() => {});
+      this.redis.decr(`collab:peers:${docId}`).catch((e: any) =>
+        this.logger.warn(`Redis decr failed for ${docId}: ${e.message}`),
+      );
       if (room.size === 0) {
         this.rooms.delete(docId);
         this.unsubscribeRedis(docId);
@@ -144,7 +160,9 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
         for (const ws of room) {
           if (ws.readyState === WebSocket.OPEN) ws.send(msg);
         }
-      });
+      }).catch((e: any) =>
+        this.logger.warn(`Redis subscribe failed for channel ${ch}: ${e.message}`),
+      );
     } else {
       this.logger.debug(`Redis subscribe not available (mock/disabled), using local-only broadcast`);
     }
@@ -154,13 +172,17 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
     const ch = this.channel(docId);
     this.subscribed.delete(ch);
     if (typeof this.redis.unsubscribe === 'function') {
-      this.redis.unsubscribe(ch).catch(() => {});
+      this.redis.unsubscribe(ch).catch((e: any) =>
+        this.logger.warn(`Redis unsubscribe failed for channel ${ch}: ${e.message}`),
+      );
     }
   }
 
   private publishRedis(docId: string, msg: string) {
     if (typeof this.redis.publish === 'function') {
-      this.redis.publish(this.channel(docId), msg).catch(() => {});
+      this.redis.publish(this.channel(docId), msg).catch((e: any) =>
+        this.logger.warn(`Redis publish failed for channel ${this.channel(docId)}: ${e.message}`),
+      );
     }
   }
 
