@@ -99,12 +99,16 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
       this.subscribeRedis(docId);
     }
     this.rooms.get(docId)!.add(client);
+    // Track peer count in Redis so getCollaborators() reads live count
+    this.redis.incr(`collab:peers:${docId}`).catch(() => {});
   }
 
   private leaveRoom(docId: string, client: WebSocket) {
     const room = this.rooms.get(docId);
     if (room) {
       room.delete(client);
+      // Decrement peer count. Redis key will expire naturally.
+      this.redis.decr(`collab:peers:${docId}`).catch(() => {});
       if (room.size === 0) {
         this.rooms.delete(docId);
         this.unsubscribeRedis(docId);

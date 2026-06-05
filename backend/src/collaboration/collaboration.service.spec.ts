@@ -4,11 +4,13 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { CollaborationService } from './collaboration.service';
 import { Node, NodeType } from '../files/entities/node.entity';
 import { Share } from '../shares/entities/share.entity';
+import { REDIS_CLIENT } from '../common/redis/redis.module';
 
 describe('CollaborationService', () => {
   let service: CollaborationService;
   let nodeRepo: any;
   let shareRepo: any;
+  let mockRedis: any;
 
   const mockNode = (overrides: Partial<Node> = {}): Node => ({
     id: 'node-1', userId: 'user-1', name: 'test.md', type: NodeType.FILE,
@@ -23,6 +25,7 @@ describe('CollaborationService', () => {
   beforeEach(async () => {
     nodeRepo = { findOne: jest.fn() };
     shareRepo = { findOne: jest.fn() };
+    mockRedis = { get: jest.fn(), incr: jest.fn(), decr: jest.fn(), del: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: 'test-secret' })],
@@ -30,6 +33,7 @@ describe('CollaborationService', () => {
         CollaborationService,
         { provide: getRepositoryToken(Node), useValue: nodeRepo },
         { provide: getRepositoryToken(Share), useValue: shareRepo },
+        { provide: REDIS_CLIENT, useValue: mockRedis },
       ],
     }).compile();
 
@@ -81,6 +85,26 @@ describe('CollaborationService', () => {
       nodeRepo.findOne.mockResolvedValue(mockNode({ type: NodeType.FOLDER }));
       const result = await service.canAccessDoc('user-1', 'node-1');
       expect(result).toBe(false);
+    });
+  });
+
+  describe('getCollaborators', () => {
+    it('returns peer count from Redis', async () => {
+      mockRedis.get.mockResolvedValue('3');
+      const result = await service.getCollaborators('node-1');
+      expect(result).toBe(3);
+    });
+
+    it('returns 0 when key not set', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      const result = await service.getCollaborators('node-1');
+      expect(result).toBe(0);
+    });
+
+    it('returns 0 on Redis error', async () => {
+      mockRedis.get.mockRejectedValue(new Error('down'));
+      const result = await service.getCollaborators('node-1');
+      expect(result).toBe(0);
     });
   });
 });

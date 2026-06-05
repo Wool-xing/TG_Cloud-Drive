@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, LessThanOrEqual, MoreThan } from 'typeorm';
 import { Node, NodeType } from '../files/entities/node.entity';
 import { Share } from '../shares/entities/share.entity';
+import { REDIS_CLIENT } from '../common/redis/redis.module';
 
 @Injectable()
 export class CollaborationService {
@@ -13,6 +14,7 @@ export class CollaborationService {
     private readonly jwt: JwtService,
     @InjectRepository(Node) private nodeRepo: Repository<Node>,
     @InjectRepository(Share) private shareRepo: Repository<Share>,
+    @Inject(REDIS_CLIENT) private redis: any,
   ) {}
 
   async verifyToken(token: string): Promise<{ userId: string } | null> {
@@ -61,9 +63,13 @@ export class CollaborationService {
     });
   }
 
-  /** List active collaborators for a document (peers in the room) */
+  /** Returns active peer count for a document from Redis counter */
   async getCollaborators(nodeId: string): Promise<number> {
-    // Returns peer count — actual tracking is in the gateway's room map
-    return 0;
+    try {
+      const count = await this.redis.get(`collab:peers:${nodeId}`);
+      return count ? parseInt(count, 10) : 0;
+    } catch {
+      return 0;
+    }
   }
 }
