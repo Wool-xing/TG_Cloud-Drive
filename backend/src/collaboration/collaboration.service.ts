@@ -63,7 +63,13 @@ export class CollaborationService {
     });
   }
 
-  /** Returns active peer count for a document from Redis counter */
+  /**
+   * Returns active peer count for a document from Redis counter.
+   *
+   * IMPORTANT: This method performs NO caller-level access check. If a
+   * controller ever exposes this to clients, gate it behind canAccessDoc()
+   * to prevent information leaks (peer counts, document existence probing).
+   */
   async getCollaborators(nodeId: string): Promise<number> {
     // Validate nodeId is a UUID before Redis key interpolation
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nodeId)) {
