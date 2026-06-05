@@ -116,7 +116,7 @@ export class FilesController {
   @HttpCode(200)
   getDownloadInfoByPost(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('password') password: string,
   ) {
     return this.filesService.getDownloadInfo(userId, nodeId, password);
@@ -130,7 +130,7 @@ export class FilesController {
   @HttpCode(308)
   getDownloadInfoLegacy(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Query('password') password: string,
     @Res() res: Response,
   ) {
@@ -142,7 +142,7 @@ export class FilesController {
   @Patch(':nodeId/rename')
   rename(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('name') name: string,
   ) {
     return this.filesService.rename(userId, nodeId, name);
@@ -151,7 +151,7 @@ export class FilesController {
   @Patch(':nodeId/move')
   move(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('targetParentId') targetParentId: string,
   ) {
     return this.filesService.move(userId, nodeId, targetParentId);
@@ -160,7 +160,7 @@ export class FilesController {
   @Post(':nodeId/copy')
   copy(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('targetParentId') targetParentId: string,
   ) {
     return this.filesService.copy(userId, nodeId, targetParentId);
@@ -200,7 +200,7 @@ export class FilesController {
   @Patch(':nodeId/lock')
   setLock(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('password') password: string,
   ) {
     return this.filesService.setLock(userId, nodeId, password);
@@ -214,7 +214,7 @@ export class FilesController {
   @HttpCode(200)
   removeLock(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('password') password: string,
   ) {
     return this.filesService.removeLock(userId, nodeId, password);
@@ -225,7 +225,7 @@ export class FilesController {
   @HttpCode(200)
   verifyLock(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('password') password: string,
   ) {
     return this.filesService.verifyLock(userId, nodeId, password);
@@ -332,7 +332,7 @@ export class FilesController {
   @Get(':nodeId/versions/:versionId/download')
   getVersionDownloadInfo(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Param('versionId') versionId: string,
   ) {
     return this.filesService.getVersionDownloadInfo(userId, nodeId, versionId);
@@ -341,7 +341,7 @@ export class FilesController {
   @Post(':nodeId/file-request')
   createFileRequest(
     @CurrentUser('id') userId: string,
-    @Param('nodeId') nodeId: string,
+    @Param('nodeId', ParseUUIDPipe) nodeId: string,
     @Body('maxFiles') maxFiles = 100,
     @Body('ttlHours') ttlHours = 72,
   ) {

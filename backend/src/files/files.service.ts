@@ -619,7 +619,9 @@ export class FilesService {
     // prefix matching via :* suffix, and ranks results by relevance.
     // Escaping: plainto_tsquery splits input into tokens; we additionally strip
     // tsquery special chars (! & | ( ) < > ~ :) to prevent syntax errors.
-    const sanitized = kw.replace(/[!&|()<>~:@*\\]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Strip tsquery special characters including SQL metacharacters that leak
+    // through user input (e.g., single-quote, semicolon from SQL injection probes).
+    const sanitized = kw.replace(/[!&|()<>~:@*\\'";\-]/g, ' ').replace(/\s+/g, ' ').trim();
     if (sanitized) {
       // Build a prefix-match tsquery: "report 2024" → "report:* & 2024:*"
       const tokens = sanitized.split(/\s+/).filter(t => t.length > 0).slice(0, 10);
