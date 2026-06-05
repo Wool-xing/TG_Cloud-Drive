@@ -378,7 +378,7 @@ async function handler(request: Request, env: Env): Promise<Response> {
     return corsError('Not Found', 404, request, env);
   } catch (err: any) {
     console.error('Worker error:', err);
-    return corsError(`Internal Server Error: ${err?.message ?? 'unknown'}`, 500, request, env);
+    return corsError('Internal Server Error', 500, request, env);
   }
 }
 
