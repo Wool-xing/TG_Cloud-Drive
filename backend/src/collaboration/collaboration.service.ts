@@ -65,10 +65,15 @@ export class CollaborationService {
 
   /** Returns active peer count for a document from Redis counter */
   async getCollaborators(nodeId: string): Promise<number> {
+    // Validate nodeId is a UUID before Redis key interpolation
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nodeId)) {
+      return 0;
+    }
     try {
       const count = await this.redis.get(`collab:peers:${nodeId}`);
       return count ? parseInt(count, 10) : 0;
-    } catch {
+    } catch (e: any) {
+      this.logger.warn(`Failed to read peer count for doc ${nodeId}: ${e.message}`);
       return 0;
     }
   }

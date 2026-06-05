@@ -382,7 +382,7 @@ describe('UsersService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('throws ConflictException when email already bound', async () => {
+    it('throws BadRequestException when email already bound', async () => {
       (hashIdentifier as jest.Mock).mockReturnValueOnce('existing');
       userRepo.findOne.mockReset();
       userRepo.findOne.mockResolvedValue(makeUser({ emailHash: 'existing' }));

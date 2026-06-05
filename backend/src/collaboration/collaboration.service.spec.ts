@@ -88,23 +88,31 @@ describe('CollaborationService', () => {
     });
   });
 
+  const docId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
   describe('getCollaborators', () => {
     it('returns peer count from Redis', async () => {
       mockRedis.get.mockResolvedValue('3');
-      const result = await service.getCollaborators('node-1');
+      const result = await service.getCollaborators(docId);
       expect(result).toBe(3);
     });
 
     it('returns 0 when key not set', async () => {
       mockRedis.get.mockResolvedValue(null);
-      const result = await service.getCollaborators('node-1');
+      const result = await service.getCollaborators(docId);
       expect(result).toBe(0);
     });
 
     it('returns 0 on Redis error', async () => {
       mockRedis.get.mockRejectedValue(new Error('down'));
-      const result = await service.getCollaborators('node-1');
+      const result = await service.getCollaborators(docId);
       expect(result).toBe(0);
+    });
+
+    it('returns 0 for non-UUID nodeId without touching Redis', async () => {
+      const result = await service.getCollaborators('not-a-uuid');
+      expect(result).toBe(0);
+      expect(mockRedis.get).not.toHaveBeenCalled();
     });
   });
 });
