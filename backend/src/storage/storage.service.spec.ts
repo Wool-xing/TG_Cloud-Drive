@@ -2,11 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { StorageService } from './storage.service';
 import { R2StorageProvider } from './r2-storage.provider';
 import { TelegramStorageProvider } from './telegram-storage.provider';
+import { LocalStorageProvider } from './local-storage.provider';
 
 describe('StorageService', () => {
   let service: StorageService;
   let mockR2: any;
   let mockTelegram: any;
+  let mockLocal: any;
 
   beforeEach(async () => {
     mockR2 = {
@@ -27,11 +29,20 @@ describe('StorageService', () => {
       healthCheck: jest.fn(),
     };
 
+    mockLocal = {
+      isEnabled: jest.fn().mockReturnValue(false),
+      upload: jest.fn(),
+      getUrl: jest.fn(),
+      delete: jest.fn(),
+      healthCheck: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StorageService,
         { provide: R2StorageProvider, useValue: mockR2 },
         { provide: TelegramStorageProvider, useValue: mockTelegram },
+        { provide: LocalStorageProvider, useValue: mockLocal },
       ],
     }).compile();
 
@@ -43,17 +54,19 @@ describe('StorageService', () => {
       expect(service.getPrimary()).toBe('r2');
     });
 
-    it('returns telegram when r2 is disabled', async () => {
+    it('returns local when r2 is disabled', async () => {
       mockR2.isEnabled.mockReturnValue(false);
+      mockLocal.isEnabled.mockReturnValue(true);
       const m = await Test.createTestingModule({
         providers: [
           StorageService,
           { provide: R2StorageProvider, useValue: mockR2 },
           { provide: TelegramStorageProvider, useValue: mockTelegram },
+          { provide: LocalStorageProvider, useValue: mockLocal },
         ],
       }).compile();
       const svc = m.get(StorageService);
-      expect(svc.getPrimary()).toBe('telegram');
+      expect(svc.getPrimary()).toBe('local');
     });
   });
 
