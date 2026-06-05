@@ -140,6 +140,15 @@ export class FilesService {
     salt: string,         // KDF salt (optional, depends on KDF design)
   ): Promise<any> {
 
+    // Reject invalid chunk parameters before they hit TypeORM/Redis.
+    if (!Number.isInteger(chunkIndex) || chunkIndex < 0 ||
+        !Number.isInteger(totalChunks) || totalChunks < 1 ||
+        chunkIndex >= totalChunks) {
+      throw new BadRequestException(
+        `无效的分块参数: chunkIndex=${chunkIndex}, totalChunks=${totalChunks}`,
+      );
+    }
+
     const cacheKey = `upload:${userId}:${nodeIdempotencyKey}`;
     let nodeId = await this.redis.get(cacheKey).catch(() => null);
 
@@ -185,6 +194,13 @@ export class FilesService {
     }
     const backend = this.storage.getPrimary();
     const r2Key = this.storage.buildR2Key(userId, nodeId, chunkIndex);
+
+    // Idempotency: skip re-upload if chunk already exists for this (nodeId, chunkIndex).
+    const existingChunk = await this.chunkRepo.findOne({ where: { nodeId, chunkIndex } }).catch(() => null);
+    if (existingChunk) {
+      return { chunkIndex, nodeId, status: 'duplicate', message: '分片已存在' };
+    }
+
     const result = await this.storage.upload(backend, buffer, r2Key, 'application/octet-stream');
     await this.chunkRepo.save(this.chunkRepo.create({
       nodeId, chunkIndex,
