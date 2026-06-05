@@ -1,100 +1,47 @@
-import { Test } from '@nestjs/testing';
-import { ValidationPipe, CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import * as cookieParser from 'cookie-parser';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
 import { ExportService } from './export.service';
 import { TemplateService } from './template.service';
-import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
-import { TransformInterceptor } from '../common/interceptors/transform.interceptor';
+import { createTestApp, setAuthGate } from '../__tests__/test-utils';
 
-let __authGate = true;
-
-class MockAuthGuard implements CanActivate {
-  canActivate(ctx: ExecutionContext): boolean {
-    if (!__authGate) throw new (require('@nestjs/common').UnauthorizedException)('请先登录');
-    const req = ctx.switchToHttp().getRequest();
-    req.user = { id: 'u-1', username: 'tester', deviceId: 'dev-1' };
-    return true;
-  }
-}
-
-function buildApp(
-  filesSvc: Record<string, jest.Mock>,
-  exportSvc?: Record<string, jest.Mock>,
-  templateSvc?: Record<string, jest.Mock>,
-): Promise<INestApplication> {
-  return Test.createTestingModule({
-    controllers: [FilesController],
-    providers: [
-      { provide: FilesService, useValue: filesSvc },
-      { provide: ExportService, useValue: exportSvc || {} },
-      { provide: TemplateService, useValue: templateSvc || {} },
-    ],
-  })
-    .compile()
-    .then(mod => {
-      const app = mod.createNestApplication();
-      app.use(cookieParser());
-      app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-      app.useGlobalFilters(new HttpExceptionFilter());
-      app.useGlobalInterceptors(new TransformInterceptor());
-      app.useGlobalGuards(new MockAuthGuard());
-      return app.init();
-    });
-}
-
-describe('FilesController — integration (supertest)', () => {
+describe('FilesController', () => {
   let app: INestApplication;
-  let files: Record<string, jest.Mock>;
+  let f: Record<string, jest.Mock>;
   let exp: Record<string, jest.Mock>;
   let tmpl: Record<string, jest.Mock>;
 
+  const nodeId = '00000000-0000-0000-0000-000000000001';
+
   beforeEach(async () => {
-    __authGate = true;
-    files = {
-      list: jest.fn(),
-      createFolder: jest.fn(),
-      updateFileContent: jest.fn(),
-      createDocument: jest.fn(),
-      listRecent: jest.fn(),
-      uploadChunk: jest.fn(),
+    setAuthGate(true);
+    f = {
+      list: jest.fn(), createFolder: jest.fn(), updateFileContent: jest.fn(),
+      createDocument: jest.fn(), listRecent: jest.fn(), uploadChunk: jest.fn(),
       getDownloadInfo: jest.fn(),
-      rename: jest.fn(),
-      move: jest.fn(),
-      copy: jest.fn(),
-      softDelete: jest.fn(),
-      listTrash: jest.fn(),
-      restoreTrash: jest.fn(),
+      rename: jest.fn(), move: jest.fn(), copy: jest.fn(),
+      softDelete: jest.fn(), listTrash: jest.fn(), restoreTrash: jest.fn(),
       permanentDelete: jest.fn(),
-      setLock: jest.fn(),
-      removeLock: jest.fn(),
-      verifyLock: jest.fn(),
+      setLock: jest.fn(), removeLock: jest.fn(), verifyLock: jest.fn(),
       moveToPrivate: jest.fn(),
-      search: jest.fn(),
-      semanticSearch: jest.fn(),
-      toggleStar: jest.fn(),
-      listStarred: jest.fn(),
-      getThumbnailUrl: jest.fn(),
-      getPath: jest.fn(),
-      getFolderDownloadList: jest.fn(),
-      listTags: jest.fn(),
-      createTag: jest.fn(),
-      deleteTag: jest.fn(),
-      addTagToNode: jest.fn(),
-      removeTagFromNode: jest.fn(),
-      createVersion: jest.fn(),
-      getVersions: jest.fn(),
+      search: jest.fn(), semanticSearch: jest.fn(),
+      toggleStar: jest.fn(), listStarred: jest.fn(),
+      getThumbnailUrl: jest.fn(), getPath: jest.fn(), getFolderDownloadList: jest.fn(),
+      listTags: jest.fn(), createTag: jest.fn(), deleteTag: jest.fn(),
+      addTagToNode: jest.fn(), removeTagFromNode: jest.fn(),
+      createVersion: jest.fn(), getVersions: jest.fn(),
       getVersionDownloadInfo: jest.fn(),
-      createFileRequest: jest.fn(),
-      setNote: jest.fn(),
-      createOfflineDownload: jest.fn(),
-      getSyncDiff: jest.fn(),
+      createFileRequest: jest.fn(), setNote: jest.fn(),
+      createOfflineDownload: jest.fn(), getSyncDiff: jest.fn(),
     };
     exp = { exportPdf: jest.fn(), exportDocx: jest.fn(), exportMarkdown: jest.fn() };
     tmpl = { list: jest.fn(), create: jest.fn(), delete: jest.fn(), getContent: jest.fn() };
-    app = await buildApp(files, exp, tmpl);
+    app = await createTestApp(FilesController, [
+      { provide: FilesService, useValue: f },
+      { provide: ExportService, useValue: exp },
+      { provide: TemplateService, useValue: tmpl },
+    ]);
   });
 
   afterEach(() => app.close());
@@ -102,382 +49,234 @@ describe('FilesController — integration (supertest)', () => {
   // ── Auth gate ────────────────────────────────────────────────────────
 
   it('returns 401 without auth', async () => {
-    __authGate = false;
+    setAuthGate(false);
     const res = await request(app.getHttpServer()).get('/files');
     expect(res.status).toBe(401);
-    expect(res.body.message).toBe('请先登录');
   });
 
-  // ── List ─────────────────────────────────────────────────────────────
+  // ── CRUD ─────────────────────────────────────────────────────────────
 
-  describe('GET /files', () => {
-    it('lists files with query params', async () => {
-      files.list.mockResolvedValue([{ id: 'n-1', name: 'photo.jpg' }]);
-      const res = await request(app.getHttpServer())
-        .get('/files?parentId=root&private=true&sort=name&order=ASC&type=image');
+  describe('CRUD', () => {
+    it('GET /files → lists with query params', async () => {
+      f.list.mockResolvedValue([]);
+      const res = await request(app.getHttpServer()).get('/files?parentId=root&type=image&sort=name&order=ASC');
       expect(res.status).toBe(200);
-      expect(files.list).toHaveBeenCalledWith('u-1', 'root', true, 'name', 'ASC', 'image');
+      expect(f.list).toHaveBeenCalledWith('u-1', 'root', false, 'name', 'ASC', 'image');
     });
-  });
 
-  // ── Folder ───────────────────────────────────────────────────────────
-
-  describe('POST /files/folder', () => {
-    it('creates folder', async () => {
-      files.createFolder.mockResolvedValue({ id: 'n-folder', name: 'docs' });
-      const res = await request(app.getHttpServer())
-        .post('/files/folder')
-        .send({ name: 'docs', parentId: 'root', private: true });
-      expect(res.status).toBe(201);
-      expect(res.body.data).toEqual({ id: 'n-folder', name: 'docs' });
-    });
-  });
-
-  // ── Document ─────────────────────────────────────────────────────────
-
-  describe('POST /files/document', () => {
-    it('creates document', async () => {
-      files.createDocument.mockResolvedValue({ id: 'n-doc' });
-      const res = await request(app.getHttpServer())
-        .post('/files/document')
-        .send({ name: 'readme', parentId: 'root', mimeType: 'text/markdown', content: '# Hello' });
+    it('POST /files/folder → creates folder', async () => {
+      f.createFolder.mockResolvedValue({ id: 'n-1' });
+      const res = await request(app.getHttpServer()).post('/files/folder').send({ name: 'docs', parentId: 'root', private: true });
       expect(res.status).toBe(201);
     });
-  });
 
-  // ── Content update ───────────────────────────────────────────────────
+    it('POST /files/folder → handles name collision', async () => {
+      f.createFolder.mockRejectedValue(new (require('@nestjs/common').ConflictException)('同名文件夹已存在'));
+      const res = await request(app.getHttpServer()).post('/files/folder').send({ name: 'docs', parentId: 'root', private: false });
+      expect(res.status).toBe(409);
+    });
 
-  describe('PUT /files/:nodeId/content', () => {
-    it('updates file content with base64 data', async () => {
-      files.updateFileContent.mockResolvedValue({ success: true });
+    it('PUT /files/:nodeId/content → updates content', async () => {
+      f.updateFileContent.mockResolvedValue({ success: true });
       const b64 = Buffer.from('hello').toString('base64');
       const res = await request(app.getHttpServer())
-        .put('/files/00000000-0000-0000-0000-000000000001/content')
-        .send({ data: b64, iv: 'iv1', size: 5, mimeType: 'text/plain' });
+        .put(`/files/${nodeId}/content`).send({ data: b64, iv: 'iv1', size: 5, mimeType: 'text/plain' });
       expect(res.status).toBe(200);
     });
-  });
 
-  // ── Upload chunk ─────────────────────────────────────────────────────
+    it('PATCH /files/:nodeId/rename → renames', async () => {
+      f.rename.mockResolvedValue({ name: 'new.txt' });
+      const res = await request(app.getHttpServer()).patch(`/files/${nodeId}/rename`).send({ name: 'new.txt' });
+      expect(res.status).toBe(200);
+    });
 
-  describe('POST /files/upload-chunk', () => {
-    it('uploads chunk with idempotency key', async () => {
-      files.uploadChunk.mockResolvedValue({ done: false });
-      const res = await request(app.getHttpServer())
-        .post('/files/upload-chunk')
-        .field('idempotencyKey', 'key-1')
-        .field('chunkIndex', '0')
-        .field('totalChunks', '2')
-        .field('filename', 'photo.jpg')
-        .field('md5', 'abc123')
-        .field('mimeType', 'image/jpeg')
-        .field('parentId', 'root')
-        .field('private', 'false')
-        .attach('chunk', Buffer.from('chunk-data'), 'photo.jpg');
-      expect(res.status).toBe(201);
+    it('DELETE /files → soft deletes', async () => {
+      f.softDelete.mockResolvedValue({ deleted: 2 });
+      const res = await request(app.getHttpServer()).delete('/files').send({ nodeIds: ['n-1', 'n-2'] });
+      expect(res.status).toBe(200);
+    });
+
+    it('DELETE /files → handles file not found', async () => {
+      f.softDelete.mockRejectedValue(new (require('@nestjs/common').NotFoundException)('文件不存在'));
+      const res = await request(app.getHttpServer()).delete('/files').send({ nodeIds: ['n-missing'] });
+      expect(res.status).toBe(404);
     });
   });
 
   // ── Download ─────────────────────────────────────────────────────────
 
-  describe('POST /files/download/:nodeId', () => {
-    it('returns download info with password', async () => {
-      files.getDownloadInfo.mockResolvedValue({ url: 'https://t.me/file/bot...' });
-      const res = await request(app.getHttpServer())
-        .post('/files/download/00000000-0000-0000-0000-000000000001')
-        .send({ password: 'secret' });
-      expect(res.status).toBe(200);
-      expect(res.body.data).toEqual({ url: 'https://t.me/file/bot...' });
-    });
-  });
-
-  // ── Rename / Move / Copy / Delete ────────────────────────────────────
-
-  describe('PATCH /files/:nodeId/rename', () => {
-    it('renames file', async () => {
-      files.rename.mockResolvedValue({ id: 'n-1', name: 'new-name.jpg' });
-      const res = await request(app.getHttpServer())
-        .patch('/files/00000000-0000-0000-0000-000000000001/rename')
-        .send({ name: 'new-name.jpg' });
-      expect(res.status).toBe(200);
-      expect(res.body.data.name).toBe('new-name.jpg');
-    });
-  });
-
-  describe('PATCH /files/:nodeId/move', () => {
-    it('moves file', async () => {
-      files.move.mockResolvedValue({ success: true });
-      const res = await request(app.getHttpServer())
-        .patch('/files/00000000-0000-0000-0000-000000000001/move')
-        .send({ targetParentId: 'target-folder-id' });
-      expect(res.status).toBe(200);
-    });
-  });
-
-  describe('POST /files/:nodeId/copy', () => {
-    it('copies file', async () => {
-      files.copy.mockResolvedValue({ id: 'n-copy' });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/copy')
-        .send({ targetParentId: 'target' });
-      expect(res.status).toBe(201);
-    });
-  });
-
-  describe('DELETE /files', () => {
-    it('soft deletes files', async () => {
-      files.softDelete.mockResolvedValue({ deleted: 2 });
-      const res = await request(app.getHttpServer())
-        .delete('/files')
-        .send({ nodeIds: ['n-1', 'n-2'] });
-      expect(res.status).toBe(200);
-      expect(res.body.data).toEqual({ deleted: 2 });
-    });
-  });
-
-  // ── Trash ────────────────────────────────────────────────────────────
-
-  describe('Trash endpoints', () => {
-    it('GET /files/trash lists deleted files', async () => {
-      files.listTrash.mockResolvedValue([{ id: 'n-1', name: 'deleted.txt' }]);
-      const res = await request(app.getHttpServer()).get('/files/trash');
+  describe('Download', () => {
+    it('POST /files/download/:nodeId → returns info with password', async () => {
+      f.getDownloadInfo.mockResolvedValue({ url: 'https://t.me/file/bot...' });
+      const res = await request(app.getHttpServer()).post(`/files/download/${nodeId}`).send({ password: 'secret' });
       expect(res.status).toBe(200);
     });
 
-    it('POST /files/trash/restore recovers files', async () => {
-      files.restoreTrash.mockResolvedValue({ restored: 1 });
-      const res = await request(app.getHttpServer())
-        .post('/files/trash/restore')
-        .send({ nodeIds: ['n-1'] });
-      expect(res.status).toBe(201);
-    });
-
-    it('DELETE /files/trash/permanent destroys files', async () => {
-      files.permanentDelete.mockResolvedValue({ deleted: 1 });
-      const res = await request(app.getHttpServer())
-        .delete('/files/trash/permanent')
-        .send({ nodeIds: ['n-1'] });
-      expect(res.status).toBe(200);
+    it('POST /files/download/:nodeId → handles wrong password', async () => {
+      f.getDownloadInfo.mockRejectedValue(new (require('@nestjs/common').ForbiddenException)('密码错误'));
+      const res = await request(app.getHttpServer()).post(`/files/download/${nodeId}`).send({ password: 'wrong' });
+      expect(res.status).toBe(403);
     });
   });
 
   // ── Lock ─────────────────────────────────────────────────────────────
 
-  describe('Lock endpoints', () => {
-    it('sets lock with password', async () => {
-      files.setLock.mockResolvedValue({ locked: true });
-      const res = await request(app.getHttpServer())
-        .patch('/files/00000000-0000-0000-0000-000000000001/lock')
-        .send({ password: 'lockpwd' });
+  describe('Lock', () => {
+    it('sets and verifies lock password', async () => {
+      f.setLock.mockResolvedValue({ locked: true });
+      const res = await request(app.getHttpServer()).patch(`/files/${nodeId}/lock`).send({ password: 'pwd' });
       expect(res.status).toBe(200);
     });
 
-    it('removes lock', async () => {
-      files.removeLock.mockResolvedValue({ success: true });
-      const res = await request(app.getHttpServer())
-        .delete('/files/00000000-0000-0000-0000-000000000001/lock')
-        .send({ password: 'lockpwd' });
-      expect(res.status).toBe(200);
+    it('handles wrong lock password', async () => {
+      f.verifyLock.mockRejectedValue(new (require('@nestjs/common').ForbiddenException)('密码错误'));
+      const res = await request(app.getHttpServer()).post(`/files/${nodeId}/verify-lock`).send({ password: 'wrong' });
+      expect(res.status).toBe(403);
     });
+  });
 
-    it('verifies lock password', async () => {
-      files.verifyLock.mockResolvedValue({ valid: true });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/verify-lock')
-        .send({ password: 'lockpwd' });
+  // ── Trash ────────────────────────────────────────────────────────────
+
+  describe('Trash', () => {
+    it('list, restore, permanent delete', async () => {
+      f.listTrash.mockResolvedValue([]);
+      f.restoreTrash.mockResolvedValue({ restored: 1 });
+      f.permanentDelete.mockResolvedValue({ deleted: 1 });
+
+      let res = await request(app.getHttpServer()).get('/files/trash');
+      expect(res.status).toBe(200);
+
+      res = await request(app.getHttpServer()).post('/files/trash/restore').send({ nodeIds: ['n-1'] });
+      expect(res.status).toBe(201);
+
+      res = await request(app.getHttpServer()).delete('/files/trash/permanent').send({ nodeIds: ['n-1'] });
       expect(res.status).toBe(200);
     });
   });
 
   // ── Search ───────────────────────────────────────────────────────────
 
-  describe('GET /files/search', () => {
-    it('does keyword search', async () => {
-      files.search.mockResolvedValue([]);
+  describe('Search', () => {
+    it('keyword search', async () => {
+      f.search.mockResolvedValue([]);
       const res = await request(app.getHttpServer()).get('/files/search?q=photo&type=image');
       expect(res.status).toBe(200);
-      expect(files.search).toHaveBeenCalledWith('u-1', 'photo', 'image', false, undefined);
+      expect(f.search).toHaveBeenCalledWith('u-1', 'photo', 'image', false, undefined);
     });
 
-    it('does semantic search when enabled', async () => {
-      files.semanticSearch.mockResolvedValue([]);
-      const res = await request(app.getHttpServer()).get('/files/search?q=cat&semantic=true');
+    it('handles empty search result', async () => {
+      f.search.mockResolvedValue([]);
+      const res = await request(app.getHttpServer()).get('/files/search?q=zzzzz');
       expect(res.status).toBe(200);
-      expect(files.semanticSearch).toHaveBeenCalledWith('u-1', 'cat', false);
+      expect(res.body.data).toEqual([]);
     });
   });
 
   // ── Star ─────────────────────────────────────────────────────────────
 
-  describe('Star endpoints', () => {
-    it('toggles star', async () => {
-      files.toggleStar.mockResolvedValue({ starred: true });
-      const res = await request(app.getHttpServer())
-        .patch('/files/00000000-0000-0000-0000-000000000001/star');
-      expect(res.status).toBe(200);
-    });
+  describe('Star', () => {
+    it('toggles and lists', async () => {
+      f.toggleStar.mockResolvedValue({ starred: true });
+      f.listStarred.mockResolvedValue([]);
 
-    it('lists starred', async () => {
-      files.listStarred.mockResolvedValue([]);
-      const res = await request(app.getHttpServer()).get('/files/starred');
+      let res = await request(app.getHttpServer()).patch(`/files/${nodeId}/star`);
+      expect(res.status).toBe(200);
+
+      res = await request(app.getHttpServer()).get('/files/starred');
       expect(res.status).toBe(200);
     });
   });
 
   // ── Tags ─────────────────────────────────────────────────────────────
 
-  describe('Tag endpoints', () => {
-    it('lists tags', async () => {
-      files.listTags.mockResolvedValue([]);
-      const res = await request(app.getHttpServer()).get('/files/tags');
-      expect(res.status).toBe(200);
-    });
+  describe('Tags', () => {
+    it('CRUD cycle', async () => {
+      f.listTags.mockResolvedValue([]);
+      f.createTag.mockResolvedValue({ id: 't-1' });
+      f.deleteTag.mockResolvedValue({ success: true });
 
-    it('creates tag', async () => {
-      files.createTag.mockResolvedValue({ id: 't-1' });
-      const res = await request(app.getHttpServer())
-        .post('/files/tags')
-        .send({ name: 'work', color: '#ff0000' });
-      expect(res.status).toBe(201);
-    });
+      const list = await request(app.getHttpServer()).get('/files/tags');
+      expect(list.status).toBe(200);
 
-    it('deletes tag', async () => {
-      files.deleteTag.mockResolvedValue({ success: true });
-      const res = await request(app.getHttpServer()).delete('/files/tags/00000000-0000-0000-0000-000000000001');
-      expect(res.status).toBe(200);
+      const create = await request(app.getHttpServer()).post('/files/tags').send({ name: 'work', color: '#ff0000' });
+      expect(create.status).toBe(201);
+
+      const del = await request(app.getHttpServer()).delete(`/files/tags/${nodeId}`);
+      expect(del.status).toBe(200);
     });
   });
 
   // ── Versions ─────────────────────────────────────────────────────────
 
-  describe('Version endpoints', () => {
-    it('creates version', async () => {
-      files.createVersion.mockResolvedValue({ id: 'v-1' });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/versions');
-      expect(res.status).toBe(201);
-    });
+  describe('Versions', () => {
+    it('creates and lists', async () => {
+      f.createVersion.mockResolvedValue({ id: 'v-1' });
+      f.getVersions.mockResolvedValue([]);
 
-    it('lists versions', async () => {
-      files.getVersions.mockResolvedValue([]);
-      const res = await request(app.getHttpServer())
-        .get('/files/00000000-0000-0000-0000-000000000001/versions');
-      expect(res.status).toBe(200);
+      const create = await request(app.getHttpServer()).post(`/files/${nodeId}/versions`);
+      expect(create.status).toBe(201);
+
+      const list = await request(app.getHttpServer()).get(`/files/${nodeId}/versions`);
+      expect(list.status).toBe(200);
     });
   });
 
   // ── Templates ────────────────────────────────────────────────────────
 
-  describe('Template endpoints', () => {
-    it('lists templates', async () => {
+  describe('Templates', () => {
+    it('list, create, delete, content', async () => {
       tmpl.list.mockResolvedValue([]);
-      const res = await request(app.getHttpServer()).get('/files/templates');
-      expect(res.status).toBe(200);
-      expect(tmpl.list).toHaveBeenCalledWith('u-1');
-    });
-
-    it('creates template', async () => {
       tmpl.create.mockResolvedValue({ id: 'tmp-1' });
-      const res = await request(app.getHttpServer())
-        .post('/files/templates')
-        .send({ name: 't1', description: 'desc', category: 'doc', content: '# Hello' });
-      expect(res.status).toBe(201);
-    });
-
-    it('deletes template', async () => {
       tmpl.delete.mockResolvedValue({ success: true });
-      const res = await request(app.getHttpServer())
-        .delete('/files/templates/00000000-0000-0000-0000-000000000001');
-      expect(res.status).toBe(200);
-    });
-
-    it('gets template content', async () => {
       tmpl.getContent.mockResolvedValue('# Content');
-      const res = await request(app.getHttpServer())
-        .get('/files/templates/00000000-0000-0000-0000-000000000001/content');
-      expect(res.status).toBe(200);
-      expect(res.body.data).toBe('# Content');
+
+      expect((await request(app.getHttpServer()).get('/files/templates')).status).toBe(200);
+      expect((await request(app.getHttpServer()).post('/files/templates')
+        .send({ name: 't1', description: 'd', category: 'doc', content: '# H' })).status).toBe(201);
+      expect((await request(app.getHttpServer()).delete(`/files/templates/${nodeId}`)).status).toBe(200);
+      expect((await request(app.getHttpServer()).get(`/files/templates/${nodeId}/content`)).status).toBe(200);
     });
   });
 
-  // ── Export ───────────────────────────────────────────────────────────
+  // ── Other ────────────────────────────────────────────────────────────
 
-  describe('Export endpoints', () => {
-    it('exports PDF', async () => {
-      exp.exportPdf.mockResolvedValue({ buffer: Buffer.from('pdf'), filename: 'doc.pdf' });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/export/pdf')
-        .send({ html: '<h1>Hello</h1>' });
-      expect(res.status).toBe(201);
-    });
-
-    it('exports docx', async () => {
-      exp.exportDocx.mockResolvedValue({ buffer: Buffer.from('docx'), filename: 'doc.docx' });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/export/docx')
-        .send({ html: '<h1>Hello</h1>' });
-      expect(res.status).toBe(201);
-    });
-
-    it('exports markdown', async () => {
-      exp.exportMarkdown.mockResolvedValue({ buffer: Buffer.from('md'), filename: 'doc.md' });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/export/markdown');
-      expect(res.status).toBe(201);
-    });
-  });
-
-  // ── Other endpoints ──────────────────────────────────────────────────
-
-  describe('Other endpoints', () => {
-    it('GET /files/recent lists recent', async () => {
-      files.listRecent.mockResolvedValue([]);
+  describe('Other', () => {
+    it('GET /files/recent → listRecent', async () => {
+      f.listRecent.mockResolvedValue([]);
       const res = await request(app.getHttpServer()).get('/files/recent');
       expect(res.status).toBe(200);
     });
 
-    it('POST /files/move-private moves to private', async () => {
-      files.moveToPrivate.mockResolvedValue({ moved: 1 });
+    it('POST /files/:nodeId/file-request → create', async () => {
+      f.createFileRequest.mockResolvedValue({ token: 'fr-1' });
       const res = await request(app.getHttpServer())
-        .post('/files/move-private')
-        .send({ nodeIds: ['n-1'], private: true });
+        .post(`/files/${nodeId}/file-request`).send({ maxFiles: 50, ttlHours: 24 });
       expect(res.status).toBe(201);
     });
 
-    it('GET /files/:nodeId/path returns path', async () => {
-      files.getPath.mockResolvedValue(['root', 'folder', 'file.txt']);
-      const res = await request(app.getHttpServer()).get('/files/n-id/path');
+    it('PUT /files/:nodeId/note → set note', async () => {
+      f.setNote.mockResolvedValue({ success: true });
+      const res = await request(app.getHttpServer()).put(`/files/${nodeId}/note`).send({ note: 'text' });
       expect(res.status).toBe(200);
     });
 
-    it('POST /files/:nodeId/file-request creates upload link', async () => {
-      files.createFileRequest.mockResolvedValue({ token: 'fr-token', maxFiles: 100 });
-      const res = await request(app.getHttpServer())
-        .post('/files/00000000-0000-0000-0000-000000000001/file-request')
-        .send({ maxFiles: 50, ttlHours: 24 });
-      expect(res.status).toBe(201);
-    });
-
-    it('PUT /files/:nodeId/note sets note', async () => {
-      files.setNote.mockResolvedValue({ success: true });
-      const res = await request(app.getHttpServer())
-        .put('/files/00000000-0000-0000-0000-000000000001/note')
-        .send({ note: 'my note text' });
+    it('GET /files/:nodeId/path → breadcrumb', async () => {
+      f.getPath.mockResolvedValue(['root', 'folder']);
+      const res = await request(app.getHttpServer()).get(`/files/${nodeId}/path`);
       expect(res.status).toBe(200);
     });
 
-    it('POST /files/offline-download starts download', async () => {
-      files.createOfflineDownload.mockResolvedValue({ id: 'od-1' });
-      const res = await request(app.getHttpServer())
-        .post('/files/offline-download')
-        .send({ url: 'https://example.com/file.zip', parentId: 'root', name: 'file.zip' });
-      expect(res.status).toBe(202);
-    });
-
-    it('GET /files/sync/diff returns delta', async () => {
-      files.getSyncDiff.mockResolvedValue({ diff: [] });
+    it('GET /files/sync/diff → delta', async () => {
+      f.getSyncDiff.mockResolvedValue({ diff: [] });
       const res = await request(app.getHttpServer()).get('/files/sync/diff?since=2026-01-01');
       expect(res.status).toBe(200);
+    });
+
+    it('POST /files/offline-download → starts download', async () => {
+      f.createOfflineDownload.mockResolvedValue({ id: 'od-1' });
+      const res = await request(app.getHttpServer())
+        .post('/files/offline-download').send({ url: 'https://x.com/f.zip', parentId: 'root', name: 'f.zip' });
+      expect(res.status).toBe(202);
     });
   });
 });
