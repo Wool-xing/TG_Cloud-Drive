@@ -54,7 +54,9 @@ export class FilesService {
       .andWhere('n.deleted_at IS NULL')
       .andWhere('n.is_private = :isPrivate', { isPrivate });
 
-    if (parentId) {
+    // Guard against non-UUID parentId (e.g. "null", "root") reaching Postgres
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (parentId && uuidRe.test(parentId)) {
       qb.andWhere('n.parent_id = :parentId', { parentId });
     } else {
       qb.andWhere('n.parent_id IS NULL');
