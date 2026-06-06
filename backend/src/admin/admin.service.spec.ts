@@ -273,4 +273,18 @@ describe('AdminService', () => {
       expect(typeof service.getAuditLogs).toBe('function');
     });
   });
+
+  describe('listAllFiles', () => {
+    it('returns paginated files', async () => {
+      const qb = {
+        select: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(), take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      nodeRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+      const r = await service.listAllFiles(1, 10);
+      expect(r).toHaveProperty('items');
+    });
+  });
 });

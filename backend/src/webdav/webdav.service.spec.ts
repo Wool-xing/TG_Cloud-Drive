@@ -310,4 +310,16 @@ describe('WebdavService', () => {
       expect(res.status).toHaveBeenCalledWith(415);
     });
   });
+
+  describe('MOVE', () => {
+    it('detects circular move', async () => {
+      const folder = { id: 'f1', userId: 'u1', name: 'd', type: NodeType.FOLDER, parentId: null } as any;
+      (service as any).resolveFile = jest.fn().mockResolvedValue(folder);
+      (service as any).isDescendant = jest.fn().mockResolvedValue(true);
+      const res: any = { status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      const req: any = { headers: { destination: '/api/dav/sub' } };
+      await (service as any).move(req, res, 'u1', 'd');
+      expect(res.status).toHaveBeenCalledWith(409);
+    });
+  });
 });
