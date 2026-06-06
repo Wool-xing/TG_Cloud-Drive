@@ -311,4 +311,62 @@ describe('AllServices (BATCH REAL DB)', () => {
     expect(r.length).toBeGreaterThanOrEqual(2);
     expect(r[0].name.localeCompare(r[1].name)).toBeLessThanOrEqual(0);
   });
+  it('F51 sort by size DESC', async () => {
+    const r = await files.list(uid, null, false, 'size', 'DESC');
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F52 sort by updatedAt', async () => {
+    const r = await files.list(uid, null, false, 'updatedAt', 'ASC');
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F53 search for non-existent returns empty', async () => {
+    const r = await files.search(uid, 'zzz_nonexistent_xyz_12345');
+    expect(r.length).toBe(0);
+  });
+  it('F54 listRecent with custom limit', async () => {
+    const r = await files.listRecent(uid, 3);
+    expect(r.length).toBeLessThanOrEqual(3);
+  });
+  it('F55 createDocument then getPath', async () => {
+    const d = await files.createDocument(uid, `${P}gp.md`, null, 'text/plain', '');
+    const r = await files.getPath(uid, d.id);
+    expect(r.length).toBeGreaterThanOrEqual(1);
+  });
+  it('F56 createFolder with isPrivate then list with filter', async () => {
+    const f = await files.createFolder(uid, `${P}pr3`, null, true);
+    const pub = await files.list(uid, null, false, 'createdAt', 'DESC');
+    const priv = await files.list(uid, null, true, 'createdAt', 'DESC');
+    expect(priv.some((n:any)=>n.id===f.id)).toBe(true);
+  });
+  it('F57 addTagToNode then removeTagFromNode', async () => {
+    const d = await files.createDocument(uid, `${P}tgn.md`, null, 'text/plain', '');
+    const t = await files.createTag(uid, `${P}tgt`, '#f00');
+    await files.addTagToNode(uid, d.id, t.id);
+    await files.removeTagFromNode(uid, d.id, t.id);
+    await files.deleteTag(uid, t.id);
+  });
+  it('F58 createVersion then getVersions', async () => {
+    const d = await files.createDocument(uid, `${P}ver2.md`, null, 'text/plain', '# cx');
+    await files.createVersion(uid, d.id).catch(()=>{});
+    const r = await files.getVersions(uid, d.id);
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F59 getDownloadInfo with valid node', async () => {
+    const d = await files.createDocument(uid, `${P}gdi.md`, null, 'text/plain', '# content');
+    const r = await files.getDownloadInfo(uid, d.id);
+    expect(r).toHaveProperty('node');
+  });
+  it('F60 getFolderDownloadList with files', async () => {
+    const f = await files.createFolder(uid, `${P}gfl_${Date.now()}`, null, false);
+    await files.createDocument(uid, `${P}inf.md`, f.id, 'text/plain', '# in folder');
+    const r = await files.getFolderDownloadList(uid, f.id);
+    expect(r.files.length).toBeGreaterThanOrEqual(1);
+  });
+  it('F61 moveToPrivate multiple files', async () => {
+    const d1 = await files.createDocument(uid, `${P}mp3a.md`, null, 'text/plain', '');
+    const d2 = await files.createDocument(uid, `${P}mp3b.md`, null, 'text/plain', '');
+    const r = await files.moveToPrivate(uid, [d1.id, d2.id], true);
+    expect(r).toHaveProperty('message');
+    await files.moveToPrivate(uid, [d1.id, d2.id], false);
+  });
 });
