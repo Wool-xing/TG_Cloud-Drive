@@ -74,6 +74,15 @@ describe('PaymentService', () => {
     it('rejects missing signature', async () => {
       await expect(service.handleWebhook(Buffer.from('{}'), '')).rejects.toThrow();
     });
+
+    it('handles valid webhook event', async () => {
+      subRepo.findOne.mockResolvedValue(null);
+      subRepo.create.mockReturnValue({});
+      subRepo.save.mockResolvedValue({});
+      const payload = JSON.stringify({ type: 'customer.subscription.updated', data: { object: {} } });
+      const r = await service.handleWebhook(Buffer.from(payload), 'valid_sig');
+      expect(r).toHaveProperty('received', true);
+    });
   });
 
   describe('createPortalSession', () => {
