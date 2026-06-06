@@ -167,6 +167,13 @@ async function handleUploadChunk(request: Request, env: Env): Promise<Response> 
     return corsError('Unauthorized', 401, request, env);
   }
 
+  // Prevent memory exhaustion: reject oversized uploads before parsing formData.
+  const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+  const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
+  if (contentLength > MAX_UPLOAD_BYTES) {
+    return corsError('Payload too large', 413, request, env);
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();
