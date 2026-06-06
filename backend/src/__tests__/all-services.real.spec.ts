@@ -527,4 +527,58 @@ describe('AllServices (BATCH REAL DB)', () => {
     expect(priv.length).toBeGreaterThanOrEqual(1);
     await files.moveToPrivate(uid, [d.id], false);
   });
+
+  // ── Admin extended ──────────────────────────────────────────────────
+  it('A8 createUser', async () => {
+    const r = await admin.createUser(uid, { username: `${P}nu`, password: 'Test1234!', role: 'user' as any }, '127.0.0.1', 'jest');
+    expect(r).toHaveProperty('id');
+  });
+  it('A9 deleteUser', async () => {
+    // Create a user to delete
+    const newU = await admin.createUser(uid, { username: `${P}del`, password: 'Test1234!', role: 'user' as any }, '127.0.0.1', 'jest');
+    const r = await admin.deleteUser(uid, newU.id, 'AdminPass1!', '127.0.0.1', 'jest');
+    expect(r).toHaveProperty('message');
+  });
+  it('A10 forceLogout', async () => {
+    const r = await admin.forceLogout(uid, uid, 'AdminPass1!', '127.0.0.1', 'jest');
+    expect(r).toHaveProperty('message');
+  });
+  it('A11 updateSystemConfig', async () => {
+    const r = await admin.updateSystemConfig(uid, { appName: 'TestName' }, '127.0.0.1', 'jest');
+    expect(r).toHaveProperty('message');
+  });
+  it('A12 testVerifyCode', async () => {
+    const r = await admin.testVerifyCode(uid, 'email', '123456', '127.0.0.1', 'jest');
+    expect(r).toHaveProperty('message');
+  });
+
+  // ── Webdav extended ─────────────────────────────────────────────────
+  it('W6 resolvePath returns null for missing', async () => {
+    const r = await (webdav as any).resolvePath(uid, 'nonexistent/path/here');
+    expect(r).toBeNull();
+  });
+  it('W7 resolveFile returns null for missing', async () => {
+    const r = await (webdav as any).resolveFile(uid, 'nonexistent_file.txt');
+    expect(r).toBeNull();
+  });
+  it('W8 encodePath for folder', async () => {
+    const r = (webdav as any).encodePath('/base', 'folder', true);
+    expect(r).toContain('folder');
+    expect(r.endsWith('/')).toBe(true);
+  });
+  it('W9 encodePath for file', async () => {
+    const r = (webdav as any).encodePath('/base', 'file.txt', false);
+    expect(r).toContain('file.txt');
+    expect(r.endsWith('/')).toBe(false);
+  });
+
+  // ── Shares extended ─────────────────────────────────────────────────
+  it('S6 getShareToken returns full token', async () => {
+    const n = nodeRepo.create({ userId: uid, name: `${P}stok.txt`, type: NodeType.FILE, isPrivate: false });
+    await nodeRepo.save(n);
+    const sh = await shares.createShare(uid, { nodeId: n.id });
+    const r = await shares.getShareToken(uid, sh.id);
+    expect(r).toHaveProperty('token');
+    expect(r.token.length).toBeGreaterThan(10);
+  });
 });
