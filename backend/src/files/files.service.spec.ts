@@ -525,9 +525,18 @@ describe('FilesService', () => {
     });
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═════════════════════════════════════════════════════════════════════════
+  describe('getThumbnailUrl', () => {
+    it('returns null when thumbnail missing', async () => {
+      nodeRepo.findOne.mockResolvedValue(makeNode({ thumbnailFileId: null }));
+      const result = await service.getThumbnailUrl('u-1', 'node-1');
+      expect(result).toBeNull();
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
   // listTags
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═════════════════════════════════════════════════════════════════════════
   describe('listTags', () => {
     it('returns user tags', async () => {
       tagRepo.find.mockResolvedValue([{ id: 't-1', name: 'important', color: '#f00' }]);
