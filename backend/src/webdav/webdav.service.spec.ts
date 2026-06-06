@@ -259,4 +259,24 @@ describe('WebdavService', () => {
       expect(r).toBeNull();
     });
   });
+
+  describe('PROPFIND', () => {
+    it('returns 404 for non-folder node', async () => {
+      const res: any = { status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      nodeRepo.findOne.mockResolvedValue({ id: 'f1', type: NodeType.FILE } as any);
+      await (service as any).propfind({} as any, res, 'u1', 'file.txt');
+      expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('lists children for existing folder', async () => {
+      const folder = { id: 'f1', name: 'docs', type: NodeType.FOLDER, createdAt: new Date(), updatedAt: new Date() } as any;
+      nodeRepo.findOne.mockResolvedValue(folder);
+      nodeRepo.find.mockResolvedValue([{ id: 'n1', name: 'test.txt', type: NodeType.FILE, size: 100, mimeType: 'text/plain', createdAt: new Date(), updatedAt: new Date() }] as any);
+      const res: any = { set: jest.fn().mockReturnThis(), status: jest.fn().mockReturnThis(), send: jest.fn() };
+      await (service as any).propfind({} as any, res, 'u1', 'docs');
+      expect(res.status).toHaveBeenCalledWith(207);
+      expect(res.send).toHaveBeenCalled();
+    });
+  });
+
 });
