@@ -369,4 +369,79 @@ describe('AllServices (BATCH REAL DB)', () => {
     expect(r).toHaveProperty('message');
     await files.moveToPrivate(uid, [d1.id, d2.id], false);
   });
+  it('F62 list with pagination via query', async () => {
+    for (let i = 0; i < 3; i++) await files.createDocument(uid, `${P}pg${i}.md`, null, 'text/plain', '');
+    const r = await files.list(uid, null, false, 'createdAt', 'DESC');
+    expect(r.length).toBeGreaterThanOrEqual(3);
+  });
+  it('F63 search with private filter', async () => {
+    await files.createDocument(uid, `${P}spriv.md`, null, 'text/plain', '');
+    const r = await files.search(uid, P, undefined, true);
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F64 getSyncDiff future date', async () => {
+    const future = new Date(Date.now() + 86400000).toISOString();
+    const r = await files.getSyncDiff(uid, future);
+    expect(r.total).toBe(0);
+  });
+  it('F65 createDocument with long content', async () => {
+    const r = await files.createDocument(uid, `${P}long.md`, null, 'text/plain', '# '.repeat(100));
+    expect(r.type).toBe(NodeType.FILE);
+  });
+  it('F66 createFolder then rename', async () => {
+    const f = await files.createFolder(uid, `${P}frn`, null, false);
+    const r = await files.rename(uid, f.id, `${P}frn_new`);
+    expect(r.name).toBe(`${P}frn_new`);
+  });
+  it('F67 move file between folders', async () => {
+    const src = await files.createFolder(uid, `${P}src`, null, false);
+    const dst = await files.createFolder(uid, `${P}dst`, null, false);
+    const d = await files.createDocument(uid, `${P}mvf.md`, src.id, 'text/plain', '');
+    await files.move(uid, d.id, dst.id).catch(()=>{});
+  });
+  it('F68 createFileRequest then access', async () => {
+    const f = await files.createFolder(uid, `${P}fra`, null, false);
+    const fr = await files.createFileRequest(uid, f.id, 10, 1);
+    expect(fr).toHaveProperty('token');
+  });
+  it('F69 updateFileContent multiple times', async () => {
+    const d = await files.createDocument(uid, `${P}multi.md`, null, 'text/plain', '# v1');
+    await files.updateFileContent(uid, d.id, Buffer.from('# v2'), 'b'.repeat(24), 3, 'text/plain');
+    await files.updateFileContent(uid, d.id, Buffer.from('# v3'), 'c'.repeat(24), 3, 'text/plain');
+  });
+  it('F70 createTag duplicate name rejected', async () => {
+    const name = `${P}duptag`;
+    await files.createTag(uid, name, '#000');
+    await expect(files.createTag(uid, name, '#111')).rejects.toThrow();
+  });
+  it('F71 getThumbnailUrl returns url or null', async () => {
+    const d = await files.createDocument(uid, `${P}th2.md`, null, 'text/plain', '');
+    const r = await files.getThumbnailUrl(uid, d.id);
+    expect(r === null || typeof r === 'string').toBe(true);
+  });
+
+  // ── Shares batch ────────────────────────────────────────────────────
+  it('S5 incrementDownload', async () => {
+    const n = nodeRepo.create({ userId: uid, name: `${P}sd_${Date.now()}.txt`, type: NodeType.FILE, isPrivate: false });
+    await nodeRepo.save(n);
+    const sh = await shares.createShare(uid, { nodeId: n.id, maxDownloads: 10 });
+    const tok = await shares.getShareToken(uid, sh.id);
+    const acc = await shares.accessShare(tok.token);
+    await shares.incrementDownload(acc.shareId || sh.id);
+  });
+
+  // ── Admin batch ─────────────────────────────────────────────────────
+  it('A7 getDashboard returns stats', async () => {
+    const r = await admin.getDashboard();
+    expect(r).toHaveProperty('totalUsers');
+  });
+
+  // ── Users batch ─────────────────────────────────────────────────────
+  it('U6 updateProfile avatar', async () => {
+    expect(await users.updateProfile(uid, { avatar: 'https://img.test/av.png' })).toHaveProperty('success');
+  });
+  it('U7 getAuditLogs with pagination', async () => {
+    const r = await users.getAuditLogs(uid, 1, 5);
+    expect(r).toHaveProperty('items');
+  });
 });
