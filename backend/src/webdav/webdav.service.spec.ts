@@ -299,4 +299,15 @@ describe('WebdavService', () => {
       expect(res.status).toHaveBeenCalledWith(204);
     });
   });
+
+  describe('GET', () => {
+    it('rejects E2E file without encryption key', async () => {
+      const file = { id: 'f1', userId: 'u1', name: 'e.bin', type: NodeType.FILE, size: 100, isPrivate: false } as any;
+      (service as any).resolveFile = jest.fn().mockResolvedValue(file);
+      (service as any).keyRepo = { findOne: jest.fn().mockResolvedValue(null) };
+      const res: any = { set: jest.fn().mockReturnThis(), status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      await (service as any).get({ headers: {} } as any, res, 'u1', 'e.bin');
+      expect(res.status).toHaveBeenCalledWith(415);
+    });
+  });
 });
