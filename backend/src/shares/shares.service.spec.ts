@@ -12,7 +12,7 @@ describe('SharesService', () => {
   let shareRepo: any;
   let nodeRepo: any;
 
-  const mockRedis = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+  const mockRedis = { get: jest.fn().mockResolvedValue(null), set: jest.fn(), del: jest.fn(), incr: jest.fn(), expire: jest.fn() };
   const mockConfig = { get: jest.fn(() => 'test-key') };
 
   beforeEach(async () => {
@@ -85,6 +85,65 @@ describe('SharesService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].tokenPreview).toBeDefined();
       expect(result[0].nodeName).toBe('doc.pdf');
+    });
+  });
+
+  describe('accessShare', () => {
+    const validShare = {
+      id: 's1', token: 'abc123', nodeId: 'n1', isActive: true,
+      passwordHash: null, expireAt: null, maxDownloads: null, downloadCount: 0,
+      oneTime: false, shareKeyFragment: null, createdAt: new Date(),
+    };
+
+    const validNode = { id: 'n1', name: 'test.pdf', deletedAt: null, type: 'file' };
+
+    beforeEach(() => {
+      nodeRepo.findOne.mockResolvedValue(validNode);
+    });
+
+    it('returns share info for valid token', async () => {
+      shareRepo.findOne.mockResolvedValue(validShare);
+      const result = await service.accessShare('abc123');
+      expect(result.nodeId).toBe('n1');
+    });
+
+    it('throws for non-existent token', async () => {
+      shareRepo.findOne.mockResolvedValue(null);
+      await expect(service.accessShare('bad-token')).rejects.toThrow();
+    });
+
+    it('throws for inactive share', async () => {
+      shareRepo.findOne.mockResolvedValue({ ...validShare, isActive: false });
+      await expect(service.accessShare('abc123')).rejects.toThrow();
+    });
+
+    it('verifies password when share has one', async () => {
+      const { comparePassword } = require('../common/encryption');
+      comparePassword.mockResolvedValue(true);
+      shareRepo.findOne.mockResolvedValue({ ...validShare, passwordHash: '$2b$hash' });
+      const result = await service.accessShare('abc123', 'correct');
+      expect(result.nodeId).toBe('n1');
+    });
+
+    it('throws on wrong password', async () => {
+      const { comparePassword } = require('../common/encryption');
+      comparePassword.mockResolvedValue(false);
+      shareRepo.findOne.mockResolvedValue({ ...validShare, passwordHash: '$2b$hash' });
+      await expect(service.accessShare('abc123', 'wrong')).rejects.toThrow();
+    });
+
+    it('throws for expired share', async () => {
+      shareRepo.findOne.mockResolvedValue({
+        ...validShare, expireAt: new Date('2020-01-01'),
+      });
+      await expect(service.accessShare('abc123')).rejects.toThrow();
+    });
+
+    it('throws when download limit reached', async () => {
+      shareRepo.findOne.mockResolvedValue({
+        ...validShare, maxDownloads: 3, downloadCount: 3,
+      });
+      await expect(service.accessShare('abc123')).rejects.toThrow();
     });
   });
 
