@@ -217,4 +217,39 @@ describe('AllServices (BATCH REAL DB)', () => {
       expect(await shares.deleteShare(uid, list[0].id)).toHaveProperty('message');
     }
   });
+
+  // ── Files batch 3 ──────────────────────────────────────────────────
+  it('F35 createDocument with null byte stripped', async () => {
+    const r = await files.createDocument(uid, `${P}x00.md`, null, 'text/plain', '');
+    expect(r.name).toBe(`${P}x00.md`);
+  });
+  it('F36 set lock and verify', async () => {
+    const d = await files.createDocument(uid, `${P}lv.md`, null, 'text/plain', '# c');
+    await files.setLock(uid, d.id, 'Lock99!');
+    expect(await files.verifyLock(uid, d.id, 'Lock99!')).toBeDefined();
+    await files.removeLock(uid, d.id, 'Lock99!');
+  });
+  it('F37 createDocument with content then getDownloadInfo', async () => {
+    const d = await files.createDocument(uid, `${P}dl2.md`, null, 'text/plain', '# test download');
+    const info = await files.getDownloadInfo(uid, d.id);
+    expect(info).toHaveProperty('node');
+  });
+  it('F38 updateFileContent then verify', async () => {
+    const d = await files.createDocument(uid, `${P}upd.md`, null, 'text/plain', '# v1');
+    await files.updateFileContent(uid, d.id, Buffer.from('# v2'), 'a'.repeat(24), 3, 'text/plain');
+    expect(await files.getPath(uid, d.id)).toBeDefined();
+  });
+  it('F39 createTag and add to node', async () => {
+    const d = await files.createDocument(uid, `${P}tg2.md`, null, 'text/plain', '');
+    const t = await files.createTag(uid, `${P}gt2`, '#0f0');
+    await files.addTagToNode(uid, d.id, t.id);
+    await files.removeTagFromNode(uid, d.id, t.id);
+    await files.deleteTag(uid, t.id);
+  });
+  it('F40 getFolderDownloadList for empty folder', async () => {
+    const f = await files.createFolder(uid, `${P}edl`, null, false);
+    const r = await files.getFolderDownloadList(uid, f.id);
+    expect(r).toHaveProperty('files');
+    expect(r.files.length).toBe(0);
+  });
 });
