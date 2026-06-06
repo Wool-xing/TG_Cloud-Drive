@@ -70,6 +70,12 @@ describe('PaymentService', () => {
     });
   });
 
+  describe('handleWebhook', () => {
+    it('rejects missing signature', async () => {
+      await expect(service.handleWebhook(Buffer.from('{}'), '')).rejects.toThrow();
+    });
+  });
+
   describe('createPortalSession', () => {
     it('throws when no billing account', async () => {
       subRepo.findOne.mockResolvedValue(null);
