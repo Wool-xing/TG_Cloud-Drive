@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body, Req, Headers, RawBodyRequest, HttpCode } f
 import { Request } from 'express';
 import { PaymentService } from './payment.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { PlanTier } from './entities/subscription.entity';
 
 @Controller('api/payment')
@@ -27,6 +28,7 @@ export class PaymentController {
    * Stripe webhook — must receive raw body for signature verification.
    * Express raw body is configured in main.ts for this route.
    */
+  @Public()
   @Post('webhook')
   @HttpCode(200)
   async webhook(
