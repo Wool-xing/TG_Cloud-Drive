@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { NoteTemplate } from './entities/note-template.entity';
@@ -23,6 +23,8 @@ export class TemplateService {
     category: string,
     content: string,
   ) {
+    if (!name || name.length > 200) throw new BadRequestException('模板名称无效');
+    if (content && content.length > 500_000) throw new BadRequestException('模板内容过大');
     return this.templateRepo.save(
       this.templateRepo.create({ userId, name, description, category, content, isSystem: false }),
     );

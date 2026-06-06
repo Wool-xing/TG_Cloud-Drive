@@ -19,8 +19,11 @@ export class TelegramStorageProvider implements StorageProvider {
   private workersSecret: string;
 
   constructor(private cs: ConfigService) {
-    this.token = cs.get<string>('TG_BOT_TOKEN')!;
-    this.channelId = cs.get<string>('TG_CHANNEL_ID')!;
+    this.token = cs.get<string>('TG_BOT_TOKEN');
+    this.channelId = cs.get<string>('TG_CHANNEL_ID');
+    if (!this.token || !this.channelId) {
+      throw new Error('Telegram storage requires TG_BOT_TOKEN and TG_CHANNEL_ID');
+    }
     this.workersUrl = cs.get<string>('CF_WORKERS_URL') || '';
     this.workersSecret = cs.get<string>('CF_WORKERS_SECRET') || '';
   }
