@@ -38,6 +38,13 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
 
   handleConnection(client: WebSocket) {
     this.logger.debug(`Client connected, awaiting auth`);
+    // Auth deadline: close unauthenticated connections after 15s
+    const deadline = setTimeout(() => {
+      if (!this.getSession(client)) {
+        client.close(4001, 'Authentication timeout');
+      }
+    }, 15000);
+    (client as any).__authTimer = deadline;
   }
 
   handleDisconnect(client: WebSocket) {
@@ -66,6 +73,9 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
       const hasAccess = await this.collab.canAccessDoc(user.userId, payload.docId);
       if (!hasAccess) { client.close(4003, 'Forbidden'); return; }
 
+      // Clear auth deadline on successful authentication
+      clearTimeout((client as any).__authTimer);
+
       // If client is re-authenticating for a different document, leave the old room
       // first to prevent Redis counter drift and room-map leaks.
       const oldSess = this.getSession(client);
@@ -84,11 +94,14 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
 
   // ── Sync ───────────────────────────────────────────────────────────────
 
+  private readonly MAX_MSG_BYTES = 1_000_000; // 1MB per-message limit
+
   @SubscribeMessage('sync')
   handleSync(@ConnectedSocket() client: WebSocket, @MessageBody() data: any) {
     const sess = this.getSession(client);
     if (!sess) return;
     const msg = JSON.stringify(data);
+    if (Buffer.byteLength(msg) > this.MAX_MSG_BYTES) return;
     this.broadcastLocal(sess.docId, msg, client);
     this.publishRedis(sess.docId, msg);
   }
@@ -98,6 +111,7 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
     const sess = this.getSession(client);
     if (!sess) return;
     const msg = JSON.stringify({ type: 'awareness', payload: data });
+    if (Buffer.byteLength(msg) > this.MAX_MSG_BYTES) return;
     this.broadcastLocal(sess.docId, msg, client);
     this.publishRedis(sess.docId, msg);
   }
@@ -137,7 +151,7 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
     if (!room) return;
     for (const ws of room) {
       if (ws !== exclude && ws.readyState === WebSocket.OPEN) {
-        ws.send(msg);
+        try { ws.send(msg); } catch { /* one client broken shouldn't block others */ }
       }
     }
   }
