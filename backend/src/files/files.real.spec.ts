@@ -234,4 +234,54 @@ describe('FilesService (REAL DB)', () => {
     const doc = await service.createDocument(userId, `${PREFIX}priv.md`, null, 'text/plain', '');
     expect(await service.moveToPrivate(userId, [doc.id], true)).toHaveProperty('moved');
   });
+
+  it('createFolder in parent', async () => {
+    const parent = await service.createFolder(userId, `${PREFIX}par`, null, false);
+    const child = await service.createFolder(userId, `${PREFIX}sub`, parent.id, false);
+    expect(child.parentId).toBe(parent.id);
+  });
+
+  it('list with type filter', async () => {
+    const items = await service.list(userId, null, false, 'createdAt', 'DESC', 'folder');
+    expect(items.every((n: any) => n.type === 'folder')).toBe(true);
+  });
+
+  it('search with type filter', async () => {
+    const results = await service.search(userId, P, 'folder', false);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('listRecent with limit', async () => {
+    const r = await (service as any).listRecent(userId, 3);
+    expect(r.length).toBeLessThanOrEqual(3);
+  });
+
+  it('getDownloadInfo returns node info', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}dl.md`, null, 'text/plain', '# d');
+    const r = await service.getDownloadInfo(userId, doc.id);
+    expect(r).toHaveProperty('node');
+  });
+
+  it('file request with custom params', async () => {
+    const f = await service.createFolder(userId, `${PREFIX}fr2`, null, false);
+    const fr = await service.createFileRequest(userId, f.id, 50, 48);
+    expect(fr.maxFiles).toBe(50);
+  });
+
+  it('duplicate folder name rejected', async () => {
+    const name = `${PREFIX}dup`;
+    await service.createFolder(userId, name, null, false);
+    await expect(service.createFolder(userId, name, null, false)).rejects.toThrow();
+  });
+
+  it('empty search returns all', async () => {
+    const r = await service.search(userId, '', undefined, false);
+    expect(Array.isArray(r)).toBe(true);
+  });
+
+  it('setNote on folder', async () => {
+    const f = await service.createFolder(userId, `${PREFIX}n`, null, false);
+    const r = await service.setNote(userId, f.id, 'folder note');
+    expect(r.note).toBe('folder note');
+  });
 });
