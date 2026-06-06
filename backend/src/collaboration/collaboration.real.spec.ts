@@ -87,4 +87,38 @@ describe('CollaborationService (REAL DB)', () => {
     expect(r).toBeDefined();
     expect(r.userId).toBe(userId);
   });
+
+  it('verifyToken returns null for invalid JWT', async () => {
+    const r = await service.verifyToken('invalid.token.here');
+    expect(r).toBeNull();
+  });
+
+  it('verifyToken returns null for expired JWT', async () => {
+    const jwtService = new (require('@nestjs/jwt').JwtService)({ secret: 'test' });
+    const token = jwtService.sign({ sub: userId }, { expiresIn: '1ms' });
+    await new Promise(r => setTimeout(r, 10));
+    const r = await service.verifyToken(token);
+    expect(r).toBeNull();
+  });
+
+  it('getDocumentInfo returns document metadata', async () => {
+    const n = nodeRepo.create({ userId, name: `${P}col.md`, type: NodeType.FILE, isPrivate: false });
+    await nodeRepo.save(n);
+    const r = await service.getDocumentInfo(n.id);
+    expect(r.name).toBe(`${P}col.md`);
+  });
+
+  it('getDocumentInfo throws for non-existent', async () => {
+    await expect(service.getDocumentInfo('00000000-0000-0000-0000-000000000000')).rejects.toThrow();
+  });
+
+  it('getCollaborators returns count (no peers)', async () => {
+    const r = await service.getCollaborators(nodeId);
+    expect(typeof r).toBe('number');
+  });
+
+  it('canAccessDoc denies non-owner', async () => {
+    const otherId = '00000000-0000-0000-0000-000000000999';
+    expect(await service.canAccessDoc(otherId, nodeId)).toBe(false);
+  });
 });
