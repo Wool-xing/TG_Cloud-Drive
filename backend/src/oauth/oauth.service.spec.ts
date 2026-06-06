@@ -73,6 +73,73 @@ describe('OauthService', () => {
     });
   });
 
+  describe('findOrCreateUser', () => {
+    const googleProfile = { provider: 'google' as const, providerId: 'g123', email: 'a@gmail.com', name: 'Alice', avatar: null };
+
+    it('returns existing user by OAuth provider + id', async () => {
+      const existing = { id: 'u1', username: 'alice', oauthProvider: 'google', oauthId: 'g123', status: 'active' };
+      userRepo.findOne.mockResolvedValue(existing);
+      const result = await service.findOrCreateUser(googleProfile);
+      expect(result).toBe(existing);
+    });
+
+    it('throws when existing user is disabled', async () => {
+      userRepo.findOne.mockResolvedValue({ id: 'u1', status: 'disabled' });
+      await expect(service.findOrCreateUser(googleProfile)).rejects.toThrow('禁用');
+    });
+
+    it('creates new user when no OAuth link exists', async () => {
+      userRepo.findOne.mockResolvedValueOnce(null) // OAuth lookup
+        .mockResolvedValueOnce(null); // username uniqueness check
+      userRepo.create.mockReturnValue({ id: 'new-user', username: 'Alice' });
+      userRepo.save.mockResolvedValue({ id: 'new-user', username: 'Alice' });
+      const subRepo = { create: jest.fn().mockReturnValue({}), save: jest.fn() };
+      (service as any).subRepo = subRepo;
+
+      const result = await service.findOrCreateUser(googleProfile);
+      expect(result.id).toBe('new-user');
+    });
+
+    it('handles username conflict by appending suffix', async () => {
+      userRepo.findOne
+        .mockResolvedValueOnce(null) // OAuth lookup
+        .mockResolvedValueOnce({})   // username 'Alice' exists
+        .mockResolvedValueOnce(null); // username 'Alice1' available
+      userRepo.create.mockReturnValue({ id: 'u1c', username: 'Alice1' });
+      userRepo.save.mockResolvedValue({ id: 'u1c', username: 'Alice1' });
+      const subRepo = { create: jest.fn().mockReturnValue({}), save: jest.fn() };
+      (service as any).subRepo = subRepo;
+
+      const result = await service.findOrCreateUser(googleProfile);
+      expect(result.username).toBe('Alice1');
+    });
+
+    it('updates avatar on each login for existing user', async () => {
+      const existing = { id: 'u1', oauthProvider: 'google', oauthId: 'g123', avatar: 'old.jpg', status: 'active' };
+      userRepo.findOne.mockResolvedValue(existing);
+      await service.findOrCreateUser({ ...googleProfile, avatar: 'new.jpg' });
+      expect(userRepo.update).toHaveBeenCalledWith('u1', { avatar: 'new.jpg' });
+    });
+
+    it('retries on unique constraint violation (race condition guard)', async () => {
+      userRepo.findOne
+        .mockResolvedValueOnce(null) // OAuth lookup
+        .mockResolvedValueOnce(null) // username: Alice
+        .mockResolvedValueOnce(null); // retry: Alice2
+      // Return the current username (simulated by returning different objects)
+      userRepo.create.mockReturnValueOnce({ id: 'u1', username: 'Alice' })
+        .mockReturnValueOnce({ id: 'u2', username: 'Alice2' });
+      userRepo.save
+        .mockRejectedValueOnce({ code: '23505' })
+        .mockResolvedValueOnce({ id: 'u2', username: 'Alice2' });
+      const subRepo = { create: jest.fn().mockReturnValue({}), save: jest.fn() };
+      (service as any).subRepo = subRepo;
+
+      const result = await service.findOrCreateUser(googleProfile);
+      expect(result.username).toBe('Alice2');
+    });
+  });
+
   describe('unlinkAccount', () => {
     it('throws when OAuth not linked', async () => {
       userRepo.findOne.mockResolvedValue({ id: 'u1', oauthProvider: null, passwordHash: 'hash' });
