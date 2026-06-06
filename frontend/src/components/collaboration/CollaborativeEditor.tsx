@@ -24,7 +24,8 @@ export default function CollaborativeEditor({ docId, token, serverUrl, userName 
   const ydoc = useMemo(() => new Y.Doc(), [docId]);
 
   const provider = useMemo(() => {
-    const wsUrl = serverUrl.replace(/^http/, 'ws') + '/api/collab';
+    const safeUrl = /^https?:\/\/[^\s]+$/.test(serverUrl) ? serverUrl : window.location.origin;
+    const wsUrl = safeUrl.replace(/^http/, 'ws') + '/api/collab';
     const p = new WebsocketProvider(wsUrl, docId, ydoc, {
       params: { token },
       connect: true,
@@ -34,7 +35,8 @@ export default function CollaborativeEditor({ docId, token, serverUrl, userName 
     });
     p.on('sync', () => setConnected(true));
     p.on('connection-error', () => setError('Connection failed'));
-    p.awareness.setLocalState({ name: userName || 'Anonymous', color: randomColor() });
+    const safeName = String(userName || 'Anonymous').replace(/<[^>]*>/g, '').slice(0, 50) || 'Anonymous';
+    p.awareness.setLocalState({ name: safeName, color: randomColor() });
     p.awareness.on('change', () => {
       setPeers(p.awareness.getStates().size - 1); // exclude self
     });

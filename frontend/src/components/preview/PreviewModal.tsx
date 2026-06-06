@@ -625,7 +625,9 @@ export default function PreviewModal({ nodes }: PreviewModalProps) {
         }
       } catch (err: any) {
         const msg = err?.response?.data?.message ?? err?.message ?? t('preview.loadError');
-        if (msg.includes('lock') || msg.includes('密码') || msg.toLowerCase().includes('password') || err?.response?.status === 403) {
+        // 403 Forbidden is the primary signal; fall back to lock-specific keywords only
+        if (err?.response?.status === 403 ||
+            msg.includes('文件已加密') || msg.includes('密码保护') || msg.includes('locked file')) {
           setNeedsLockPassword(true);
           setPreviewState({ status: 'error', message: t('preview.locked') });
         } else {

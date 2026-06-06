@@ -142,6 +142,7 @@ export default function SharedAccess() {
 
       if (!chunks.length) {
         toast.error(t('shareAccess.noChunks'));
+        setIsDownloading(false);
         return;
       }
 
