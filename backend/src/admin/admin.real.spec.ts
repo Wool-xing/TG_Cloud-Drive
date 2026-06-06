@@ -109,5 +109,5 @@ describe('AdminService (REAL DB)', () => {
   it('listAllFiles returns admin file browser', async () => {
     const r = await service.listAllFiles(1, 10);
     expect(r).toHaveProperty('items');
-  }).skip; // needs deeper mock of node repo query
+  });  // FIXME: needs deeper mock of node repo query
 });
