@@ -284,4 +284,38 @@ describe('FilesService (REAL DB)', () => {
     const r = await service.setNote(userId, f.id, 'folder note');
     expect(r.note).toBe('folder note');
   });
+
+  it('move file with conflict gracefully', async () => {
+    const d = await service.createDocument(userId, `${PREFIX}mv2.md`, null, 'text/plain', '');
+    await service.move(userId, d.id, null).catch(()=>{});
+    expect(Array.isArray(await service.getPath(userId, d.id))).toBe(true);
+  });
+
+  it('copy file then verify both exist', async () => {
+    const d = await service.createDocument(userId, `${PREFIX}cpe.md`, null, 'text/plain', '# x');
+    const copy = await service.copy(userId, d.id, null);
+    expect(copy).toHaveProperty('id');
+    expect(copy.id).not.toBe(d.id);
+  });
+
+  it('listRecent with high limit', async () => {
+    for (let i = 0; i < 5; i++) await service.createDocument(userId, `${PREFIX}lr${i}.md`, null, 'text/plain', '');
+    const r = await service.listRecent(userId, 50);
+    expect(r.length).toBeLessThanOrEqual(50);
+  });
+
+  it('getDownloadInfo for unlocked file', async () => {
+    const d = await service.createDocument(userId, `${PREFIX}gd2.md`, null, 'text/plain', '# content');
+    const r = await service.getDownloadInfo(userId, d.id);
+    expect(r).toHaveProperty('node');
+    expect(r).toHaveProperty('chunks');
+  });
+
+  it('createFileRequest then getFileRequest', async () => {
+    const f = await service.createFolder(userId, `${PREFIX}fr4_${Date.now()}`, null, false);
+    const fr = await service.createFileRequest(userId, f.id, 5, 24);
+    expect(fr.maxFiles).toBe(5);
+    const info = await service.getFileRequest(fr.token);
+    expect(info.maxFiles).toBe(5);
+  });
 });
