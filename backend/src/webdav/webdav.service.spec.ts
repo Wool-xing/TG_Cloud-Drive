@@ -1,12 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { UnauthorizedException } from '@nestjs/common';
+import { Request } from 'express';
 import { WebdavService } from './webdav.service';
 import { Node, NodeType } from '../files/entities/node.entity';
 import { FileChunk } from '../files/entities/file-chunk.entity';
 import { NodeKey } from '../files/entities/node-key.entity';
-import { User } from '../users/entities/user.entity';
+import { User, UserStatus } from '../users/entities/user.entity';
 import { StorageService } from '../storage/storage.service';
+import * as bcrypt from 'bcrypt';
+
+jest.mock('bcrypt');
 
 describe('WebdavService', () => {
   let service: WebdavService;
@@ -98,6 +103,96 @@ describe('WebdavService', () => {
       nodeRepo.findOne.mockResolvedValue({ id: 'a', parentId: 'root-a' });
       const result = await (service as any).isDescendant('user-1', 'parent', 'a');
       expect(result).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  describe('auth()', () => {
+    let userRepo: any;
+    let jwtService: JwtService;
+
+    const makeUser = (o: any = {}) => ({
+      id: 'u-1', username: 'alice', role: 'user', status: UserStatus.ACTIVE,
+      passwordHash: '$2b$12$hash', loginAttempts: 0, lockedUntil: null,
+      ...o,
+    } as User);
+
+    const req = (headers: any = {}) =>
+      ({ headers, ip: '127.0.0.1' } as Request);
+
+    beforeEach(async () => {
+      userRepo = { findOne: jest.fn(), update: jest.fn().mockResolvedValue({}) };
+      const mod: TestingModule = await Test.createTestingModule({
+        imports: [JwtModule.register({ secret: 'test-secret' })],
+        providers: [
+          WebdavService,
+          { provide: getRepositoryToken(Node), useValue: { findOne: jest.fn(), find: jest.fn(), save: jest.fn(), create: jest.fn(), delete: jest.fn(), update: jest.fn() } },
+          { provide: getRepositoryToken(FileChunk), useValue: { find: jest.fn() } },
+          { provide: getRepositoryToken(User), useValue: userRepo },
+          { provide: getRepositoryToken(NodeKey), useValue: { findOne: jest.fn() } },
+          { provide: StorageService, useValue: mockStorage },
+        ],
+      }).compile();
+      service = mod.get(WebdavService);
+      jwtService = mod.get(JwtService);
+    });
+
+    it('throws without Authorization header', async () => {
+      await expect((service as any).auth(req())).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects expired JWT', async () => {
+      const token = jwtService.sign({ sub: 'u-1' }, { expiresIn: '1ms' });
+      await new Promise(r => setTimeout(r, 10));
+      await expect((service as any).auth(req({ authorization: `Bearer ${token}` })))
+        .rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects disabled user (Bearer)', async () => {
+      const token = jwtService.sign({ sub: 'u-1' });
+      userRepo.findOne.mockResolvedValue(makeUser({ status: UserStatus.DISABLED }));
+      await expect((service as any).auth(req({ authorization: `Bearer ${token}` })))
+        .rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects Basic auth with wrong password', async () => {
+      const basic = Buffer.from('alice:wrong').toString('base64');
+      userRepo.findOne.mockResolvedValue(makeUser());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      await expect((service as any).auth(req({ authorization: `Basic ${basic}` })))
+        .rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects Basic auth for locked account', async () => {
+      const basic = Buffer.from('alice:pass').toString('base64');
+      userRepo.findOne.mockResolvedValue(makeUser({
+        lockedUntil: new Date(Date.now() + 3600000), // 1 hour in future
+      }));
+      await expect((service as any).auth(req({ authorization: `Basic ${basic}` })))
+        .rejects.toThrow(UnauthorizedException);
+    });
+
+    it('increments loginAttempts on Basic auth failure', async () => {
+      const basic = Buffer.from('alice:wrong').toString('base64');
+      userRepo.findOne.mockResolvedValue(makeUser());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      try { await (service as any).auth(req({ authorization: `Basic ${basic}` })); } catch {}
+      expect(userRepo.update).toHaveBeenCalledWith('u-1', expect.objectContaining({ loginAttempts: 1 }));
+    });
+
+    it('accepts valid Basic auth and resets attempts', async () => {
+      const basic = Buffer.from('alice:correct').toString('base64');
+      userRepo.findOne.mockResolvedValue(makeUser({ loginAttempts: 3 }));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const user = await (service as any).auth(req({ authorization: `Basic ${basic}` }));
+      expect(user.username).toBe('alice');
+      expect(userRepo.update).toHaveBeenCalledWith('u-1', { loginAttempts: 0, lockedUntil: null });
+    });
+
+    it('rejects Basic auth with empty username', async () => {
+      const basic = Buffer.from(':pass').toString('base64');
+      await expect((service as any).auth(req({ authorization: `Basic ${basic}` })))
+        .rejects.toThrow(UnauthorizedException);
     });
   });
 });
