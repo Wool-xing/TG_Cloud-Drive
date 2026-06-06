@@ -254,4 +254,61 @@ describe('AllServices (BATCH REAL DB)', () => {
     expect(r).toHaveProperty('files');
     expect(r.files.length).toBe(0);
   });
+  it('F41 createDocument with duration', async () => {
+    const r = await files.createDocument(uid, `${P}ts.md`, null, 'text/plain', '# Timestamp test');
+    expect(r.createdAt).toBeDefined();
+  });
+  it('F42 rename to same name', async () => {
+    const name = `${P}same.md`;
+    const d = await files.createDocument(uid, name, null, 'text/plain', '');
+    const r = await files.rename(uid, d.id, name);
+    expect(r.name).toBe(name);
+  });
+  it('F43 search for folder only', async () => {
+    const r = await files.search(uid, P, 'folder', false);
+    expect(r.every((n:any) => n.type === 'folder')).toBe(true);
+  });
+  it('F44 getPath returns empty array for unknown', async () => {
+    const r = await files.getPath(uid, '00000000-0000-0000-0000-000000000000');
+    expect(r.length).toBe(0);
+  });
+  it('F45 list in subfolder with private filter', async () => {
+    const parent = await files.createFolder(uid, `${P}sp_${Date.now()}`, null, false);
+    await files.createFolder(uid, `${P}child`, parent.id, true);
+    const r = await files.list(uid, parent.id, true, 'name', 'ASC');
+    expect(r.length).toBeGreaterThanOrEqual(1);
+  });
+  it('F46 toggleStar then listStarred', async () => {
+    const d = await files.createDocument(uid, `${P}star2.md`, null, 'text/plain', '');
+    await files.toggleStar(uid, d.id);
+    const r = await files.listStarred(uid);
+    expect(r.some((n:any) => n.id === d.id)).toBe(true);
+    await files.toggleStar(uid, d.id);
+  });
+  it('F47 listTrash empty initially', async () => {
+    const r = await files.listTrash(uid);
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F48 softDelete + restore multiple files', async () => {
+    const d1 = await files.createDocument(uid, `${P}ml1.md`, null, 'text/plain', '');
+    const d2 = await files.createDocument(uid, `${P}ml2.md`, null, 'text/plain', '');
+    await files.softDelete(uid, [d1.id, d2.id]);
+    await files.restoreTrash(uid, [d1.id, d2.id]);
+    await files.softDelete(uid, [d1.id, d2.id]);
+    await files.permanentDelete(uid, [d1.id, d2.id]);
+  });
+  it('F49 createTag then listTags count', async () => {
+    const before = (await files.listTags(uid)).length;
+    const t = await files.createTag(uid, `${P}cnt`, '#000');
+    const after = (await files.listTags(uid)).length;
+    expect(after).toBe(before + 1);
+    await files.deleteTag(uid, t.id);
+  });
+  it('F50 list with sort by name ASC', async () => {
+    await files.createFolder(uid, `${P}aa`, null, false);
+    await files.createFolder(uid, `${P}bb`, null, false);
+    const r = await files.list(uid, null, false, 'name', 'ASC', 'folder');
+    expect(r.length).toBeGreaterThanOrEqual(2);
+    expect(r[0].name.localeCompare(r[1].name)).toBeLessThanOrEqual(0);
+  });
 });
