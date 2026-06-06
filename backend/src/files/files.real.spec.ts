@@ -318,4 +318,35 @@ describe('FilesService (REAL DB)', () => {
     const info = await service.getFileRequest(fr.token);
     expect(info.maxFiles).toBe(5);
   });
+
+  it('search with private true returns empty', async () => {
+    const r = await service.search(userId, `${PREFIX}nonexistent_xyz`, undefined, true);
+    expect(r).toHaveLength(0);
+  });
+
+  it('list with order DESC', async () => {
+    const r = await service.list(userId, null, false, 'createdAt', 'DESC');
+    expect(Array.isArray(r)).toBe(true);
+  });
+
+  it('softDelete then permanentDelete folder', async () => {
+    const f = await service.createFolder(userId, `${PREFIX}permf`, null, false);
+    await service.softDelete(userId, [f.id]);
+    const r = await service.permanentDelete(userId, [f.id]);
+    expect(r).toHaveProperty('message');
+  });
+
+  it('createDocument private flag', async () => {
+    const r = await service.createDocument(userId, `${PREFIX}pridoc.md`, null, 'text/plain', '', true);
+    expect(r.isPrivate).toBe(true);
+  });
+
+  it('toggleStar then listStarred validates', async () => {
+    const d = await service.createDocument(userId, `${PREFIX}st2.md`, null, 'text/plain', '');
+    await service.toggleStar(userId, d.id);
+    const starred = await service.listStarred(userId);
+    const found = starred.some((n: any) => n.id === d.id);
+    expect(found).toBe(true);
+    await service.toggleStar(userId, d.id);
+  });
 });
