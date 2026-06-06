@@ -154,7 +154,17 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
     this.subscribed.add(ch);
 
     if (typeof this.redis.subscribe === 'function') {
-      this.redis.subscribe(ch, (msg: string) => {
+      this.redis.subscribe(ch, (envelope: string) => {
+        // Unwrap envelope; skip if published from this same instance
+        // (broadcastLocal already delivered to local peers).
+        let msg: string;
+        try {
+          const parsed = JSON.parse(envelope);
+          if (parsed.i === this.instanceId) return;
+          msg = parsed.m;
+        } catch {
+          msg = envelope; // backwards-compat with old message format
+        }
         const room = this.rooms.get(docId);
         if (!room) return;
         for (const ws of room) {
@@ -180,7 +190,10 @@ export class CollaborationGateway implements OnGatewayInit, OnGatewayConnection,
 
   private publishRedis(docId: string, msg: string) {
     if (typeof this.redis.publish === 'function') {
-      this.redis.publish(this.channel(docId), msg).catch((e: any) =>
+      // Attach instanceId so the subscriber on the same instance filters out
+      // self-published messages (broadcastLocal already delivered them).
+      const envelope = JSON.stringify({ i: this.instanceId, m: msg });
+      this.redis.publish(this.channel(docId), envelope).catch((e: any) =>
         this.logger.warn(`Redis publish failed for channel ${this.channel(docId)}: ${e.message}`),
       );
     }
