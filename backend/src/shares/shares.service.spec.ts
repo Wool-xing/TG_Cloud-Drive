@@ -158,4 +158,40 @@ describe('SharesService', () => {
       await expect(service.deleteShare('user-1', 's1')).rejects.toThrow();
     });
   });
+
+  describe('incrementDownload', () => {
+    it('increments download count', async () => {
+      shareRepo.update.mockResolvedValue({ affected: 1 });
+      await service.incrementDownload('s1');
+      expect(shareRepo.update).toHaveBeenCalledWith('s1', expect.objectContaining({ downloadCount: expect.any(Function) }));
+    });
+  });
+
+  describe('getShareToken', () => {
+    it('returns full token for owner', async () => {
+      shareRepo.findOne.mockResolvedValue({ id: 's1', userId: 'user-1', token: 'full-token-123' });
+      const r = await service.getShareToken('user-1', 's1');
+      expect(r.token).toBe('full-token-123');
+    });
+
+    it('throws for non-owner', async () => {
+      shareRepo.findOne.mockResolvedValue({ id: 's1', userId: 'owner-1' });
+      await expect(service.getShareToken('user-1', 's1')).rejects.toThrow();
+    });
+  });
+
+  describe('createShare', () => {
+    it('creates share with password', async () => {
+      nodeRepo.findOne.mockResolvedValue({ id: 'n1', userId: 'u1', name: 'f.txt', type: 'file', isPrivate: false, isLocked: false, lockHash: null });
+      shareRepo.create.mockReturnValue({ token: 'tok-abc' });
+      shareRepo.save.mockResolvedValue({ id: 's1', token: 'tok-abc' });
+      const r = await service.createShare('u1', { nodeId: 'n1', password: 'pwd', maxDownloads: 5 });
+      expect(r).toHaveProperty('token');
+    });
+
+    it('throws for locked file without password', async () => {
+      nodeRepo.findOne.mockResolvedValue({ id: 'n1', userId: 'u1', isLocked: true, lockHash: 'hash', isPrivate: false });
+      await expect(service.createShare('u1', { nodeId: 'n1' })).rejects.toThrow();
+    });
+  });
 });
