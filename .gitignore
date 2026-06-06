@@ -116,3 +116,6 @@ Thumbs.db
 certs/fullchain.pem
 certs/privkey.pem
 certs/acme-webroot/
+backend/.nyc_output/
+backend/local-storage/
+backend/coverage/
