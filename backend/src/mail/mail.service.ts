@@ -70,7 +70,12 @@ export class MailService {
     let count: number;
     try {
       count = await this.redis.incr(dayKey);
-      if (count === 1) await this.redis.expire(dayKey, 86400);
+      if (count === 1) {
+        await this.redis.expire(dayKey, 86400).catch(() => {
+          // If expire fails, delete the key to prevent permanent lockout
+          this.redis.del(dayKey).catch(() => {});
+        });
+      }
     } catch (e) {
       throw new ServiceUnavailableException('邮件服务暂时不可用，请稍后重试');
     }
