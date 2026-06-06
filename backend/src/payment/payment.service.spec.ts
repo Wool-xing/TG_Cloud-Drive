@@ -83,6 +83,30 @@ describe('PaymentService', () => {
       const r = await service.handleWebhook(Buffer.from(payload), 'valid_sig');
       expect(r).toHaveProperty('received', true);
     });
+
+    it('handles invoice.paid event', async () => {
+      const payload = JSON.stringify({
+        type: 'invoice.paid',
+        data: { object: { subscription: 'sub_123', customer: 'cus_456' } },
+      });
+      subRepo.findOne.mockResolvedValue({ id: 'sub1', stripeSubscriptionId: 'sub_123' });
+      const r = await service.handleWebhook(Buffer.from(payload), 'sig');
+      expect(r).toHaveProperty('received', true);
+    });
+
+    it('handles customer.subscription.deleted event', async () => {
+      const payload = JSON.stringify({
+        type: 'customer.subscription.deleted',
+        data: { object: { id: 'sub_123' } },
+      });
+      subRepo.findOne.mockResolvedValue({ id: 'sub1', stripeSubscriptionId: 'sub_123' });
+      const r = await service.handleWebhook(Buffer.from(payload), 'sig');
+      expect(r).toHaveProperty('received', true);
+    });
+
+    it('rejects webhook with invalid signature', async () => {
+      await expect(service.handleWebhook(Buffer.from('{}'), 'wrong_sig')).rejects.toThrow();
+    });
   });
 
   describe('createPortalSession', () => {
