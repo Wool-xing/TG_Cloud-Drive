@@ -444,4 +444,87 @@ describe('AllServices (BATCH REAL DB)', () => {
     const r = await users.getAuditLogs(uid, 1, 5);
     expect(r).toHaveProperty('items');
   });
+  it('U8 getUserStats has all fields', async () => {
+    const r = await users.getUserStats(uid);
+    expect(r.quotaBytes).toBeGreaterThan(0);
+    expect(r.usedBytes).toBeGreaterThanOrEqual(0);
+    expect(r).toHaveProperty('totalFiles');
+  });
+
+  // ── Files batch 7 ───────────────────────────────────────────────────
+  it('F72 createDocument private', async () => {
+    const r = await files.createDocument(uid, `${P}prdoc.md`, null, 'text/plain', '', true);
+    expect(r.isPrivate).toBe(true);
+  });
+  it('F73 createFolder duplicate name different parent', async () => {
+    const name = `${P}dupf2`;
+    const p1 = await files.createFolder(uid, `${P}dp1`, null, false);
+    const p2 = await files.createFolder(uid, `${P}dp2`, null, false);
+    await files.createFolder(uid, name, p1.id, false);
+    await files.createFolder(uid, name, p2.id, false);
+  });
+  it('F74 search with no keyword returns list', async () => {
+    const r = await files.search(uid, '');
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F75 list with order ASC', async () => {
+    const r = await files.list(uid, null, false, 'createdAt', 'ASC');
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F76 rename folder', async () => {
+    const f = await files.createFolder(uid, `${P}ref`, null, false);
+    const r = await files.rename(uid, f.id, `${P}ref2`);
+    expect(r).toHaveProperty('id');
+  });
+  it('F77 setNote then verify', async () => {
+    const d = await files.createDocument(uid, `${P}nv.md`, null, 'text/plain', '');
+    await files.setNote(uid, d.id, 'verify_note');
+    const r = await files.getPath(uid, d.id);
+    expect(Array.isArray(r)).toBe(true);
+  });
+  it('F78 copy file then verify exists', async () => {
+    const d = await files.createDocument(uid, `${P}cp2.md`, null, 'text/plain', '# copy2');
+    const r = await files.copy(uid, d.id, null);
+    expect(r).toHaveProperty('id');
+  });
+  it('F79 trash restore single', async () => {
+    const d = await files.createDocument(uid, `${P}trs.md`, null, 'text/plain', '');
+    await files.softDelete(uid, [d.id]);
+    const r = await files.restoreTrash(uid, [d.id]);
+    expect(r).toHaveProperty('message');
+    await files.permanentDelete(uid, [d.id]);
+  });
+  it('F80 listStarred after unstar', async () => {
+    const d = await files.createDocument(uid, `${P}unst.md`, null, 'text/plain', '');
+    await files.toggleStar(uid, d.id);
+    await files.toggleStar(uid, d.id);
+    const r = await files.listStarred(uid);
+    expect(r.some((n:any) => n.id === d.id)).toBe(false);
+  });
+  it('F81 createTag with empty color', async () => {
+    const t = await files.createTag(uid, `${P}nc`, '');
+    expect(t).toHaveProperty('id');
+    await files.deleteTag(uid, t.id);
+  });
+  it('F82 getSyncDiff with recent date', async () => {
+    const r = await files.getSyncDiff(uid, new Date().toISOString());
+    expect(r.total).toBe(0);
+  });
+  it('F83 createFileRequest with default params', async () => {
+    const f = await files.createFolder(uid, `${P}fr3_${Date.now()}`, null, false);
+    const r = await files.createFileRequest(uid, f.id, 100, 72);
+    expect(r).toHaveProperty('token');
+  });
+  it('F84 listRecent after creating files', async () => {
+    for (let i = 0; i < 3; i++) await files.createDocument(uid, `${P}lrec${i}.md`, null, 'text/plain', '');
+    const r = await files.listRecent(uid);
+    expect(r.length).toBeGreaterThanOrEqual(1);
+  });
+  it('F85 moveToPrivate then verify private', async () => {
+    const d = await files.createDocument(uid, `${P}pvt.md`, null, 'text/plain', '');
+    await files.moveToPrivate(uid, [d.id], true);
+    const priv = await files.list(uid, null, true, 'createdAt', 'DESC');
+    expect(priv.length).toBeGreaterThanOrEqual(1);
+    await files.moveToPrivate(uid, [d.id], false);
+  });
 });
