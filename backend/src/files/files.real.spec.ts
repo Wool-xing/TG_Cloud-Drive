@@ -195,4 +195,43 @@ describe('FilesService (REAL DB)', () => {
     await service.deleteTag(userId, tag.id);
     // No throw = success
   });
+
+  // ── Lock ──────────────────────────────────────────────────────────
+  it('setLock', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}lk.md`, null, 'text/plain', '');
+    const r = await service.setLock(userId, doc.id, 'Lock1!');
+    expect(r).toHaveProperty('locked', true);
+  });
+
+  it('verifyLock', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}vl.md`, null, 'text/plain', '');
+    await service.setLock(userId, doc.id, 'Pass1!');
+    expect((await service.verifyLock(userId, doc.id, 'Pass1!')).valid).toBe(true);
+  });
+
+  it('removeLock', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}rl.md`, null, 'text/plain', '');
+    await service.setLock(userId, doc.id, 'Rm1!');
+    expect(await service.removeLock(userId, doc.id, 'Rm1!')).toHaveProperty('message');
+  });
+
+  // ── Version ───────────────────────────────────────────────────────
+  it('createVersion + getVersions', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}ver.md`, null, 'text/plain', '# v1');
+    expect((await service.createVersion(userId, doc.id))).toHaveProperty('id');
+    expect(Array.isArray(await service.getVersions(userId, doc.id))).toBe(true);
+  });
+
+  // ── Content ───────────────────────────────────────────────────────
+  it('updateFileContent', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}cnt.md`, null, 'text/plain', '# old');
+    const b64 = Buffer.from('# updated').toString('base64');
+    await service.updateFileContent(userId, doc.id, Buffer.from('# updated'), '0'.repeat(24), 9, 'text/plain');
+  });
+
+  // ── Move to private ───────────────────────────────────────────────
+  it('moveToPrivate', async () => {
+    const doc = await service.createDocument(userId, `${PREFIX}priv.md`, null, 'text/plain', '');
+    expect(await service.moveToPrivate(userId, [doc.id], true)).toHaveProperty('moved');
+  });
 });
