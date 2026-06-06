@@ -116,4 +116,58 @@ describe('CollaborationGateway', () => {
       expect.stringContaining(gateway['instanceId']),
     );
   });
+
+  it('subscribeRedis filters self-published messages', () => {
+    const ch = 'collab:d2';
+    mockRedis.subscribe.mockImplementation((_ch: string, cb: Function) => {
+      const selfEnvelope = JSON.stringify({ i: gateway['instanceId'], m: 'self-msg' });
+      const otherEnvelope = JSON.stringify({ i: 'other-instance', m: 'other-msg' });
+      cb(selfEnvelope);
+      cb(otherEnvelope);
+      return Promise.resolve();
+    });
+    const ws1 = mockWs(), ws2 = mockWs();
+    gateway['rooms'].set('d2', new Set([ws1, ws2]));
+    gateway['subscribeRedis']('d2');
+    // self-published should be filtered - only other-instance message delivered
+    expect(ws1.send).toHaveBeenCalledWith('other-msg');
+    expect(ws1.send).not.toHaveBeenCalledWith('self-msg');
+  });
+
+  it('handleSync rejects oversized messages', () => {
+    const ws = mockWs();
+    (gateway as any).setSession(ws, { userId: 'u1', docId: 'd1', instanceId: 'i1' });
+    const largeData = { data: 'x'.repeat(1_000_001) };
+    gateway.handleSync(ws, largeData);
+    // Should NOT broadcast (message too large)
+    expect(mockRedis.publish).not.toHaveBeenCalled();
+  });
+
+  it('handleAwareness rejects oversized messages', () => {
+    const ws = mockWs();
+    (gateway as any).setSession(ws, { userId: 'u1', docId: 'd1', instanceId: 'i1' });
+    gateway.handleAwareness(ws, 'x'.repeat(1_000_001));
+    expect(mockRedis.publish).not.toHaveBeenCalled();
+  });
+
+  it('handleConnection sets auth deadline', () => {
+    jest.useFakeTimers();
+    const ws = mockWs();
+    gateway.handleConnection(ws);
+    expect((ws as any).__authTimer).toBeDefined();
+    jest.advanceTimersByTime(16000);
+    expect(ws.close).toHaveBeenCalledWith(4001, expect.any(String));
+    jest.useRealTimers();
+  });
+
+  it('handleAuth clears auth deadline on success', async () => {
+    jest.useFakeTimers();
+    const ws = mockWs();
+    gateway.handleConnection(ws);
+    await gateway.handleAuth(ws, { token: 'tok', docId: '00000000-0000-0000-0000-000000000001' });
+    jest.advanceTimersByTime(16000);
+    // Auth succeeded, deadline should be cleared — no close
+    expect(ws.close).not.toHaveBeenCalledWith(4001, expect.any(String));
+    jest.useRealTimers();
+  });
 });
