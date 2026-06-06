@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException, Inject } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ServiceUnavailableException, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Resend } from 'resend';
@@ -80,6 +80,10 @@ export class MailService {
   }
 
   private async send(to: string, subject: string, html: string) {
+    // Prevent header injection and basic validation
+    if (!to || to.includes('\r') || to.includes('\n') || to.length > 254 || !to.includes('@')) {
+      throw new BadRequestException('无效的收件人地址');
+    }
     await this.checkQuotaOrThrow();
 
     // Try Resend API first
