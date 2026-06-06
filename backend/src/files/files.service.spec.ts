@@ -535,6 +535,14 @@ describe('FilesService', () => {
   });
 
   // ═════════════════════════════════════════════════════════════════════════
+  describe('createDocument (extended)', () => {
+    it('creates document without content', async () => {
+      const result = await service.createDocument('u-1', 'empty.md', null, 'text/plain');
+      expect(result).toHaveProperty('id');
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
   // listTags
   // ═════════════════════════════════════════════════════════════════════════
   describe('listTags', () => {
