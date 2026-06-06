@@ -287,4 +287,16 @@ describe('WebdavService', () => {
       expect(res.status).toHaveBeenCalledWith(409);
     });
   });
+
+  describe('DEL', () => {
+    it('soft-deletes a folder', async () => {
+      const folder = { id: 'f1', userId: 'u1', name: 'tmp', type: NodeType.FOLDER, parentId: null, deletedAt: null, isPrivate: false } as any;
+      nodeRepo.findOne.mockResolvedValue(folder);
+      nodeRepo.find.mockResolvedValue([]); // no children
+      nodeRepo.save.mockResolvedValue({});
+      const res: any = { status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      await (service as any).del({} as any, res, 'u1', 'tmp');
+      expect(res.status).toHaveBeenCalledWith(204);
+    });
+  });
 });
