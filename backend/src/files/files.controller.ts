@@ -95,9 +95,10 @@ export class FilesController {
     @Body('chunkIv') chunkIv: string,
     @Body('salt') salt: string,
   ) {
+    const safeParentId = (parentId && parentId !== 'null' && parentId !== 'undefined') ? parentId : null;
     return this.filesService.uploadChunk(
       userId, idempotencyKey, parseInt(chunkIndex), parseInt(totalChunks),
-      filename, md5, mimeType, parentId, isPrivate === 'true',
+      filename, md5, mimeType, safeParentId, isPrivate === 'true',
       file.buffer, encryptedDek, dekIv, chunkIv, salt,
     );
   }
