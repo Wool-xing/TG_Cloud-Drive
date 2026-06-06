@@ -34,6 +34,22 @@ export class LocalStorageProvider implements StorageProvider {
     this.logger.warn(`⚠️  LOCAL STORAGE ACTIVE (DEV ONLY) — files stored in ${path.resolve(this.dir)}`);
   }
 
+  /**
+   * Reject keys that attempt path traversal. Call BEFORE path.join().
+   * Allowed: alphanumeric, hyphens, underscores (UUID / random-id).
+   * Blocked: .. / \ \x00 and any key whose resolved path escapes baseDir.
+   */
+  private sanitizeKey(key: string): string {
+    if (!key || typeof key !== 'string') throw new Error('Invalid storage key');
+    if (/\.\.|[/\\]|\x00/.test(key)) throw new Error('Path traversal denied');
+    const resolved = path.resolve(this.dir, key);
+    if (!resolved.startsWith(path.resolve(this.dir) + path.sep) &&
+        resolved !== path.resolve(this.dir)) {
+      throw new Error('Path traversal denied');
+    }
+    return key;
+  }
+
   async upload(buffer: Buffer, _filename: string, mimeType: string): Promise<UploadResult> {
     const id = crypto.randomUUID();
     const filePath = path.join(this.dir, id);
@@ -43,16 +59,16 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async getUrl(key: string): Promise<string> {
+    this.sanitizeKey(key);
     const filePath = path.join(this.dir, key);
     if (!fs.existsSync(filePath)) {
       throw new Error(`Local file not found: ${key}`);
     }
-    // Return a local file:// URL or a /api/files/proxy-local/ endpoint.
-    // For simplicity, we return an internal URL that files.controller.ts can handle.
     return `/api/files/local-proxy/${key}`;
   }
 
   async delete(key: string, _meta?: string): Promise<void> {
+    try { this.sanitizeKey(key); } catch { return; }
     const filePath = path.join(this.dir, key);
     try { fs.unlinkSync(filePath); } catch {}
     try { fs.unlinkSync(filePath + '.meta.json'); } catch {}
