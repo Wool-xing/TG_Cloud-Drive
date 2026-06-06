@@ -68,5 +68,13 @@ describe('MailService', () => {
         (service as any).send('test@test.com', 'Subject', '<p>body</p>'),
       ).resolves.toBeUndefined();
     });
+
+    it('rejects recipient without @ sign', async () => {
+      await expect((service as any).send('notanemail', 'S', '<p>b</p>')).rejects.toThrow();
+    });
+
+    it('rejects recipient with newline injection', async () => {
+      await expect((service as any).send('a@b.com\r\nCc: evil@x.com', 'S', '<p>b</p>')).rejects.toThrow();
+    });
   });
 });
