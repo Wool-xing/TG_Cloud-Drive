@@ -459,13 +459,25 @@ export class FilesController {
     return this.filesService.getSyncDiff(userId, since);
   }
 
-  /** DEV ONLY — serve local storage files (no auth, localhost only) */
+  /** DEV ONLY — serve local storage files. Disabled in production. */
   @Get('local-proxy/:key')
   async localProxy(@Param('key') key: string, @Res() res: Response) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+    // Path traversal protection: sanitize key before path.join()
+    const SANE = /^[a-zA-Z0-9\-_]+$/;
+    if (!key || key.length > 255 || !SANE.test(key)) {
+      return res.status(400).json({ error: 'Invalid key' });
+    }
     const fs = require('fs');
     const path = require('path');
     const dir = process.env.LOCAL_STORAGE_DIR || './local-storage';
-    const filePath = path.join(dir, key);
+    const resolved = path.resolve(dir, key);
+    if (!resolved.startsWith(path.resolve(dir) + path.sep) && resolved !== path.resolve(dir)) {
+      return res.status(400).json({ error: 'Invalid key' });
+    }
+    const filePath = resolved;
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found' });
     }
