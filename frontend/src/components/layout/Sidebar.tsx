@@ -125,8 +125,8 @@ export default function Sidebar() {
         >
           {/* Avatar */}
           <div className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-            {user?.avatar
-              ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+            {user?.avatar && /^https?:\/\//.test(user.avatar)
+              ? <img src={user.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
               : (user?.nickname || user?.username || '?')[0].toUpperCase()
             }
           </div>
