@@ -37,8 +37,8 @@ with sync_playwright() as pw:
     try:
         page.fill("#login-identifier", "admin")
         page.fill("#login-password", "Wool")
-        page.click("button[type='submit']")
-        time.sleep(3)  # Wait for auth API + MEK derivation + redirect
+        page.press("#login-password", "Enter")  # Try Enter key
+        time.sleep(4)  # Wait for auth API + MEK derivation + redirect
         current = page.url
         if "/login" in current:
             nope("Login", f"still on login page: {page.url}")
