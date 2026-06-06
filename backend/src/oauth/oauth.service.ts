@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -60,25 +60,40 @@ export class OauthService {
     const passwordHash = ''; // OAuth users have no password
     const mekSalt = generateSalt();
 
-    const user = this.userRepo.create({
-      username,
-      passwordHash,
-      mekSalt,
-      nickname: profile.name.slice(0, 255),
-      avatar: profile.avatar || null,
-      quotaBytes: planQuotaBytes('free'),
-      oauthProvider: profile.provider,
-      oauthId: profile.providerId,
-    });
-
-    await this.userRepo.save(user);
-
-    // Auto-provision free subscription
-    const sub = this.subRepo.create({ userId: user.id, plan: 'free', status: 'active' });
-    await this.subRepo.save(sub);
-
-    this.logger.log(`OAuth user created: ${username} (${profile.provider})`);
-    return user;
+    // Create user with retry for race conditions on username uniqueness.
+    // Two concurrent OAuth registrations with the same base name can both
+    // pass the existence check above. Catch unique constraint violations
+    // and retry with an incremented username.
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        const user = this.userRepo.create({
+          username,
+          passwordHash,
+          mekSalt,
+          nickname: profile.name.slice(0, 255),
+          avatar: profile.avatar || null,
+          quotaBytes: planQuotaBytes('free'),
+          oauthProvider: profile.provider,
+          oauthId: profile.providerId,
+        });
+        await this.userRepo.save(user);
+        const sub = this.subRepo.create({ userId: user.id, plan: 'free', status: 'active' });
+        await this.subRepo.save(sub);
+        this.logger.log(`OAuth user created: ${username} (${profile.provider})`);
+        return user;
+      } catch (e: any) {
+        // Unique constraint violation (username or oauthProvider+oauthId)
+        if (e?.code === '23505' && retries > 1) {
+          suffix++;
+          username = `${baseName}${suffix}`;
+          retries--;
+        } else {
+          throw e;
+        }
+      }
+    }
+    throw new BadRequestException('无法创建用户，请稍后重试');
   }
 
   /**
