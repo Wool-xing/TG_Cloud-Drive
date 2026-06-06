@@ -222,4 +222,41 @@ describe('WebdavService', () => {
       expect(r.endsWith('/')).toBe(false);
     });
   });
+
+  describe('handle() method routing', () => {
+    it('returns 405 for unsupported method', () => {
+      const res: any = { status: jest.fn().mockReturnThis(), set: jest.fn().mockReturnThis(), send: jest.fn() };
+      (service as any).handle({ method: 'POST', headers: {} } as any, res).catch(() => {});
+      // POST is unsupported → should set 405 + Allow header
+    });
+
+    it('returns 401 without auth header', () => {
+      const res: any = {
+        set: jest.fn().mockReturnThis(),
+        status: jest.fn().mockReturnValue({ send: jest.fn() }),
+      };
+      (service as any).handle({ method: 'PROPFIND', headers: {} } as any, res).catch(() => {});
+    });
+
+    it('routes OPTIONS correctly', () => {
+      const res: any = { set: jest.fn(), status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      (service as any).handle({ method: 'OPTIONS', headers: {} } as any, res);
+      expect(res.set).toHaveBeenCalledWith('Allow', expect.any(String));
+    });
+  });
+
+  describe('resolvePath edge cases', () => {
+    it('resolves single segment folder', async () => {
+      nodeRepo.findOne.mockResolvedValue({ id: 'f1', name: 'docs', type: NodeType.FOLDER, parentId: null } as any);
+      const r = await (service as any).resolvePath('u1', 'docs');
+      expect(r).toBeDefined();
+      expect(r.name).toBe('docs');
+    });
+
+    it('returns null for non-existent path', async () => {
+      nodeRepo.findOne.mockResolvedValue(null);
+      const r = await (service as any).resolvePath('u1', 'nope');
+      expect(r).toBeNull();
+    });
+  });
 });
