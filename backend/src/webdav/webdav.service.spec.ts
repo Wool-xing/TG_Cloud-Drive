@@ -194,5 +194,32 @@ describe('WebdavService', () => {
       await expect((service as any).auth(req({ authorization: `Basic ${basic}` })))
         .rejects.toThrow(UnauthorizedException);
     });
+
+    it('accepts valid Bearer token', async () => {
+      const token = jwtService.sign({ sub: 'u-1' });
+      userRepo.findOne.mockResolvedValue(makeUser());
+      const user = await (service as any).auth(req({ authorization: `Bearer ${token}` }));
+      expect(user).toBeDefined();
+    });
+  });
+
+  describe('handle() routing', () => {
+    it('routes OPTIONS to options handler', () => {
+      const res: any = { set: jest.fn(), status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      (service as any).handle({ method: 'OPTIONS', headers: {} } as any, res);
+      expect(res.set).toHaveBeenCalledWith('Allow', expect.any(String));
+    });
+  });
+
+  describe('encodePath', () => {
+    it('encodes folder with trailing slash', () => {
+      const r = (service as any).encodePath('/root', 'docs', true);
+      expect(r.endsWith('/')).toBe(true);
+    });
+
+    it('encodes file without trailing slash', () => {
+      const r = (service as any).encodePath('/root', 'file.txt', false);
+      expect(r.endsWith('/')).toBe(false);
+    });
   });
 });
