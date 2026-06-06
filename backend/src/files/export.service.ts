@@ -43,9 +43,8 @@ export class ExportService {
       const key = backend === 'r2' ? chunk.r2Key! : chunk.tgFileId!;
       const url = await this.storage.getUrl(backend, key);
       const res = await fetch(url);
-      if (res.ok) {
-        buffers.push(Buffer.from(await res.arrayBuffer()));
-      }
+      if (!res.ok) throw new BadRequestException(`文件块下载失败 (HTTP ${res.status})`);
+      buffers.push(Buffer.from(await res.arrayBuffer()));
     }
     return {
       buffer: Buffer.concat(buffers),
