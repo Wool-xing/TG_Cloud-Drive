@@ -19,6 +19,13 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
         const client = new Redis(cs.get<string>('REDIS_URL'), {
           password,
           lazyConnect: true,
+          connectTimeout: 5000,
+          commandTimeout: 3000,
+          maxRetriesPerRequest: 3,
+          retryStrategy(times) {
+            if (times > 3) return null; // stop retrying
+            return Math.min(times * 200, 2000);
+          },
         });
         // Redis is required for security mechanisms (force-logout, rate-limiting,
         // brute-force lockouts, upload idempotency). Fail-closed: refuse to start
