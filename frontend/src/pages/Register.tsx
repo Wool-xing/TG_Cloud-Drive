@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Cloud, Eye, EyeOff, Loader2, Phone, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -59,11 +59,15 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
   const startCountdown = () => {
     setCountdown(60);
-    const id = setInterval(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) { clearInterval(id); return 0; }
+        if (prev <= 1) { if (timerRef.current) clearInterval(timerRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);

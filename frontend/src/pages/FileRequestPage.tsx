@@ -39,6 +39,7 @@ export default function FileRequestPage() {
         setDone(prev => [...prev, file.name]);
         setInfo(prev => prev ? { ...prev, uploadCount: prev.uploadCount + 1 } : prev);
       } catch {
+        setFailed?.(prev => [...(prev || []), file.name]);
       }
     }
     setUploading(false);
