@@ -128,8 +128,14 @@ describe('StorageService', () => {
 
   describe('buildR2Key', () => {
     it('delegates to R2StorageProvider.buildKey', () => {
-      const key = service.buildR2Key('user-1', 'node-a', 3);
-      expect(key).toBe('user-1/node-a/chunk_3');
+      const uid = '00000000-0000-0000-0000-000000000001';
+      const nid = '00000000-0000-0000-0000-000000000002';
+      const key = service.buildR2Key(uid, nid, 3);
+      expect(key).toBe(`${uid}/${nid}/chunk_3`);
+    });
+
+    it('throws for non-UUID userId', () => {
+      expect(() => service.buildR2Key('bad', '00000000-0000-0000-0000-000000000001', 0)).toThrow();
     });
   });
 
