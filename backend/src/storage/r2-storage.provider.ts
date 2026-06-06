@@ -44,8 +44,12 @@ export class R2StorageProvider implements StorageProvider {
     }
   }
 
-  /** Build object key: {userId}/{nodeId}/chunk_{index} */
+  /** Build object key: {userId}/{nodeId}/chunk_{index}. Rejects non-UUID inputs. */
   static buildKey(userId: string, nodeId: string, chunkIndex: number): string {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(userId) || !uuidRe.test(nodeId)) {
+      throw new Error('Invalid userId or nodeId for R2 key construction');
+    }
     return `${userId}/${nodeId}/chunk_${chunkIndex}`;
   }
 
@@ -71,7 +75,7 @@ export class R2StorageProvider implements StorageProvider {
       };
     } catch (e: any) {
       this.logger.error(`R2 upload failed: ${e.message}`);
-      throw new ServiceUnavailableException(`R2 上传失败：${e.message.slice(0, 200)}`);
+      throw new ServiceUnavailableException('R2 上传失败');
     }
   }
 
@@ -104,12 +108,15 @@ export class R2StorageProvider implements StorageProvider {
 
   async deleteMany(keys: string[]): Promise<void> {
     this.ensureEnabled();
-    // R2 doesn't support batch delete natively, but we can do parallel deletes
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       keys.map(key =>
-        this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key })).catch(() => {})
+        this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
       )
     );
+    const failed = results.filter(r => r.status === 'rejected').length;
+    if (failed > 0) {
+      this.logger.warn(`R2 deleteMany: ${failed}/${keys.length} keys failed`);
+    }
   }
 
   async healthCheck(): Promise<boolean> {

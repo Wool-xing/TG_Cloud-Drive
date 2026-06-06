@@ -78,7 +78,12 @@ export class TelegramStorageProvider implements StorageProvider {
       : `https://api.telegram.org/bot${this.token}/sendDocument`;
 
     const headers = form.getHeaders();
-    if (this.workersUrl && this.workersSecret) headers['X-Workers-Secret'] = this.workersSecret;
+    if (this.workersUrl) {
+      if (!this.workersSecret) {
+        this.logger.warn('CF_WORKERS_URL set without CF_WORKERS_SECRET — Worker will reject requests');
+      }
+      headers['X-Workers-Secret'] = this.workersSecret || '';
+    }
 
     const res = await this.fetchWithRetry(url, { method: 'POST', body: form, headers }, UPLOAD_TIMEOUT_MS);
     if (!res.ok) {
