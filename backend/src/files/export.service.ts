@@ -13,6 +13,19 @@ export class ExportService {
     private storage: StorageService,
   ) {}
 
+  /** Strip script tags, event handlers, and dangerous attributes from HTML. */
+  private sanitizeHtml(html: string): string {
+    return html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<script[^>]*\/?>/gi, '')
+      .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/\bon\w+\s*=\s*[^\s>]+/gi, '')
+      .replace(/javascript\s*:/gi, 'denied:')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+      .replace(/<embed[^>]*\/?>/gi, '');
+  }
+
   /** Get the raw content of a file node */
   async getNodeContent(userId: string, nodeId: string): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
     const node = await this.nodeRepo.findOne({
@@ -59,6 +72,7 @@ export class ExportService {
     // Content is already application-generated (markdown → html, or rich text),
     // but the filename comes from user input and goes into <title>.
     const safeName = name.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c] || c);
+    const safeHtml = this.sanitizeHtml(html);
     const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -77,7 +91,7 @@ export class ExportService {
   @media print { body { -webkit-print-color-adjust: exact; } }
 </style>
 </head>
-<body>${html}</body>
+<body>${safeHtml}</body>
 </html>`;
 
     return { buffer: Buffer.from(fullHtml, 'utf-8'), filename: exportName };
@@ -94,7 +108,7 @@ export class ExportService {
 
     // Dynamically import html-docx-js (CJS)
     const htmlDocx = require('html-docx-js');
-    const docxBuffer = htmlDocx.asBlob(htmlContent) as Buffer;
+    const docxBuffer = htmlDocx.asBlob(this.sanitizeHtml(htmlContent)) as Buffer;
     return { buffer: docxBuffer, filename: exportName };
   }
 
@@ -109,7 +123,7 @@ export class ExportService {
 
     // Convert markdown to HTML using marked
     const { marked } = require('marked');
-    const html = marked(md);
+    const html = this.sanitizeHtml(marked(md));
 
     const fullHtml = `<!DOCTYPE html>
 <html>
