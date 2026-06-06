@@ -279,4 +279,12 @@ describe('WebdavService', () => {
     });
   });
 
+  describe('MKCOL', () => {
+    it('returns 409 if folder exists', async () => {
+      nodeRepo.findOne.mockResolvedValue({ id: 'f1', type: NodeType.FOLDER } as any);
+      const res: any = { status: jest.fn().mockReturnValue({ send: jest.fn() }) };
+      await (service as any).mkcol({} as any, res, 'u1', 'exists');
+      expect(res.status).toHaveBeenCalledWith(409);
+    });
+  });
 });
